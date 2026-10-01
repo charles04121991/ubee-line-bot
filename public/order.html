@@ -3,18 +3,18 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-01
-  Release: Customer Native Primary Action V3
-  PWA: 20261001-customer-native-primary-action-v3
+  Release: Customer Native Notification Tab V4
+  PWA: 20261001-customer-native-notification-tab-v4
 
   本次整理：
-  1. 底部主導航改為「首頁／訂單／發任務／我的」；店家探索移出主 Tab，保留於首頁次要入口。
-  2. 「發任務」改為 UBee 黃色 Native Primary Action，點擊後建立全新任務並回到六大服務選擇。
-  3. action=new、瀏覽器 History／PWA Shortcut 與 Bottom Navigation 使用同一正式導航契約。
-  4. 延續 Native Picker / Bottom Sheet、Safe Area、鍵盤避讓、通知與既有原生操作規格。
-  5. 計價、下單、Routes、定位、ETA、店家資料、會員與後端 API 契約完全不變。
+  1. 底部主導航正式改為「首頁／訂單／通知／我的」，四個入口各自負責不同功能。
+  2. 完整移除舊「發任務」主 Tab、Primary Action 樣式與主導航路由；action=new 僅保留為 PWA 快捷下單入口，不再佔用主導航。
+  3. 「我的」內通知中心入口、My Panel 對應與 My History 子路由全部移除；通知中心改為獨立 Native 主頁。
+  4. 首頁右上通知鈴鐺保留為通知 Tab 快捷入口；首頁與底部通知 Tab 共用同一未讀數量來源。
+  5. 延續 Native Picker / Bottom Sheet、Safe Area、鍵盤避讓、訂單、ETA、店家、會員與既有後端 API 契約。
 
   Canonical recent milestones:
-  - 2026-10-01 Customer Native Primary Action V3 / Native Controls V2 / Notification Center
+  - 2026-10-01 Customer Native Notification Tab V4 / Native Controls V2 / Notification Center
   - 2026-09-29 State Sync / Rating Lock / No-Map + Universal ETA / Drive Semantic
   - 2026-09-24 Order Lifecycle / Segmented Live Progress / Final Delivery ETA
   - 2026-09-23 Multi-stop / Cloud Draft
@@ -22,7 +22,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-native-primary-action-v3" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-native-notification-tab-v4" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -5262,7 +5262,6 @@ body.ubee-active-order #globalTopbar{display:none!important;}
 #productionOrderFlow .ubee-my-menu-item[data-my-action="favorites"]::before{content:"☆";}
 #productionOrderFlow .ubee-my-menu-item[data-my-action="addresses"]::before{content:"⌖";}
 #productionOrderFlow .ubee-my-menu-item[data-my-action="coupons"]::before{content:"◇";}
-#productionOrderFlow .ubee-my-menu-item[data-my-action="notifications"]::before{content:"♢";}
 #productionOrderFlow .ubee-my-menu-item[data-my-action="serviceAreas"]::before{content:"◎";}
 #productionOrderFlow .ubee-my-menu-item[data-my-action="rewards"]::before{content:"★";}
 #productionOrderFlow .ubee-my-menu-item[data-my-action="support"]::before{content:"◉";}
@@ -13079,6 +13078,7 @@ function getInitialOpenAction(){
   ).trim().toLowerCase();
 
   if(['orders','my-orders','tasks','task'].includes(directOpen)) return 'task';
+  if(['notifications','notification','notify'].includes(directOpen)) return 'notify';
   if(['profile','my','account'].includes(directOpen)) return 'my';
   if(['stores','store','merchant'].includes(directOpen)) return 'store';
   if(['new','create','order'].includes(directOpen)) return 'new';
@@ -13093,8 +13093,14 @@ function handleInitialOpenAction(){
   if(!action) return;
 
   initialOpenActionHandled = true;
-  window.__UBEE_PENDING_INITIAL_NAV__=action;
 
+  // action=new 是 PWA／網址快捷下單，不再屬於底部主導航。
+  if(action === 'new'){
+    window.__UBEE_PENDING_INITIAL_NAV__='';
+    return window.openUBeeNewTaskPage?.() || window.openUBeeSystemOrderFlow?.({fresh:true,source:'initial-url'});
+  }
+
+  window.__UBEE_PENDING_INITIAL_NAV__=action;
   if(window.UBeePrimaryNavigation?.open){
     window.UBeePrimaryNavigation.open(action,{source:'initial-url'});
     window.__UBEE_PENDING_INITIAL_NAV__='';
@@ -13102,7 +13108,7 @@ function handleInitialOpenAction(){
   }
 
   if(action === 'task') return window.openUBeeTaskPage?.();
-  if(action === 'new') return window.openUBeeNewTaskPage?.() || window.openUBeeSystemOrderFlow?.({fresh:true,source:'initial-url'});
+  if(action === 'notify') return window.openUBeeNotificationPage?.();
   if(action === 'store') return window.openUBeeStorePage?.();
   if(action === 'my') return window.openUBeeProfilePage?.();
   return window.openUBeeHomePage?.() || showHomeTab();
@@ -19311,7 +19317,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-brand"><span>U</span>Bee 跑腿</div>
 <div class="ubee-home-header-actions">
 <button class="flow-city-btn" id="flowCityButton" type="button">定位中…</button>
-<button class="ubee-customer-notification-bell" id="ubeeCustomerNotificationBell" data-my-action="notifications" type="button" aria-label="通知中心">
+<button class="ubee-customer-notification-bell" id="ubeeCustomerNotificationBell" data-primary-shortcut="notify" type="button" aria-label="通知中心">
 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
 <span class="ubee-customer-notification-badge" id="ubeeCustomerNotificationBadge" hidden>0</span>
 </button>
@@ -19774,7 +19780,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="ubee-my-groups" role="list">
 <section class="ubee-my-group"><h3>我的服務</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="orders"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="ubee-my-menu-copy"><strong>我的訂單</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="favorites"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></span><span class="ubee-my-menu-copy"><strong>常用任務</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="addresses"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="ubee-my-menu-copy"><strong>常用地址</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="serviceAreas"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></span><span class="ubee-my-menu-copy"><strong>服務地區</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button></div></section>
 <section class="ubee-my-group"><h3>成長與邀請</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-growth-detail="tasks"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3"/></svg></span><span class="ubee-my-menu-copy"><strong>成長任務</strong><small>目前的成長里程碑</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-growth-detail="achievements"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="m8.5 13-1 8 4.5-2 4.5 2-1-8"/></svg></span><span class="ubee-my-menu-copy"><strong>我的成就</strong><small>已解鎖的會員成就</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="rewards"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c.6-4 2.5-6 5.5-6 1.5 0 2.7.4 3.6 1.2M17 10v6M14 13h6"/></svg></span><span class="ubee-my-menu-copy"><strong>邀請好友</strong><small>推薦碼與好友進度</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-growth-detail="history"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span><span class="ubee-my-menu-copy"><strong>成長歷程</strong><small>會員晉升紀錄</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button></div></section>
-<section class="ubee-my-group"><h3>消息與支援</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="notifications"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></span><span class="ubee-my-menu-copy"><strong>通知中心</strong></span><span class="ubee-my-notification-count" id="ubeeMyNotificationBadge" hidden>0</span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="support" data-ubee-line-support id="flowProfileSupport" type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="ubee-my-menu-copy"><strong>聯繫客服</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="feedback"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1 10-10a2.8 2.8 0 0 0-4-4l-10 10z"/><path d="m13 6 5 5"/></svg></span><span class="ubee-my-menu-copy"><strong>意見回饋</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button></div></section>
+<section class="ubee-my-group"><h3>支援與回饋</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="support" data-ubee-line-support id="flowProfileSupport" type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="ubee-my-menu-copy"><strong>聯繫客服</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="feedback"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1 10-10a2.8 2.8 0 0 0-4-4l-10 10z"/><path d="m13 6 5 5"/></svg></span><span class="ubee-my-menu-copy"><strong>意見回饋</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button></div></section>
 <section class="ubee-my-group"><h3>其他</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="becomeRider"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r="3"/><path d="M2.5 20c.5-4 2.3-6 5.5-6 2 0 3.5.8 4.4 2.4M17 11v8M13 15h8"/></svg></span><span class="ubee-my-menu-copy"><strong>成為小U</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="settings"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.7-1.7.9-1.9-2.1-2.1-1.9.9-1.7-.7L10.5 2h-3l-.7 2-1.7.7-1.9-.9-2.1 2.1.9 1.9-.7 1.7L0 10.5v3l2 .7.7 1.7-.9 1.9 2.1 2.1 1.9-.9 1.7.7.7 2.3h3l.7-2.3 1.7-.7 1.9.9 2.1-2.1-.9-1.9.7-1.7z" transform="translate(2 -0.5) scale(.83)"/></svg></span><span class="ubee-my-menu-copy"><strong>設定</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button></div></section>
 </div>
 <section class="ubee-my-panel" hidden="" id="ubeeMyAddressesPanel">
@@ -19804,14 +19810,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="ubee-my-panel" hidden="" id="ubeeMyCouponsPanel">
 <div class="ubee-my-panel-head"><strong>優惠券</strong><button data-my-close="" type="button">關閉</button></div>
 <div class="ubee-my-empty-state" id="ubeeMyCouponsContent">目前沒有可使用的優惠券。</div>
-</section>
-<section class="ubee-my-panel ubee-customer-notification-panel" hidden="" id="ubeeMyNotificationsPanel">
-<div class="ubee-my-panel-head"><strong>通知中心</strong><button data-my-close="" type="button">關閉</button></div>
-<div class="ubee-customer-notification-toolbar">
-<span id="ubeeNotificationSummary">正在讀取通知…</span>
-<button id="ubeeNotificationReadAll" type="button" disabled>全部已讀</button>
-</div>
-<div class="ubee-customer-notification-list" id="ubeeMyNotificationsContent"><div class="ubee-my-empty-state">正在讀取通知…</div></div>
 </section>
 <section class="ubee-my-panel ubee-my-growth-detail-panel" hidden="" id="ubeeMyGrowthPanel">
 <div id="ubeeMyGrowthContent"><div class="ubee-my-empty-state">正在讀取會員資料…</div></div>
@@ -19983,6 +19981,20 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <span hidden="" id="flowProfileTaskCount">0</span><span hidden="" id="flowProfileLevel">一般</span>
 </div>
 </section>
+<section class="flow-page ubee-customer-notification-page" data-page="notifications" id="flowPageNotifications">
+<header class="flow-header ubee-notification-page-header">
+<span aria-hidden="true"></span>
+<div class="flow-title-wrap"><div class="flow-title">通知中心</div><div class="flow-subtitle">訂單進度、重要提醒與 UBee 最新消息</div></div>
+<span aria-hidden="true"></span>
+</header>
+<div class="flow-scroll ubee-customer-notification-scroll">
+<div class="ubee-customer-notification-toolbar">
+<span id="ubeeNotificationSummary">正在讀取通知…</span>
+<button id="ubeeNotificationReadAll" type="button" disabled>全部已讀</button>
+</div>
+<div class="ubee-customer-notification-list" id="ubeeNotificationsContent"><div class="ubee-my-empty-state">正在讀取通知…</div></div>
+</div>
+</section>
 <section class="flow-page ubee-customer-active-page" data-page="activeTask" id="step5">
 <header class="flow-header home ubee-customer-active-header">
 <div class="flow-title-wrap">
@@ -20089,7 +20101,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <nav aria-label="主要導覽" class="ubee-primary-bottom-nav" id="ubeePersistentBottomNav">
 <button aria-label="首頁" aria-current="page" class="active" data-nav-target="home" id="flowNavHome" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.8l8.5 6.7"/><path d="M5.5 9.8V20h13V9.8M9.3 20v-6.2h5.4V20"/></svg></span><span class="flow-nav-label">首頁</span></button>
 <button aria-label="訂單" data-nav-target="task" id="flowNavTasks" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 1.8 1.8 3.2-3.2M8.5 16h7"/></svg></span><span class="flow-nav-label">訂單</span></button>
-<button aria-label="發任務" class="ubee-nav-primary-action" data-nav-target="new" id="flowNavCreate" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="flow-nav-label">發任務</span></button>
+<button aria-label="通知" data-nav-target="notify" id="flowNavNotify" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span class="ubee-bottom-notification-badge" id="ubeeBottomNotificationBadge" hidden>0</span></span><span class="flow-nav-label">通知</span></button>
 <button aria-label="我的" data-nav-target="my" id="flowNavMy" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20.5c.8-4.1 3.2-6.2 7-6.2s6.2 2.1 7 6.2"/></svg></span><span class="flow-nav-label">我的</span></button>
 </nav>
 <script id="ubee-production-flow-v4-script">
@@ -21854,13 +21866,33 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     renderProfile();
     return true;
   };
+  window.openUBeeNotificationPage=function(options={}){
+    if(!currentCustomer){
+      root.classList.remove('active');
+      document.body.classList.remove('flow-active','ubee-active-order','ubee-store-active','ubee-my-subpage-open');
+      window.UBeeCustomerAuthHost?.show('login');
+      return true;
+    }
+    window.UBeePrimaryNavigation?.activate('notify');
+    document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
+    root.classList.add('active');
+    document.body.classList.add('flow-active');
+    showPage('notifications');
+    const focusNotificationId=String(
+      options.notificationId || new URLSearchParams(location.search).get('notificationId') || ''
+    ).trim();
+    requestAnimationFrame(()=>{
+      window.UBeeCustomerNotificationCenter?.refresh?.({focusNotificationId});
+    });
+    return true;
+  };
   window.showProfileTab=window.openUBeeProfilePage;
   window.showCustomerSubPage=window.openUBeeProfilePage;
   window.openUBeeSystemOrderFlow=(options={})=>
     showFlow({fresh:options.fresh!==false});
 
   window.openUBeeNewTaskPage=function(){
-    window.UBeePrimaryNavigation?.activate('new');
+    window.UBeePrimaryNavigation?.activate('home');
     showFlow({fresh:true});
     requestAnimationFrame(()=>{
       const serviceList=$('flowServiceTabs');
@@ -21949,7 +21981,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-primary-action-v3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-notification-tab-v4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23626,7 +23658,7 @@ html,body{
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.10.01.1';
+  const APP_VERSION = '2026.10.01.2';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -23635,7 +23667,6 @@ html,body{
     account:'ubeeMyAccountPanel',
     coupons:'ubeeMyCouponsPanel',
     addresses:'ubeeMyAddressesPanel',
-    notifications:'ubeeMyNotificationsPanel',
     growth:'ubeeMyGrowthPanel',
     rewards:'ubeeMyRewardsPanel',
     feedback:'ubeeMyFeedbackPanel',
@@ -24242,7 +24273,7 @@ html,body{
     const panelId = panelMap[normalized];
     if(!panelId) return false;
 
-    if(['account','rewards','notifications'].includes(normalized) && !getCurrentCustomerSafe()){
+    if(['account','rewards'].includes(normalized) && !getCurrentCustomerSafe()){
       root.classList.remove('active');
       document.body.classList.remove('flow-active','ubee-my-subpage-open');
       window.UBeeCustomerAuthHost?.show('login');
@@ -24278,10 +24309,6 @@ html,body{
     if(normalized === 'settings'){
       refreshEnvironmentStatus();
     }
-    if(normalized === 'notifications'){
-      window.UBeeCustomerNotificationCenter?.refresh?.({focusNotificationId:options.notificationId || ''});
-    }
-
     if(!options.fromHistory){
       window.UBeeCustomerNavigation?.pushMySection?.(normalized);
     }
@@ -25251,7 +25278,7 @@ html,body{
   pointer-events:none;
 }
 #productionOrderFlow .ubee-customer-notification-badge,
-#productionOrderFlow .ubee-my-notification-count{
+body > #ubeePersistentBottomNav .ubee-bottom-notification-badge{
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -25275,13 +25302,35 @@ html,body{
   height:19px;
 }
 #productionOrderFlow .ubee-customer-notification-badge[hidden],
-#productionOrderFlow .ubee-my-notification-count[hidden]{display:none!important}
-#productionOrderFlow .ubee-my-notification-count{
-  margin-left:auto;
-  margin-right:3px;
-  flex:0 0 auto;
+body > #ubeePersistentBottomNav .ubee-bottom-notification-badge[hidden]{display:none!important}
+body > #ubeePersistentBottomNav #flowNavNotify .flow-nav-icon{position:relative!important}
+body > #ubeePersistentBottomNav .ubee-bottom-notification-badge{
+  position:absolute;
+  top:-7px;
+  right:-10px;
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  border:2px solid #fff;
+  border-radius:999px;
+  background:#e53935;
+  color:#fff;
+  font-size:10px;
+  font-weight:950;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
 }
-#productionOrderFlow .ubee-customer-notification-panel{
+#productionOrderFlow .ubee-customer-notification-page{
+  background:#f6f7f8!important;
+}
+#productionOrderFlow .ubee-notification-page-header{
+  grid-template-columns:44px minmax(0,1fr) 44px!important;
+}
+#productionOrderFlow .ubee-notification-page-header .flow-title-wrap{
+  text-align:center;
+}
+#productionOrderFlow .ubee-customer-notification-scroll{
+  padding:0 14px calc(96px + env(safe-area-inset-bottom))!important;
   background:#f6f7f8!important;
 }
 #productionOrderFlow .ubee-customer-notification-toolbar{
@@ -25448,11 +25497,11 @@ html,body{
 </style>
 
 <!-- 2026-10-01｜Customer Notification Card UX Fix：收合摘要與完整展開分離，避免提示文字與內容重疊。 -->
-<script id="ubee-customer-notification-center-v1-controller">
+<script id="ubee-customer-notification-center-v2-controller">
 (()=>{
   'use strict';
-  if(window.__UBEE_CUSTOMER_NOTIFICATION_CENTER_V1__) return;
-  window.__UBEE_CUSTOMER_NOTIFICATION_CENTER_V1__ = true;
+  if(window.__UBEE_CUSTOMER_NOTIFICATION_CENTER_V2__) return;
+  window.__UBEE_CUSTOMER_NOTIFICATION_CENTER_V2__ = true;
 
   const API = '/api/customer/notifications';
   let notifications = [];
@@ -25500,8 +25549,8 @@ html,body{
     unreadCount = Math.max(0,Number(value||0));
     const display = formatCount(unreadCount);
     const homeBadge = $('ubeeCustomerNotificationBadge');
-    const myBadge = $('ubeeMyNotificationBadge');
-    [homeBadge,myBadge].forEach(el=>{
+    const navBadge = $('ubeeBottomNotificationBadge');
+    [homeBadge,navBadge].forEach(el=>{
       if(!el) return;
       el.textContent = display;
       el.hidden = unreadCount <= 0;
@@ -25509,6 +25558,8 @@ html,body{
     });
     const bell = $('ubeeCustomerNotificationBell');
     if(bell) bell.setAttribute('aria-label',unreadCount > 0 ? `通知中心，${unreadCount} 則未讀` : '通知中心');
+    const navButton = $('flowNavNotify');
+    if(navButton) navButton.setAttribute('aria-label',unreadCount > 0 ? `通知，${unreadCount} 則未讀` : '通知');
     const readAll = $('ubeeNotificationReadAll');
     if(readAll) readAll.disabled = unreadCount <= 0 || loading;
     const summary = $('ubeeNotificationSummary');
@@ -25531,7 +25582,7 @@ html,body{
   }
 
   function render(){
-    const target = $('ubeeMyNotificationsContent');
+    const target = $('ubeeNotificationsContent');
     if(!target) return;
     setUnreadCount(unreadCount);
 
@@ -25563,7 +25614,7 @@ html,body{
   }
 
   function syncExpandableNotifications(){
-    const rows = document.querySelectorAll('#ubeeMyNotificationsContent .ubee-customer-notification-item');
+    const rows = document.querySelectorAll('#ubeeNotificationsContent .ubee-customer-notification-item');
     rows.forEach(row=>{
       if(String(row.dataset.orderId || '').trim()) return;
       const message = row.querySelector('.ubee-notification-message');
@@ -25599,7 +25650,7 @@ html,body{
     if(loading) return;
     if(!currentCustomerSafe()) return;
     loading = true;
-    const target = $('ubeeMyNotificationsContent');
+    const target = $('ubeeNotificationsContent');
     if(target) target.innerHTML = '<div class="ubee-notification-loading">正在讀取通知…</div>';
     const readAll = $('ubeeNotificationReadAll');
     if(readAll) readAll.disabled = true;
@@ -25611,7 +25662,7 @@ html,body{
       const focusId = String(options.focusNotificationId || '').trim();
       if(focusId){
         requestAnimationFrame(()=>{
-          const item = document.querySelector(`#ubeeMyNotificationsContent [data-notification-id="${CSS.escape(focusId)}"]`);
+          const item = document.querySelector(`#ubeeNotificationsContent [data-notification-id="${CSS.escape(focusId)}"]`);
           if(item){
             syncExpandableNotifications();
             if(item.classList.contains('can-expand')){
@@ -25677,7 +25728,6 @@ html,body{
     }catch(_){ }
     try{
       await window.ubeeFetchCustomerTrackingSummary?.(id,{silent:true});
-      window.closeUBeeMySubPages?.();
       if(window.UBeeCustomerOpenActiveTask){
         window.UBeeCustomerOpenActiveTask();
         return true;
@@ -25686,7 +25736,6 @@ html,body{
       console.warn('UBee 通知訂單開啟失敗：',error);
     }
     if(window.UBeePrimaryNavigation?.open){
-      window.closeUBeeMySubPages?.();
       window.UBeePrimaryNavigation.open('task',{source:'notification'});
       return true;
     }
@@ -25701,7 +25750,7 @@ html,body{
       await openOrderFromNotification(orderId);
       return;
     }
-    const current = document.querySelector(`#ubeeMyNotificationsContent [data-notification-id="${CSS.escape(notificationId)}"]`);
+    const current = document.querySelector(`#ubeeNotificationsContent [data-notification-id="${CSS.escape(notificationId)}"]`);
     if(current && current.classList.contains('can-expand')){
       const expanded = current.classList.toggle('is-expanded');
       current.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -25716,10 +25765,27 @@ html,body{
     if(!currentCustomerSafe()) return;
     deepLinkHandled = true;
     const notificationId = String(params.get('notificationId') || '').trim();
-    setTimeout(()=>window.openUBeeMySection?.('notifications',{notificationId}),120);
+    setTimeout(()=>{
+      if(window.UBeePrimaryNavigation?.open){
+        window.UBeePrimaryNavigation.open('notify',{source:'notification-deeplink',notificationId});
+      }else{
+        window.openUBeeNotificationPage?.({notificationId});
+      }
+    },120);
   }
 
   document.addEventListener('click',event=>{
+    const shortcut = event.target.closest?.('[data-primary-shortcut="notify"]');
+    if(shortcut){
+      event.preventDefault();
+      event.stopPropagation();
+      if(window.UBeePrimaryNavigation?.open){
+        window.UBeePrimaryNavigation.open('notify',{source:'home-notification-bell'});
+      }else{
+        window.openUBeeNotificationPage?.();
+      }
+      return;
+    }
     const readAll = event.target.closest?.('#ubeeNotificationReadAll');
     if(readAll){
       event.preventDefault();
@@ -25727,7 +25793,7 @@ html,body{
       markAllRead();
       return;
     }
-    const item = event.target.closest?.('#ubeeMyNotificationsContent [data-notification-id]');
+    const item = event.target.closest?.('#ubeeNotificationsContent [data-notification-id]');
     if(item){
       event.preventDefault();
       event.stopPropagation();
@@ -25739,7 +25805,13 @@ html,body{
     const data = event.data || {};
     if(data.type === 'UBEE_CUSTOMER_OPEN_NOTIFICATION'){
       const notificationId = String(data.notificationId || '').trim();
-      setTimeout(()=>window.openUBeeMySection?.('notifications',{notificationId}),80);
+      setTimeout(()=>{
+        if(window.UBeePrimaryNavigation?.open){
+          window.UBeePrimaryNavigation.open('notify',{source:'notification-push',notificationId});
+        }else{
+          window.openUBeeNotificationPage?.({notificationId});
+        }
+      },80);
       return;
     }
     if(data.type === 'UBEE_CUSTOMER_OPEN_ORDER'){
@@ -26025,7 +26097,7 @@ body{
 /* =========================================================
    UBee 用戶端 V2.9｜唯一正式底部導航
    - 全站只保留 #ubeePersistentBottomNav 一套導航。
-   - 首頁／訂單／發任務／我的使用一致的純線條 SVG；發任務使用 UBee 黃色主操作。
+   - 首頁／訂單／通知／我的使用一致的純線條 SVG 與相同 Tab 規格。
    - active 狀態不改變按鈕尺寸，避免切換時跳動。
    - 不使用 blur、transform、動畫或重複 fixed 元件。
    ========================================================= */
@@ -26229,49 +26301,8 @@ body.flow-active{
   body > #ubeePersistentBottomNav > button:hover{background:#fffdf4!important;}
 }
 </style>
-<style id="ubee-customer-native-primary-action-v3-style">
-/* 2026-10-01｜Customer Native Primary Action V3
-   主導航只保留高頻功能；店家探索下沉至首頁，發任務成為唯一主要操作。 */
-body > #ubeePersistentBottomNav > #flowNavCreate{
-  overflow:visible!important;
-  background:#fff!important;
-  color:#111!important;
-}
-body > #ubeePersistentBottomNav > #flowNavCreate::before{
-  display:none!important;
-  content:none!important;
-}
-body > #ubeePersistentBottomNav > #flowNavCreate .flow-nav-icon{
-  width:42px!important;
-  height:42px!important;
-  flex:0 0 42px!important;
-  margin-top:-8px!important;
-  border:1px solid rgba(17,17,17,.08)!important;
-  border-radius:15px!important;
-  background:#facc15!important;
-  color:#111!important;
-  box-shadow:0 6px 15px rgba(17,24,39,.14)!important;
-  transform:translateY(1px)!important;
-  transition:transform .12s ease,box-shadow .12s ease!important;
-}
-body > #ubeePersistentBottomNav > #flowNavCreate .ubee-nav-line{
-  width:22px!important;
-  height:22px!important;
-  stroke-width:2.15!important;
-}
-body > #ubeePersistentBottomNav > #flowNavCreate .flow-nav-label{
-  margin-top:-4px!important;
-  color:#111!important;
-  font-size:11px!important;
-  font-weight:950!important;
-}
-body > #ubeePersistentBottomNav > #flowNavCreate.ubee-nav-pressed .flow-nav-icon{
-  transform:translateY(1px) scale(.94)!important;
-  box-shadow:0 3px 9px rgba(17,24,39,.10)!important;
-}
-body > #ubeePersistentBottomNav > #flowNavCreate.active{
-  background:#fff!important;
-}
+<style id="ubee-customer-home-store-shortcut-v4-style">
+/* 2026-10-01｜店家探索維持首頁次要入口；不佔用底部主導航。 */
 #productionOrderFlow .flow-home-store-shortcut{
   width:100%;
   min-height:50px;
@@ -26336,7 +26367,6 @@ body > #ubeePersistentBottomNav > #flowNavCreate.active{
   line-height:1;
 }
 @media (prefers-reduced-motion:reduce){
-  body > #ubeePersistentBottomNav > #flowNavCreate .flow-nav-icon,
   #productionOrderFlow .flow-home-store-shortcut{transition:none!important}
 }
 </style>
@@ -27556,15 +27586,15 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   scroll-padding-bottom:calc(var(--ubee-keyboard-height) + 24px)!important;
 }
 </style>
-<script id="ubee-customer-navigation-stack-v2">
+<script id="ubee-customer-navigation-stack-v3">
 (()=>{
   'use strict';
-  if(window.__UBEE_CUSTOMER_NAVIGATION_STACK_V2__) return;
-  window.__UBEE_CUSTOMER_NAVIGATION_STACK_V2__=true;
+  if(window.__UBEE_CUSTOMER_NAVIGATION_STACK_V3__) return;
+  window.__UBEE_CUSTOMER_NAVIGATION_STACK_V3__=true;
 
-  const STATE_KEY='ubeeCustomerNavigationV2';
-  const PRIMARY=new Set(['home','task','new','store','my']);
-  const MY_SECTIONS=new Set(['account','rewards','settings','feedback','privacy','notifications']);
+  const STATE_KEY='ubeeCustomerNavigationV3';
+  const PRIMARY=new Set(['home','task','notify','store','my']);
+  const MY_SECTIONS=new Set(['account','rewards','settings','feedback','privacy']);
   const GROWTH_DETAILS=new Set(['benefits','tasks','achievements','history']);
   let applying=false;
 
@@ -27699,14 +27729,14 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   else syncViewport();
 })();
 </script>
-<script id="ubee-bottom-navigation-controller-v30">
+<script id="ubee-bottom-navigation-controller-v31">
 (() => {
   'use strict';
-  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V30__) return;
-  window.__UBEE_BOTTOM_NAV_CONTROLLER_V30__=true;
+  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V31__) return;
+  window.__UBEE_BOTTOM_NAV_CONTROLLER_V31__=true;
 
-  const targetToId={home:'flowNavHome',task:'flowNavTasks',new:'flowNavCreate',my:'flowNavMy'};
-  const supportedTargets=new Set(['home','task','new','store','my']);
+  const targetToId={home:'flowNavHome',task:'flowNavTasks',notify:'flowNavNotify',my:'flowNavMy'};
+  const supportedTargets=new Set(['home','task','notify','store','my']);
   let navigation=null;
   let navigationToken=0;
   let activeTarget='home';
@@ -27735,12 +27765,12 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     if(target!=='task') window.__UBEE_CANCEL_TASK_OPEN__?.();
   }
 
-  async function openTarget(target){
+  async function openTarget(target,options={}){
     if(target==='home'){
       return window.openUBeeHomePage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-navigation'});
     }
     if(target==='task') return window.openUBeeTaskPage?.();
-    if(target==='new') return window.openUBeeNewTaskPage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:true,source:'primary-action'});
+    if(target==='notify') return window.openUBeeNotificationPage?.({notificationId:options.notificationId||''});
     if(target==='store') return window.openUBeeStorePage?.();
     if(target==='my') return window.openUBeeProfilePage?.({navMode:'my'});
   }
@@ -27756,7 +27786,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     setActive(target);
 
     try{
-      await Promise.resolve(openTarget(target));
+      await Promise.resolve(openTarget(target,options));
     }catch(error){
       console.warn('UBee 底部導航切換失敗：',error);
     }
@@ -27791,12 +27821,6 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     const target=normalizeTarget(button.dataset.navTarget||'home');
     window.__UBEE_PENDING_INITIAL_NAV__='';
 
-    // Native Primary Action：重複點「發任務」只回到目前任務首頁，不清掉已填內容。
-    if(target==='new'&&target===activeTarget){
-      window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-action-repeat'});
-      requestAnimationFrame(scrollCurrentPageToTop);
-      return;
-    }
 
     if(target===activeTarget) scrollCurrentPageToTop();
     navigate(target,{source:'user'});
@@ -27818,7 +27842,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     if(!existing||!document.body) return;
 
     const clean=existing.cloneNode(true);
-    clean.dataset.ubeeNavController='v30';
+    clean.dataset.ubeeNavController='v31';
     existing.replaceWith(clean);
     navigation=clean;
 
