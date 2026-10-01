@@ -1,3 +1,4 @@
+// 2026-10-01｜Customer Native Notification Center V1：客戶 Inbox、未讀 Badge、單則／全部已讀、全體會員公告管理與 Web Push Deep Link；沿用既有 customerAccounts/{customerId}/notifications，不改下單／派單／計價核心。
 // 2026-10-01｜Finance Dispatch Hold V1：新增月結未回繳財務派單鎖；不改 ACTIVE／正式資格；財務確認結清後才可人工恢復新任務。
 // 2026-09-30｜Rider Notification Admin No-Key V1.2：修復其他 V4 管理路由 middleware 定義；通知管理 GET/POST 維持直接存取；發布加入冪等防重送。
 // 2026-09-30｜Rider V5.3 Native Notification Center：新增小U後端 Notification Inbox、已讀同步與 Badge count；整合任務完成收入、客戶取消、預約承接／確認／任務前提醒與資格狀態事件；Web Push 與 App Inbox 分工，不改派單／計價／Smart Stack 核心。
@@ -7974,6 +7975,571 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
   }
 });
 
+
+
+
+
+// ============================================================
+// Customer Native Notification Center V1
+// - 沿用 customerAccounts/{customerId}/notifications 作為唯一 Customer Inbox。
+// - Web Push 只負責背景提醒；Inbox 保存可追溯通知，兩者不互相取代。
+// - 系統公告使用 deterministic notificationId，管理端重試不重複建立。
+// - 既有訂單 notifyCustomer() 寫入的舊通知保持相容。
+// ============================================================
+const CUSTOMER_NOTIFICATION_SUBCOLLECTION = 'notifications';
+const CUSTOMER_NOTIFICATION_ANNOUNCEMENT_COLLECTION = 'customerNotificationAnnouncements';
+const CUSTOMER_NOTIFICATION_LIST_LIMIT = 80;
+
+function normalizeCustomerNotificationMetadata(value, depth = 0) {
+  if (depth > 3 || value === undefined || value === null) return null;
+  if (typeof value === 'string') return cleanText(value, 600);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map(item => normalizeCustomerNotificationMetadata(item, depth + 1));
+  }
+  if (typeof value === 'object') {
+    const out = {};
+    Object.entries(value).slice(0, 30).forEach(([key, item]) => {
+      const normalized = normalizeCustomerNotificationMetadata(item, depth + 1);
+      if (normalized !== undefined) out[cleanText(key, 80)] = normalized;
+    });
+    return out;
+  }
+  return cleanText(String(value), 300);
+}
+
+function buildCustomerNotificationId(customerId, eventKey, revision = '1') {
+  return crypto
+    .createHash('sha256')
+    .update(`${String(customerId || '').trim()}:${String(eventKey || '').trim()}:${String(revision || '1').trim()}`)
+    .digest('hex')
+    .slice(0, 40);
+}
+
+function customerNotificationApiPayload(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    notificationId: cleanText(data.notificationId || data.id || doc?.id || '', 80),
+    type: cleanText(data.type || 'system', 80) || 'system',
+    category: cleanText(data.category || (data.type === 'order_update' ? '任務通知' : '系統公告'), 80),
+    title: cleanText(data.title || 'UBee 通知', 160) || 'UBee 通知',
+    message: cleanText(data.message || data.body || '', 2000),
+    orderId: cleanText(data.orderId || data.metadata?.orderId || '', 80).toUpperCase(),
+    status: cleanText(data.status || '', 80),
+    actionType: cleanText(data.actionType || '', 80),
+    actionTarget: cleanText(data.actionTarget || '', 160),
+    read: data.read === true,
+    readAtMs: Math.max(0, Number(data.readAtMs || 0)),
+    createdAtMs: Math.max(0, Number(data.createdAtMs || 0)),
+    updatedAtMs: Math.max(0, Number(data.updatedAtMs || data.createdAtMs || 0)),
+    metadata: data.metadata && typeof data.metadata === 'object'
+      ? normalizeCustomerNotificationMetadata(data.metadata) || {}
+      : {},
+  };
+}
+
+async function getCustomerUnreadNotificationCount(customerRef, cap = 500) {
+  const snapshot = await customerRef
+    .collection(CUSTOMER_NOTIFICATION_SUBCOLLECTION)
+    .where('read', '==', false)
+    .limit(Math.max(1, Math.min(500, Number(cap || 500))))
+    .get();
+  return snapshot.size;
+}
+
+function customerAnnouncementAllowed(account = {}, announcement = {}) {
+  if (String(account.status || 'active').trim().toLowerCase() !== 'active') return false;
+  const category = cleanText(announcement.category || '', 80);
+  if (category.includes('優惠') || category.includes('活動')) {
+    return account.preferences?.marketingNotifications === true;
+  }
+  return true;
+}
+
+async function sendCustomerInboxWebPush(customerId, notification = {}) {
+  try {
+    const safeCustomerId = String(customerId || '').trim();
+    const notificationId = cleanText(notification.notificationId || notification.id || '', 80);
+    if (!isValidCustomerUserId(safeCustomerId) || !notificationId || !WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) {
+      return { sent:0, removed:0, skipped:true };
+    }
+
+    const customerRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(safeCustomerId);
+    const accountDoc = await customerRef.get();
+    if (!accountDoc.exists) return { sent:0, removed:0, skipped:true };
+    const account = accountDoc.data() || {};
+    if (String(account.status || 'active') !== 'active') return { sent:0, removed:0, skipped:true };
+
+    const snapshot = await customerRef.collection(CUSTOMER_PUSH_SUBCOLLECTION).limit(20).get();
+    if (snapshot.empty) return { sent:0, removed:0 };
+
+    const orderId = cleanText(notification.orderId || notification.metadata?.orderId || '', 80).toUpperCase();
+    const deepLink = orderId && notification.actionType === 'order'
+      ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=notification`
+      : `/order.html?action=notifications&notificationId=${encodeURIComponent(notificationId)}&source=push`;
+
+    const payload = JSON.stringify({
+      title: notification.title || 'UBee 跑腿',
+      body: notification.message || '你有一則新的 UBee 通知。',
+      type: 'UBEE_CUSTOMER_INBOX',
+      category: notification.category || '系統公告',
+      notificationId,
+      orderId,
+      tag: `ubee-customer-inbox-${notificationId}`,
+      url: deepLink,
+      deepLink,
+      icon: '/ubee-customer-icon-192.png',
+      badge: '/ubee-customer-icon-192.png',
+    });
+
+    let sent = 0;
+    let removed = 0;
+    await Promise.allSettled(snapshot.docs.map(async doc => {
+      const data = doc.data() || {};
+      if (data.enabled === false) return;
+      const subscription = normalizeCustomerPushSubscription(data.subscription || data);
+      if (!subscription) {
+        await doc.ref.delete().catch(() => {});
+        removed += 1;
+        return;
+      }
+      try {
+        await webpush.sendNotification(subscription, payload, { TTL:60 * 60 * 6, urgency:'high' });
+        sent += 1;
+        await doc.ref.set({
+          lastSentAtMs:Date.now(),
+          lastNotificationId:notificationId,
+          lastError:'',
+        }, { merge:true }).catch(() => {});
+      } catch (error) {
+        const statusCode = Number(error?.statusCode || error?.status || 0);
+        if ([404,410].includes(statusCode)) {
+          await doc.ref.delete().catch(() => {});
+          removed += 1;
+          return;
+        }
+        await doc.ref.set({
+          lastError:cleanText(error?.message || 'push_failed', 300),
+          lastErrorAtMs:Date.now(),
+        }, { merge:true }).catch(() => {});
+        throw error;
+      }
+    }));
+    return { sent, removed };
+  } catch (error) {
+    console.warn('⚠️ Customer Inbox Web Push 發送失敗：', error?.message || error);
+    return { sent:0, removed:0, failed:true };
+  }
+}
+
+async function createCustomerInboxNotification(customerId, payload = {}) {
+  const safeCustomerId = String(customerId || '').trim();
+  const eventKey = cleanText(payload.eventKey || '', 220);
+  const revision = cleanText(payload.revision || '1', 80) || '1';
+  if (!isValidCustomerUserId(safeCustomerId) || !eventKey) {
+    return { created:false, notificationId:'' };
+  }
+
+  const notificationId = buildCustomerNotificationId(safeCustomerId, eventKey, revision);
+  const customerRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(safeCustomerId);
+  const notificationRef = customerRef.collection(CUSTOMER_NOTIFICATION_SUBCOLLECTION).doc(notificationId);
+  const nowMs = Math.max(1, Number(payload.createdAtMs || Date.now()));
+  const notification = {
+    notificationId,
+    id: notificationId,
+    customerId:safeCustomerId,
+    eventKey,
+    revision,
+    type:cleanText(payload.type || 'system', 80) || 'system',
+    category:cleanText(payload.category || '系統公告', 80) || '系統公告',
+    title:cleanText(payload.title || 'UBee 通知', 160) || 'UBee 通知',
+    message:cleanText(payload.message || payload.body || '', 2000),
+    orderId:cleanText(payload.orderId || payload.metadata?.orderId || '', 80).toUpperCase(),
+    status:cleanText(payload.status || '', 80),
+    actionType:cleanText(payload.actionType || '', 80),
+    actionTarget:cleanText(payload.actionTarget || '', 160),
+    metadata:normalizeCustomerNotificationMetadata(payload.metadata || {}) || {},
+    read:false,
+    readAt:null,
+    readAtMs:0,
+    createdAtMs:nowMs,
+    updatedAtMs:nowMs,
+  };
+
+  let created = false;
+  await db.runTransaction(async transaction => {
+    const [customerDoc, notificationDoc] = await Promise.all([
+      transaction.get(customerRef),
+      transaction.get(notificationRef),
+    ]);
+    if (!customerDoc.exists || notificationDoc.exists) return;
+    const account = customerDoc.data() || {};
+    if (String(account.status || 'active') !== 'active') return;
+    transaction.set(notificationRef, {
+      ...notification,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+    transaction.set(customerRef, {
+      notificationUnreadCount:admin.firestore.FieldValue.increment(1),
+      lastNotificationId:notificationId,
+      lastNotificationAtMs:nowMs,
+      lastNotificationAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs:nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    created = true;
+  });
+
+  let pushResult = { sent:0, removed:0 };
+  if (created && payload.webPush === true) {
+    pushResult = await sendCustomerInboxWebPush(safeCustomerId, notification).catch(() => ({ sent:0, failed:true }));
+  }
+  return { created, notificationId, notification, pushResult };
+}
+
+async function syncGlobalCustomerAnnouncementsToInbox(customerId) {
+  const safeCustomerId = String(customerId || '').trim();
+  if (!isValidCustomerUserId(safeCustomerId)) return 0;
+  try {
+    const customerRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(safeCustomerId);
+    const accountDoc = await customerRef.get();
+    if (!accountDoc.exists) return 0;
+    const account = accountDoc.data() || {};
+    const joinedAtMs = Math.max(0, Number(account.createdAtMs || 0));
+
+    const snapshot = await db
+      .collection(CUSTOMER_NOTIFICATION_ANNOUNCEMENT_COLLECTION)
+      .orderBy('createdAtMs', 'desc')
+      .limit(30)
+      .get();
+    if (snapshot.empty) return 0;
+
+    const activeDocs = snapshot.docs.filter(doc => (doc.data() || {}).active !== false);
+    const results = await Promise.allSettled(activeDocs.map(doc => {
+      const announcement = doc.data() || {};
+      if (joinedAtMs > 0 && Number(announcement.createdAtMs || 0) < joinedAtMs) {
+        return Promise.resolve({ created:false });
+      }
+      if (!customerAnnouncementAllowed(account, announcement)) {
+        return Promise.resolve({ created:false });
+      }
+      return createCustomerInboxNotification(safeCustomerId, {
+        eventKey:`system_announcement:${doc.id}`,
+        revision:cleanText(announcement.revision || '1', 80) || '1',
+        type:'system_announcement',
+        category:cleanText(announcement.category || '系統公告', 80) || '系統公告',
+        title:cleanText(announcement.title || 'UBee 系統公告', 160),
+        message:cleanText(announcement.message || announcement.body || '', 2000),
+        actionType:cleanText(announcement.actionType || '', 80),
+        actionTarget:cleanText(announcement.actionTarget || '', 160),
+        metadata:{ announcementId:doc.id },
+        createdAtMs:Math.max(1, Number(announcement.createdAtMs || Date.now())),
+        webPush:false,
+      });
+    }));
+    return results.filter(result => result.status === 'fulfilled' && result.value?.created === true).length;
+  } catch (error) {
+    console.warn('⚠️ 同步 Customer 系統公告失敗：', error?.message || error);
+    return 0;
+  }
+}
+
+async function publishCustomerAnnouncementToActiveCustomers(announcementId, announcement = {}, options = {}) {
+  const safeAnnouncementId = cleanText(announcementId || '', 80);
+  if (!safeAnnouncementId) return { eligible:0, created:0, pushed:0, failed:0 };
+
+  const webPush = options.webPush !== false;
+  let eligible = 0;
+  let created = 0;
+  let pushed = 0;
+  let failed = 0;
+  let lastDoc = null;
+
+  do {
+    let query = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .limit(250);
+    if (lastDoc) query = query.startAfter(lastDoc);
+    const snapshot = await query.get();
+    if (snapshot.empty) break;
+    lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+    const eligibleDocs = snapshot.docs.filter(doc => customerAnnouncementAllowed(doc.data() || {}, announcement));
+    eligible += eligibleDocs.length;
+
+    for (let i = 0; i < eligibleDocs.length; i += 25) {
+      const chunk = eligibleDocs.slice(i, i + 25);
+      const results = await Promise.allSettled(chunk.map(async doc => {
+        const result = await createCustomerInboxNotification(doc.id, {
+          eventKey:`system_announcement:${safeAnnouncementId}`,
+          revision:cleanText(announcement.revision || '1', 80) || '1',
+          type:'system_announcement',
+          category:cleanText(announcement.category || '系統公告', 80) || '系統公告',
+          title:cleanText(announcement.title || 'UBee 系統公告', 160),
+          message:cleanText(announcement.message || announcement.body || '', 2000),
+          actionType:cleanText(announcement.actionType || '', 80),
+          actionTarget:cleanText(announcement.actionTarget || '', 160),
+          metadata:{ announcementId:safeAnnouncementId },
+          createdAtMs:Math.max(1, Number(announcement.createdAtMs || Date.now())),
+          webPush,
+        });
+        return result;
+      }));
+
+      results.forEach(result => {
+        if (result.status !== 'fulfilled') {
+          failed += 1;
+          return;
+        }
+        if (result.value?.created === true) {
+          created += 1;
+          pushed += Math.max(0, Number(result.value?.pushResult?.sent || 0));
+        }
+      });
+    }
+
+    if (snapshot.size < 250) break;
+  } while (lastDoc);
+
+  return { eligible, created, pushed, failed };
+}
+
+function customerAnnouncementAdminPayload(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    announcementId:cleanText(data.announcementId || doc?.id || '', 80),
+    title:cleanText(data.title || '', 160),
+    message:cleanText(data.message || data.body || '', 2000),
+    category:cleanText(data.category || '系統公告', 80) || '系統公告',
+    revision:cleanText(data.revision || '1', 80) || '1',
+    active:data.active !== false,
+    webPush:data.webPush !== false,
+    actionType:cleanText(data.actionType || '', 80),
+    actionTarget:cleanText(data.actionTarget || '', 160),
+    createdAtMs:Math.max(0, Number(data.createdAtMs || 0)),
+    updatedAtMs:Math.max(0, Number(data.updatedAtMs || 0)),
+    delivery:data.delivery && typeof data.delivery === 'object' ? data.delivery : null,
+  };
+}
+
+app.get('/api/admin/customer-notifications/announcements', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const requestedLimit = Number(req.query?.limit || 50);
+    const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(100, Math.round(requestedLimit))) : 50;
+    const snapshot = await db.collection(CUSTOMER_NOTIFICATION_ANNOUNCEMENT_COLLECTION)
+      .orderBy('createdAtMs', 'desc')
+      .limit(limit)
+      .get();
+    const announcements = snapshot.docs.map(customerAnnouncementAdminPayload);
+    return res.json({ success:true, announcements, count:announcements.length });
+  } catch (error) {
+    console.error('❌ 讀取 Customer 系統公告管理清單失敗：', error);
+    return res.status(500).json({ success:false, message:'讀取客戶系統公告失敗。' });
+  }
+});
+
+app.post('/api/admin/customer-notifications/announcement', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const title = cleanText(req.body?.title || '', 160);
+    const message = cleanText(req.body?.message || req.body?.body || '', 2000);
+    if (!title || !message) return res.status(400).json({ success:false, message:'客戶系統公告需要標題與內容。' });
+
+    const requestedId = cleanText(req.body?.announcementId || '', 80).replace(/[^a-zA-Z0-9_-]/g, '');
+    const ref = requestedId
+      ? db.collection(CUSTOMER_NOTIFICATION_ANNOUNCEMENT_COLLECTION).doc(requestedId)
+      : db.collection(CUSTOMER_NOTIFICATION_ANNOUNCEMENT_COLLECTION).doc();
+    const nowMs = Date.now();
+    const revision = cleanText(req.body?.revision || String(nowMs), 80) || String(nowMs);
+    const category = cleanText(req.body?.category || '系統公告', 80) || '系統公告';
+    const webPush = req.body?.webPush !== false;
+    const active = req.body?.active !== false;
+
+    const existingDoc = requestedId ? await ref.get() : null;
+    const existing = existingDoc?.exists ? (existingDoc.data() || {}) : null;
+    if (existing) {
+      const samePayload =
+        String(existing.revision || '') === revision &&
+        cleanText(existing.title || '', 160) === title &&
+        cleanText(existing.message || existing.body || '', 2000) === message &&
+        cleanText(existing.category || '系統公告', 80) === category &&
+        (existing.webPush !== false) === webPush &&
+        (existing.active !== false) === active;
+      if (!samePayload) {
+        return res.status(409).json({
+          success:false,
+          message:'這筆發布識別碼已存在，但內容不同。請重新建立一則通知。',
+        });
+      }
+      if (active && Number(existing.publishedAtMs || 0) > 0 && existing.delivery) {
+        return res.json({
+          success:true,
+          idempotent:true,
+          announcementId:ref.id,
+          revision,
+          delivery:existing.delivery,
+          message:'此客戶通知已發布完成，本次未重複發送。',
+        });
+      }
+    }
+
+    const announcement = {
+      announcementId:ref.id,
+      title,
+      message,
+      category,
+      revision,
+      active,
+      webPush,
+      actionType:cleanText(req.body?.actionType || '', 80),
+      actionTarget:cleanText(req.body?.actionTarget || '', 160),
+      createdAtMs:nowMs,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs:nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await ref.set(announcement, { merge:true });
+
+    let delivery = { eligible:0, created:0, pushed:0, failed:0 };
+    if (active) {
+      delivery = await publishCustomerAnnouncementToActiveCustomers(ref.id, announcement, { webPush });
+      await ref.set({
+        delivery,
+        publishedAtMs:Date.now(),
+        publishedAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:Date.now(),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+    }
+
+    return res.json({
+      success:true,
+      announcementId:ref.id,
+      revision,
+      delivery,
+      message: active
+        ? `Customer 系統公告已發布；已建立 ${delivery.created} 位會員 Inbox 通知。`
+        : 'Customer 系統公告已儲存為停用狀態。',
+    });
+  } catch (error) {
+    console.error('❌ 建立 Customer 系統公告失敗：', error);
+    return res.status(500).json({ success:false, message:'建立客戶系統公告失敗。' });
+  }
+});
+
+app.get('/api/customer/notifications', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const customerRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    await syncGlobalCustomerAnnouncementsToInbox(customerId);
+
+    const unreadCount = await getCustomerUnreadNotificationCount(customerRef);
+    await customerRef.set({
+      notificationUnreadCount:unreadCount,
+      notificationCountSyncedAtMs:Date.now(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true }).catch(() => {});
+
+    const summaryOnly = ['1','true','yes'].includes(String(req.query?.summary || '').trim().toLowerCase());
+    if (summaryOnly) return res.json({ success:true, unreadCount, notifications:[] });
+
+    const requestedLimit = Number(req.query?.limit || 60);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(CUSTOMER_NOTIFICATION_LIST_LIMIT, Math.round(requestedLimit)))
+      : 60;
+    const snapshot = await customerRef
+      .collection(CUSTOMER_NOTIFICATION_SUBCOLLECTION)
+      .orderBy('createdAtMs', 'desc')
+      .limit(limit)
+      .get();
+    const notifications = snapshot.docs.map(customerNotificationApiPayload);
+    return res.json({ success:true, unreadCount, notifications, count:notifications.length });
+  } catch (error) {
+    console.error('❌ 讀取 Customer Notification Inbox 失敗：', error);
+    return res.status(500).json({ success:false, message:'通知中心暫時無法讀取，請稍後再試。' });
+  }
+});
+
+app.post('/api/customer/notifications/read', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const notificationId = cleanText(req.body?.notificationId || '', 80);
+    if (!notificationId) return res.status(400).json({ success:false, message:'缺少通知編號。' });
+
+    const customerRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    const notificationRef = customerRef.collection(CUSTOMER_NOTIFICATION_SUBCOLLECTION).doc(notificationId);
+    const doc = await notificationRef.get();
+    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這則通知。' });
+
+    if (doc.data()?.read !== true) {
+      const nowMs = Date.now();
+      await notificationRef.set({
+        read:true,
+        readAtMs:nowMs,
+        readAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+    }
+
+    const unreadCount = await getCustomerUnreadNotificationCount(customerRef);
+    await customerRef.set({
+      notificationUnreadCount:unreadCount,
+      updatedAtMs:Date.now(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    return res.json({ success:true, notificationId, unreadCount });
+  } catch (error) {
+    console.error('❌ Customer Notification 標記已讀失敗：', error);
+    return res.status(500).json({ success:false, message:'通知已讀狀態暫時無法更新。' });
+  }
+});
+
+app.post('/api/customer/notifications/read-all', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const customerRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    let updated = 0;
+
+    for (let round = 0; round < 10; round += 1) {
+      const snapshot = await customerRef
+        .collection(CUSTOMER_NOTIFICATION_SUBCOLLECTION)
+        .where('read', '==', false)
+        .limit(400)
+        .get();
+      if (snapshot.empty) break;
+      const nowMs = Date.now();
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => batch.set(doc.ref, {
+        read:true,
+        readAtMs:nowMs,
+        readAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true }));
+      await batch.commit();
+      updated += snapshot.size;
+      if (snapshot.size < 400) break;
+    }
+
+    const unreadCount = await getCustomerUnreadNotificationCount(customerRef);
+    await customerRef.set({
+      notificationUnreadCount:unreadCount,
+      updatedAtMs:Date.now(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    return res.json({ success:true, updated, unreadCount });
+  } catch (error) {
+    console.error('❌ Customer Notification 全部已讀失敗：', error);
+    return res.status(500).json({ success:false, message:'通知已讀狀態暫時無法更新。' });
+  }
+});
 
 
 // ============================================================
@@ -28967,24 +29533,51 @@ async function notifyCustomer(order, messages) {
   const customerId = String(order?.userId || order?.customerId || '').trim();
   if (!isValidCustomerUserId(customerId)) return false;
 
-  const notificationRef = db
+  const customerRef = db
     .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-    .doc(customerId)
-    .collection('notifications')
+    .doc(customerId);
+  const notificationRef = customerRef
+    .collection(CUSTOMER_NOTIFICATION_SUBCOLLECTION)
     .doc();
 
   const nowMs = Date.now();
+  const orderId = cleanText(order?.id || order?.orderId || '', 80).toUpperCase();
+  const pushCopy = getCustomerWebPushCopy(order, messages);
+  const notification = {
+    notificationId:notificationRef.id,
+    id:notificationRef.id,
+    orderId,
+    type:'order_update',
+    category:'任務通知',
+    title:cleanText(pushCopy.title || 'UBee 任務通知', 160),
+    message:getCustomerNotificationText(messages),
+    status:String(order?.status || ''),
+    actionType:'order',
+    actionTarget:orderId,
+    metadata:{ orderId },
+    read:false,
+    readAt:null,
+    readAtMs:0,
+    createdAtMs:nowMs,
+    updatedAtMs:nowMs,
+  };
 
-  const inAppTask = notificationRef.set({
-    id: notificationRef.id,
-    orderId: String(order?.id || ''),
-    type: 'order_update',
-    title: 'UBee 任務通知',
-    message: getCustomerNotificationText(messages),
-    status: String(order?.status || ''),
-    read: false,
-    createdAtMs: nowMs,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  const inAppTask = db.runTransaction(async transaction => {
+    const accountDoc = await transaction.get(customerRef);
+    if (!accountDoc.exists) return;
+    transaction.set(notificationRef, {
+      ...notification,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+    transaction.set(customerRef, {
+      notificationUnreadCount:admin.firestore.FieldValue.increment(1),
+      lastNotificationId:notificationRef.id,
+      lastNotificationAtMs:nowMs,
+      lastNotificationAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs:nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
   });
 
   const pushTask = sendCustomerWebPush(order, messages);
