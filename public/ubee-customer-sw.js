@@ -1,10 +1,10 @@
 /* ============================================================
  * UBee 跑腿｜客戶端 Service Worker｜最新正式版 2026-10-01
- * Release: Customer Native Controls V2
- * Version: 20261001-customer-native-controls-v2
+ * Release: Customer Native Primary Action V3
+ * Version: 20261001-customer-native-primary-action-v3
  *
  * Canonical responsibilities:
- * - Customer PWA Cache 隔離與版本更新
+ * - Customer PWA Cache 隔離與版本更新（同步首頁／訂單／發任務／我的主導航）
  * - API / Auth / Orders / Quote 一律 Network Only
  * - order.html Navigation 採 Network First
  * - 靜態資源 Stale While Revalidate
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-native-controls-v2';
+const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-native-primary-action-v3';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
