@@ -1,82 +1,25 @@
-<!-- 2026-09-30｜Rider V5.4.2 Scheduled Offer Restore：修復首頁只顯示「預約 N」摘要、卻不會把預約單顯示成主 U 任務卡；首頁現在可直接顯示預約時間、收入、取送區域並承接預約。沿用既有 /api/rider/tasks 與 /api/rider/reserve-order 契約，不修改 index 後端。 -->
-<!-- 2026-09-30｜Rider V5.4.1 Scheduled Spotlight：首頁「預約任務」由 58px 摘要列升級為大型預約卡；強化預約筆數、等待承接與查看入口；沿用既有 /api/rider/tasks、reserve-order 與 scheduled-orders 契約，不修改後端派單邏輯。 -->
-<!-- 2026-09-30｜Rider V5.4 My Native Clean：精修「我的」頁面為 Account & Settings 架構；Profile 僅保留姓名與小U編號；資格／成長／福利整合為「小U」；語音播報改用獨立音量 icon；螢幕常亮移除動態工程狀態文案；保留既有大頭照、資格、成長、福利、接單設定、Push、Wake Lock、客服與後端契約。 -->
-<!-- 2026-09-30｜Rider V5.3.1 Notification Polish：正式營運通知空狀態精修；完全無通知時只保留頁面標題，不重複「沒有未讀」；首次同步狀態與真正空狀態分離；縮短 Empty State 文案，通知 Inbox／Badge／已讀／深連結／後端契約不變。 -->
-<!-- 2026-09-30｜Rider V5.3 Native Notification Center：通知頁升級為真正的 App Inbox；後端事件載入、未讀跨裝置同步、Badge 獨立同步、List→Detail Navigation State、局部已讀更新、Push Inbox Dirty 同步；移除四則固定假通知。 -->
 <!DOCTYPE html>
-<!-- 2026-09-30｜Rider V5.2.1 Native Income：僅精修收入頁；0 元統計改為 nullish-safe；收入 Dashboard 採結構一次建立＋局部數字更新；收入明細直接進入任務已完成；移除 80ms 導頁 workaround；帳務文案與資訊層級收斂。 -->
-<!-- 2026-09-30｜Rider V5.1.1 Native Status Control：接單中狀態移除重複「暫停接單」主 CTA；右上接單狀態改為 Native Bottom Sheet 管理入口；離線時才保留「開始接單」主 CTA。 -->
-<!-- 2026-09-30｜Rider V5.1.0 Native Experience：底部五大 Tab 原生化切換、分頁捲動位置記憶、輕量轉場、按鈕觸感／Haptic、Native Toast 收斂與 Web scrollbar 隱藏；不修改派單、收入、Smart Stack、代駕、多點、資格鎖與後端契約。 -->
-<!-- 2026-09-30｜Rider V5.0.3 Online State Fix：修復 V5 Clean Architecture 移除舊地圖後，上下線流程仍呼叫 openRiderMapWorkspace／closeRiderMapSheets 的殘留；上下線改為 Workbench 原生狀態更新，非致命 Promise 錯誤不再誤報「系統啟動失敗」；首頁開始／暫停接單主按鈕固定移至底部導航列上方。 -->
-<!-- 2026-09-29｜Rider V5.0.2 Clean Architecture：正式刪除舊首頁內嵌地圖、Marker、Routes Library、舊地圖任務卡、地圖工作台與舊 Bottom Sheet 任務池；只保留 GPS/Presence/任務追蹤核心、V5 小U工作台、U 任務卡、任務執行 Dock、外部導航、Smart Stack 與既有資格/收入/代駕/多點契約。 -->
-<!-- 2026-09-29｜Rider V5.0.1 Task Pool UX：工作台任務卡新增即時／預約任務池摘要；略過後立即切換下一張 U 任務，不重整、不回地圖。 -->
-<!-- 2026-09-29｜Rider V5.0 Workbench：首頁移除內嵌地圖，改為 UBee 小U工作台；新任務以全螢幕 U 任務卡呈現，立即接單後直接進入任務執行模式；導航改為外部地圖，保留既有派單、Smart Stack、資格鎖、收入與代駕契約。 -->
-<!-- 2026-09-29｜Rider V4.4.3 Drive + Area MultiSelect：新任務第一層明確顯示代駕服務與車輛所在地／代駕目的地；接單設定與小U申請移除行政區固定數量上限，支援跨縣市多選。 -->
-<!-- 2026-09-29｜Rider Drive Semantic V4.4.2：代駕任務全面使用車輛所在地／車輛交接／代駕進行中／代駕目的地／完成交車語意；一般跑腿流程不變。 -->
-<!-- 2026-09-29｜Rider Contact Removal V1.1：完整移除 Order Chat 即時對話 UI、事件與 API 呼叫；保留代駕任務與完成任務時間軸 Dark UI 修正。 -->
-<!-- 2026-09-25｜Rider Profile Photo UI V4.3.4：我的首頁與帳號資料顯示正式小U大頭照；照片採後端短效 Signed URL，失敗自動回退原 icon／姓名縮寫。 -->
-<!-- 2026-09-25｜Rider V4.3.3 Profile Supplement Compatibility Fix：補件優先使用 Firebase Rider Token；過渡期 Token 尚未建立時保留既有手機登入身分，由後端相容模式安全完成大頭照 commit。 -->
-
-<!-- 2026-09-25｜Rider V4.3.1 Profile Supplement Capture Fix：修復 iPhone PWA「立即補件」拍完大頭照後沒有確認、沒有上傳；file input 改為掛載 DOM 並處理相機返回前景生命週期，加入確認並上傳、上傳中狀態、照片壓縮與成功更新。 -->
-<!-- 2026-09-25｜Rider Native Application V4.3 Native Large Control + Next Step Fix：申請流程 CTA 統一「下一步」；下一步只做當頁驗證並立即切頁、不等待大頭照背景上傳；大頭照未完成時按鈕仍可點並即時提示；Native Row / Input / Select / Choice / Bottom CTA 統一大尺寸；服務區域優先帶入居住縣市；同步 Rider PWA Cache。 -->
-<!-- 2026-09-25｜Rider Native Application V4.2 Interaction Fix：修復 iPhone PWA 資料編輯互動、同步開啟鍵盤/日期選擇、下一步回饋、統一 58px Native 控制高度。 -->
-<!-- 2026-09-25｜Rider Native UI V2：小U 9 頁申請改為 edge-to-edge Native Onboarding、固定底部主操作與 1/9 App Bar；完成任務詳情修正日夜模式文字對比與重複返回導航。 -->
-<!-- 2026-09-24｜Rider Application Native Onboarding V1：小U申請改為 9 頁式 Native Onboarding；第一關大頭照、身分證正反面同頁、駕照／行照／強制險分頁、最後確認送審。 -->
-<!-- 2026-09-24｜Rider Completed Native Detail V2：完成任務詳情由通用 Modal 改為全頁 Native Detail；固定 App Bar 返回、Grouped List 收入／路線／任務／時間軸／照片，保留列表捲動位置。 -->
-<!-- 2026-09-24｜Rider Completed Task Detail V1：完成任務卡片整張可進入唯讀詳情；補 completedOrdersCache 查找、失敗重抓、本人專屬詳情 API、收入／轉場補貼／時間軸／照片。 -->
-<!-- 2026-09-24｜Rider Online Qualification Notice V1：已審核但尚未完成新手入職的小U，上線前顯示正式資格提醒與待完成項目；ACTIVE + canAcceptOrders=true 後完全不再顯示。 -->
-<!-- 2026-09-24｜Smart Stack Transfer Subsidy V1：疊單轉場費由平台分潤吸收；候選／下一筆任務明確顯示平台轉場補貼，不向客戶加收。 -->
-<!-- 2026-09-24｜Queue ETA Engine V1：下一筆疊單同時顯示抵達 B 取件 ETA 與後端計算的最終送達 ETA；不暴露前序客戶資訊。 -->
-<!-- 2026-09-23｜Rider Multi-stop Route Refresh V1：完成送達點 1 後清除上一段路線，使用目前位置＋下一站座標強制重算並重畫 1→2 路線；導航狀態仍按站點隔離。 -->
-<!-- 2026-09-23｜Rider Multi-stop Navigation Fix V1：完成送達點 1 後，送達點 2 使用獨立導航狀態，重新顯示「開始導航送達」並可正常開啟 Google Maps；多點 Dock 顯示 1/2、2/2。 -->
-<!-- 2026-09-23｜Rider Multi-stop Visibility V1：待接任務顯示多點站數與行政區；接單後任務詳情列出所有送達點，執行 Dock 顯示目前站次。 -->
-<!-- 2026-09-23｜UBee Launch Transition V2：一次性雙圓點 Launch 完成後，白色圓角方塊以 2 秒週期、2.5% 幅度輕微呼吸等待；Session Restore 與動畫並行，Ready 後 310ms 淡出直接銜接工作地圖。 -->
-<!-- 2026-09-22｜Rider Core Cleanup V1：清理已停用制度與相關 UI；保留證件審核、學習測驗、接單資格、小U專屬福利、街口平台款項回繳與既有任務核心。 -->
-<!-- 2026-09-22｜Rider Native V6 Cleanup V1：整理「我的」重複入口、整合小U成長中心、收入頁結算入口去重、螢幕常亮改為可控制 Wake Lock 開關、更新慢慢騎優惠文案；不修改首頁動畫、地圖、派單、Smart Stack、Qualification Hard Lock 與收入計算核心。 -->
-<!-- 2026-09-21｜Xinhong Benefit Price V1：昕紘整復推拿小U優惠改為明確價格：原價 NT$900、現折 NT$100、小U專屬價 NT$800；列表直接顯示小U價，詳情頁顯示完整價格拆分。 -->
-<!-- 2026-09-21｜Rider Partner Benefits V1：新增「小U專屬福利」；完成分類列表、合作店家詳情、正式小U資格提示與外部地圖導航；不加入 QR Code／店家核驗，不修改派單、計價、資格與任務核心。 -->
-<!-- 2026-09-18｜Rider Task Control V1：首頁新任務新增拒絕；我的任務新增取件前取消接單；Smart Stack 安全釋放。 -->
-<!-- 2026-09-18｜UBee Smart Stack V1.1：Recovery Hard Lock、Google Routes 真實道路判斷、QUEUED Live ETA。 -->
-<!-- 2026-09-18｜UBee Smart Stack V1：順序疊單 CURRENT + QUEUED；完成目前任務後自動切下一筆。 -->
-<!-- 2026-09-17｜Profit Pricing V1 / Rider Income Canonical V4：維持70%與NT$50保底，小U仍只顯示後端正式收入；同步新長途分段費率發版。 -->
-<!-- 2026-09-16｜Rider Motor Vehicle Hard Lock V1：小U新申請僅接受機車／汽車；前端移除自行車、步行，送出前再次硬鎖驗證。 -->
-<!-- 2026-09-16｜Rider Service Quality UX V2：服務品質未滿 20 筆時改顯示資料累積中，移除暫定分數與無門檻的「---」狀態。 -->
-<!-- 2026-09-16｜UBee Native Experience V2：Release Sync；本版 Rider 僅同步 Manifest / Service Worker 發版版本，不變更任務與接單核心。 -->
-<!-- 2026-09-19｜My Page Native Clean V1：精簡「我的」列表資訊密度；移除多數副標、移除主頁成長任務入口、支付與社群縮名；不改既有功能與 Native 返回流程。 -->
 <html lang="zh-TW">
 <head>
-<!-- 2026-09-11｜Rider Income Canonical V3：刪除騎士端所有自行 70%／保底／總額回推收入邏輯；小U待接、任務詳情、錢包與統計只顯示後端 canonical riderIncome。 -->
-<!-- 2026-09-16｜Rider Service Quality UX V2：服務品質未滿 20 筆樣本時不再顯示「—／暫定分數」；改為資料累積進度、五維白話說明與適用牌級品質門檻。 -->
-<!-- 2026-09-09｜Rider Navigation Handoff V1.1：修正 V1.4 導航需等待定位 Promise／Timer 才跳 Google Maps 的手感與 iOS 外部 App 手勢問題；改為同步立即導航，定位交接降為 best-effort 非阻塞。 -->
-<!-- 2026-09-09｜Rider Tracking Handoff V1：外部 Google Maps 導航前先強制同步最後 GPS 並啟動背景追蹤交接；回到 UBee 時沿用既有 pageshow／visibility fresh GPS 恢復，降低 PWA 切出導航造成的定位斷點。 -->
-<!-- 2026-09-09｜Rider Task Pool Recovery V1：待接任務 API 非 2xx 時不再靜默當成空任務；Native 任務頁直接顯示資格鎖／API 錯誤原因，方便區分「真的沒單」與「任務池讀取失敗」。 -->
-<!-- 2026-09-16｜Growth Engine V1.7 Native Usability：整理雙端資訊層級；騎士二級頁返回真正上一層，不再從「我的」子頁直接跳回工作地圖。 -->
-<!-- 2026-09-16｜Growth Engine V1.3 Native：舊 Rider Activity V1 已完整移除；小U成長中心採牌級、近期活躍、品質、成就與推薦分層，一般訂單維持公平。 -->
-<!-- 2026-09-09｜Rider Arrival Quick Capture V2：刪除舊到場照片 Sheet＋二次上傳按鈕；抵達 CTA 直接喚起後鏡頭，照片前端壓縮後於狀態確認成功時自動上傳；上傳失敗仍由既有照片硬鎖阻止下一階段。 -->
-<!-- 2026-09-09｜Rider Native System V1.1：先刪除舊 Task Detail Card/Row、Purchase Detail Card 與 V4 Application Card/Form/Document Card 視覺，再建立 Native Task Detail + Native Onboarding/Application Form；Qualification Hard Lock、首頁地圖與既有 API contract 保留。 -->
-<!-- 2026-09-09｜Rider Native System V1：先刪除被取代的 Task Card List／Wallet Dashboard／Notification Card Feed／Learning Dashboard 與舊 Modal 視覺，再建立唯一 Native List／Grouped Settings／Native Sheet；首頁地圖、Safety Center、My Native V3 與 Qualification Hard Lock 保留。 -->
-<!-- 2026-09-09｜Rider My Native V3：刪除舊「我的」Dashboard／四宮格／大卡片式首頁與 ubee-my-v2 殘留樣式；改為原生 App Profile + Grouped Settings 資訊架構，活躍度移入二級頁。 -->
-<!-- 2026-09-09｜Rider Qualification Hard Lock V1：刪除舊 APPROVED 相容放行與 V4 bootstrap fail-open；登入、上線、接單三處皆以後端 ACTIVE + canAcceptOrders=true 做 fail-closed 驗證。 -->
-<!-- 2026-09-08｜Rider Global Task Pool V1.1 Clean：清除舊服務區域／距離半徑擋單邏輯；待接任務與首頁任務池統一為全區可見。 -->
-<!-- 2026-09-08｜Rider Global Task Pool V1：我的任務待接任務改為全員可見任務池；解除前端服務區域與距離半徑擋單，首頁同步顯示全區待接任務提示。 -->
-<!-- 2026-09-08｜Rider Home Tasks Restore V1.1：首頁回到地圖後主動同步全區待接任務 Sheet，避免待接任務已載入但首頁沒有重新顯示。 -->
-<!-- 2026-09-07｜Rider Background Presence V2：刪除舊「背景仍靠 setInterval Heartbeat 維持在線」假設；改為前景 Heartbeat＋背景 Web Push 可達＋進背景前快照/Presence 同步，避免 PWA 被 OS 暫停後誤判為下線。 -->
+<!-- =========================================================
+  UBee Driver｜騎士端最新正式版｜2026-10-01
+  Release: Rider Native Polish & Cleanup V1
+  PWA: 20261001-rider-native-polish-cleanup-v1
 
-<!-- 2026-09-03｜Rider Task Contract V3 Full Flow：完成任務前依 taskDetails 強制文字／照片／現場交接回報；支援全能單點任務執行流程，完成回報寫回後端驗證。 -->
-<!-- 2026-09-03｜Rider Task Contract V2：待接任務與接單後任務詳情直接讀取 taskDetails.reportMode / handoffMode，顯示現場回報與交接要求；保留舊 note 相容。 -->
-<!-- 2026-09-03｜Rider Universal Arrival Photo V1.1：所有服務抵達後強制拍照；排隊／全能單點視為單一現場任務，照片上傳後才可繼續處理，客戶可即時查看。 -->
-<!-- 2026-09-03｜Rider Arrival Photo Proof V1：所有服務抵達任務／取件地點與每個送達點後皆強制拍照回傳；未上傳照片不得進入下一狀態，照片由客戶端即時查看。 -->
-<!-- 2026-09-02｜Rider Task Visibility V1：修正調度中心待派狀態與騎士任務池不一致；2026-09-08 起待接任務改為全員可見任務池，不再用服務區域或距離半徑擋住待接列表。 -->
-<!-- 2026-09-01｜V12.1 Safety Native Refine：僅精修安全中心 App Bar、Row 密度、Section 間距、字體層級、Icon/Chevron、灰階/圓角、問題詳情與 Bottom Action Bar；五大分類與回報 API 不變，日夜模式共用既有 Theme Token。 -->
-<!-- UBee 店家平台 V3 相容：保留 V5.2 導航殘影修正，支援 merchant_settlement / merchant_paid 與店家單。 -->
-<!-- 2026-09-01｜V12 Safety App UI Rebuild：安全中心三層介面改為與既有 Rider Native UI 同語言：置中 App Bar、Grouped List、Row Separator、Section Header、UBee 黃底部操作列；保留五大分類、細項、回報 API。 -->
-<!-- 2026-09-01｜V12 Safety Native Scroll Fix：修正安全中心 App 化後 iOS/PWA 無法垂直滑動；改為固定 App Shell＋獨立內容 Scroll Container＋頁內底部操作列。 -->
-<!-- 2026-09-01｜V12 Safety Native Detail：安全中心五大類與回報 API 保持不變；細項內容／結果頁改為原生 App 式全頁內容、處理步驟與底部固定主要操作。 -->
-<!-- 2026-09-23｜Launch Transition V4 Wide Orbit：保留 100px 圓角方塊與 35px 雙圓點比例；擴大雙圓點環繞半徑，讓圓點與方塊保持更明顯留白。主動畫只跑一次，未 Ready 時維持 2.5%／2 秒呼吸，Ready 後約 310ms 放大淡出直入工作地圖。 -->
-<!-- 2026-09-23｜Launch Transition V3 Dot Size Fix：依照設計參考圖放大雙圓點至方塊邊長約三分之一，修正右上／左下視覺比例，保留 Launch Transition V2 與工作地圖直入流程。 -->
-<!-- 2026-09-01｜V12 PreAuth Black Unified：延續 Header Clean V2，將 Splash／歡迎入口／登入騎士端背景統一為純黑 #000000，移除舊 #050505＋黃色 radial-gradient 色差。 -->
-<!-- 2026-09-01｜V12 Header Clean V2：在既有 Header Clean 基礎上，進一步刪除舊 v5NativeWorkStatus 橫向「接單中」狀態列的 DOM、CSS、Runtime 與所有引用。 -->
-<!-- 2026-09-01｜Clean Core V11：先刪除舊 V4/V9 語音與舊殘影轉場，再建立單一任務生命週期語音核心＋啟動/地圖硬隔離。 -->
+  本次整理：
+  1. V5 Workbench／Task Center／Notification Center／我的頁維持唯一正式 Native Shell。
+  2. 清除已無 DOM／Runtime 的舊地圖工作台視覺層，避免舊樣式干擾 V5 Workbench。
+  3. 原生捲動、觸控回饋、Safe Area、Reduced Motion 與 Tab 切換收斂為單一 Native Experience 規格。
+  4. 移除長駐 will-change GPU layer，降低長時間 PWA 使用的繪製與記憶體負擔。
+  5. 保留派單、Presence、Smart Stack、多點、代駕、收入、資格、福利、通知與外部導航核心。
+
+  Canonical recent milestones:
+  - 2026-10-01 Native Benefits Recovery / Native Polish & Cleanup
+  - 2026-09-30 V5.4 Workbench / Scheduled Offer / Native Notification Center / Native Income
+  - 2026-09-29 V5 Clean Architecture / Drive Semantic / Area MultiSelect
+  - 2026-09-25 Native Application / Profile Photo
+  - 2026-09-24 Completed Detail / Queue ETA / Smart Stack Subsidy
+========================================================= -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>UBee Driver</title>
@@ -98,7 +41,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/ubee-rider-icon-192.png?v=20260722-logo-v2">
 <link rel="icon" type="image/png" sizes="512x512" href="/ubee-rider-icon.png?v=20260722-logo-v2">
 <link rel="shortcut icon" type="image/png" href="/ubee-rider-icon.png?v=20260722-logo-v2">
-<link rel="manifest" href="/rider-manifest.json?v=20260930-rider-v5-4-2-scheduled-offer-restore">
+<link rel="manifest" href="/rider-manifest.json?v=20261001-rider-native-polish-cleanup-v1">
   
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="UBee Driver">
@@ -154,112 +97,34 @@ html,body{
   overflow:hidden;
 }
 
-body,
-button,
-input,
-select,
-textarea{
+body,button,input,select,textarea{
   font-size:var(--font-base);
 }
 
-#map{
-  width:100%;
-  height:100%;
-  background:#eef2f7;
-}
+
 
 
   /* ===== UBee 地圖任務狀態列 ===== */
 
-.map-task-status{
-  position:fixed;
-  top:66px;
-  left:14px;
-  right:14px;
-  z-index:24;
 
-  min-height:58px;
-  padding:11px 15px;
 
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
 
-  background:rgba(255,255,255,.96);
-  border:1px solid rgba(15,23,42,.10);
-  border-radius:20px;
 
-  box-shadow:0 12px 32px rgba(15,23,42,.12);
 
-  backdrop-filter:blur(16px);
-  -webkit-backdrop-filter:blur(16px);
 
-  transition:background .25s ease, border-color .25s ease;
-}
 
-.map-task-status.stage-pickup{
-  background:rgba(255,251,235,.97);
-  border-color:rgba(250,204,21,.42);
-}
 
-.map-task-status.stage-delivery{
-  background:rgba(240,253,244,.97);
-  border-color:rgba(22,163,74,.32);
-}
 
-.map-task-status.stage-arrived{
-  background:rgba(239,246,255,.97);
-  border-color:rgba(37,99,235,.32);
-}
 
-.map-task-status.stage-pickup
-.map-task-status-stage{
-  color:#a16207;
-}
 
-.map-task-status.stage-delivery
-.map-task-status-stage{
-  color:#15803d;
-}
 
-.map-task-status.stage-arrived
-.map-task-status-stage{
-  color:#1d4ed8;
-}
+
   
-.map-task-status-stage{
-  min-width:0;
 
-  font-size:17px;
-  line-height:1.25;
-  font-weight:1000;
-  color:#111827;
 
-  transition:color .25s ease;
-  
-  white-space:nowrap;
-}
 
-.map-task-status-metrics{
-  min-width:0;
 
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  gap:7px;
 
-  font-size:15px;
-  line-height:1.25;
-  font-weight:1000;
-  color:#111827;
-
-  white-space:nowrap;
-}
-
-.map-task-status-dot{
-  color:#9ca3af;
-}
 #ubeeMapSheetOfflineBtn{
   display:flex;
   align-items:center;
@@ -282,29 +147,7 @@ textarea{
   transform:scale(.96);
 }
 
-@media(max-width:390px){
 
-  .map-task-status{
-    top:64px;
-    left:10px;
-    right:10px;
-
-    min-height:54px;
-    padding:10px 12px;
-    gap:8px;
-
-    border-radius:18px;
-  }
-
-  .map-task-status-stage{
-    font-size:16px;
-  }
-
-  .map-task-status-metrics{
-    gap:5px;
-    font-size:14px;
-  }
-}
   
 .badge{
   background:rgba(255,255,255,.94);
@@ -333,42 +176,13 @@ textarea{
   box-shadow:0 0 0 4px rgba(22,163,74,.14);
 }
 
-.locate-btn{
-  position:fixed;
-  right:18px;
-  bottom:calc(110px + env(safe-area-inset-bottom));
-  z-index:50;
-  width:48px;
-  height:48px;
-  border-radius:50%;
-  border:1px solid rgba(15,23,42,.12);
-  background:rgba(255,255,255,.94);
-  color:var(--text);
-  font-size:22px;
-  font-weight:900;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  box-shadow:0 12px 30px rgba(15,23,42,.12);
-}
 
-.locate-btn:active,
-.btn:active,
-.menu-item:active,
-.online-toggle-btn:active{
+
+.btn:active,.menu-item:active,.online-toggle-btn:active{
   transform:scale(.97);
 }
 
-.bottom-panel{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:calc(92px + env(safe-area-inset-bottom));
-  z-index:22;
-  padding:0 10px 10px;
-  background:transparent;
-  pointer-events:none;
-}
+
 
 .order-card{
   background:rgba(255,255,255,.96);
@@ -385,8 +199,7 @@ textarea{
   color:var(--text);
 }
 
-.order-card::-webkit-scrollbar,
-.page-scroll::-webkit-scrollbar{
+.order-card::-webkit-scrollbar,.page-scroll::-webkit-scrollbar{
   display:none;
 }
 
@@ -510,8 +323,7 @@ textarea{
   margin-top:10px;
 }
 
-.action-row .btn,
-.action-single .btn{
+.action-row .btn,.action-single .btn{
   margin-top:0;
 }
 
@@ -674,22 +486,14 @@ textarea{
   flex:0 0 auto;
 }
 
-.menu-title,
-.ubee-action-title,
-.ubee-option-title,
-.ubee-form-label{
+.menu-title,.ubee-action-title,.ubee-option-title,.ubee-form-label{
   font-size:var(--font-lg);
   line-height:1.35;
   font-weight:1000;
   color:var(--text);
 }
 
-.menu-desc,
-.ubee-action-desc,
-.ubee-option-desc,
-.ubee-form-help,
-.ubee-status-line,
-.info-note-card{
+.menu-desc,.ubee-action-desc,.ubee-option-desc,.ubee-form-help,.ubee-status-line,.info-note-card{
   font-size:var(--font-base);
   line-height:1.55;
   color:var(--text);
@@ -996,8 +800,7 @@ textarea{
   background:var(--ubee-page-bg);
 }
 
-.ubee-modal-close,
-.ubee-modal-secondary{
+.ubee-modal-close,.ubee-modal-secondary{
   width:100%;
   min-height:50px;
   border-radius:14px;
@@ -1139,9 +942,7 @@ textarea{
   margin-top:7px;
 }
 
-.ubee-input,
-.ubee-select,
-.ubee-textarea{
+.ubee-input,.ubee-select,.ubee-textarea{
   width:100%;
   border:1px solid var(--ubee-border);
   background:var(--ubee-surface-2);
@@ -1345,7 +1146,7 @@ textarea{
   color:#16a34a;
 }
 
-@media(max-width:390px){
+@media (max-width:390px){
   .ubee-live-route-summary{
     gap:8px;
   }
@@ -1395,8 +1196,7 @@ textarea{
   color:var(--text);
 }
 
-.ubee-task-sub,
-.ubee-countdown{
+.ubee-task-sub,.ubee-countdown{
   margin-top:6px;
   font-size:var(--font-sm);
   font-weight:900;
@@ -1518,9 +1318,7 @@ textarea{
   justify-content:center;
 }
 
-.order-card.ubee-task-card .dispatch-actions,
-.order-card.ubee-task-card .action-row,
-.order-card.ubee-task-card .action-single{
+.order-card.ubee-task-card .dispatch-actions,.order-card.ubee-task-card .action-row,.order-card.ubee-task-card .action-single{
   flex:0 0 auto;
   position:relative;
   z-index:3;
@@ -1542,8 +1340,7 @@ textarea{
   margin-top:12px;
 }
 
-.dispatch-actions .btn,
-.order-card.ubee-task-card .btn{
+.dispatch-actions .btn,.order-card.ubee-task-card .btn{
   min-height:var(--btn-height);
   margin-top:0;
   padding:13px 10px;
@@ -1557,34 +1354,27 @@ textarea{
   font-weight:1000;
 }
 
-body.has-active-task-card .locate-btn{
-  bottom:calc(92px + 53dvh + env(safe-area-inset-bottom) + 14px);
-}
 
-@supports (height:100svh){
-  body.has-active-task-card .locate-btn{
-    bottom:calc(92px + 53svh + env(safe-area-inset-bottom) + 14px);
-  }
-}
+
+
 
 /* ===== 騎士任務卡：字體精簡版，只影響任務卡 ===== */
-.order-card.ubee-task-card .task-title {
+.order-card.ubee-task-card .task-title{
   font-size: 18px !important;
   line-height: 1.3 !important;
 }
 
-.order-card.ubee-task-card .task-price {
+.order-card.ubee-task-card .task-price{
   font-size: 22px !important;
   line-height: 1.2 !important;
 }
 
-.order-card.ubee-task-card .task-distance,
-.order-card.ubee-task-card .task-eta {
+.order-card.ubee-task-card .task-distance,.order-card.ubee-task-card .task-eta{
   font-size: 18px !important;
   line-height: 1.3 !important;
 }
 
-.order-card.ubee-task-card .task-address {
+.order-card.ubee-task-card .task-address{
   font-size: 15px !important;
   line-height: 1.45 !important;
 }
@@ -1606,7 +1396,7 @@ body.has-active-task-card .locate-btn{
 
 /* ===== 小螢幕 ===== */
 
-@media(max-width:390px){
+@media (max-width:390px){
   :root{
     --font-xs:12px;
     --font-sm:13px;
@@ -1635,10 +1425,7 @@ body.has-active-task-card .locate-btn{
     font-size:21px;
   }
 
-  .bottom-panel{
-    bottom:calc(90px + env(safe-area-inset-bottom));
-    padding:0 9px 9px;
-  }
+  
 
   .order-card.ubee-task-card{
     max-height:min(55dvh, 490px);
@@ -1675,15 +1462,9 @@ body.has-active-task-card .locate-btn{
     font-size:19px;
   }
 
-  body.has-active-task-card .locate-btn{
-    bottom:calc(90px + 55dvh + env(safe-area-inset-bottom) + 12px);
-  }
+  
 
-  @supports (height:100svh){
-    body.has-active-task-card .locate-btn{
-      bottom:calc(90px + 55svh + env(safe-area-inset-bottom) + 12px);
-    }
-  }
+  
 
   .ubee-profile-two{
     grid-template-columns:1fr;
@@ -1714,18 +1495,9 @@ body.has-active-task-card .locate-btn{
 
 
 
-.map-task-status{
-  top:calc(env(safe-area-inset-top) + 12px);
-  left:12px;
-  right:12px;
-  border-radius:18px;
-  min-height:58px;
-}
 
-.bottom-panel{
-  bottom:calc(var(--simple-nav-height) + env(safe-area-inset-bottom));
-  padding:0 12px 12px;
-}
+
+
 
 .order-card{
   border-radius:var(--simple-radius);
@@ -1770,9 +1542,7 @@ body.has-active-task-card .locate-btn{
   z-index:60;
 }
 
-.online-toggle-btn,
-.online-toggle-btn.online-searching,
-.online-toggle-btn.offline{
+.online-toggle-btn,.online-toggle-btn.online-searching,.online-toggle-btn.offline{
   width:100%;
   height:54px;
   border-radius:16px;
@@ -1795,9 +1565,7 @@ body.has-active-task-card .locate-btn{
 }
 
 body.has-active-task-card .online-float{display:none;}
-body.has-active-task-card .locate-btn{
-  bottom:calc(var(--simple-nav-height) + 53dvh + env(safe-area-inset-bottom) + 16px);
-}
+
 
 
 .app-page{
@@ -1856,8 +1624,7 @@ body.has-active-task-card .locate-btn{
 .simple-secondary-btn:disabled{opacity:.45;}
 
 /* 第一階段穩定性修正：關鍵操作送出期間禁止重複點擊 */
-button[aria-busy="true"],
-button:disabled{
+button[aria-busy="true"],button:disabled{
   opacity:.58;
   cursor:not-allowed;
   pointer-events:none;
@@ -1868,8 +1635,8 @@ button:disabled{
 .menu-title{font-size:16px;}
 .menu-desc{font-size:13px;color:var(--ubee-muted);}
 
-@media(max-width:390px){
-  .bottom-panel{padding-left:9px;padding-right:9px;}
+@media (max-width:390px){
+  
   .order-card.ubee-task-card{max-height:min(60dvh,540px);}
   .simple-secondary-row{gap:6px;}
   .simple-secondary-btn{font-size:12px;padding:8px 4px;}
@@ -1877,8 +1644,7 @@ button:disabled{
 
 
 /* ===== UBee 全域按鈕觸控可靠性修正｜2026-07-22 ===== */
-button:not(:disabled),
-[role="button"]:not([aria-disabled="true"]){
+button:not(:disabled),[role="button"]:not([aria-disabled="true"]){
   pointer-events:auto;
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
@@ -2165,7 +1931,7 @@ button:disabled{cursor:default;}
   font-weight:900;
 }
 
-@media(max-width:390px){
+@media (max-width:390px){
   .ubee-recruit-title{font-size:34px;}
   .ubee-recruit-showcase{min-height:500px;}
   .ubee-recruit-slide-inner{padding:24px 18px 16px;}
@@ -2199,7 +1965,7 @@ html,body{background:var(--ui-page);color:var(--ui-ink);}
 button{font-family:inherit;cursor:pointer;}
 .simple-screen-reader{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}
 
-#map{padding-top:0;padding-bottom:calc(var(--ui-nav) + env(safe-area-inset-bottom));}
+
 .simple-map-dim{
   position:fixed;inset:0 0 calc(var(--ui-nav) + env(safe-area-inset-bottom)) 0;
   z-index:20;background:rgba(17,24,39,.35);backdrop-filter:saturate(.8);-webkit-backdrop-filter:saturate(.8);pointer-events:none;
@@ -2207,7 +1973,7 @@ button{font-family:inherit;cursor:pointer;}
 
 /* Home state cards */
 .online-float{display:none!important;}
-.bottom-panel{left:0;right:0;bottom:calc(var(--ui-nav) + env(safe-area-inset-bottom));padding:0 12px 12px;z-index:60;}
+
 .order-card{border:1px solid rgba(15,23,42,.08);background:var(--ubee-surface);border-radius:28px;padding:0;box-shadow:var(--ui-shadow);max-height:none;overflow:visible;}
 .order-card:not(.ubee-task-card){min-height:0;display:block;}
 .order-card:not(.ubee-task-card) .empty::before{display:none!important;content:none!important;}
@@ -2280,12 +2046,7 @@ body.has-new-task-card .order-card.ubee-task-card{
 .simple-advance-warning{margin:12px 0 0;padding:10px 12px;border-radius:14px;background:#fff8df;border:1px solid rgba(255,196,0,.3);font-size:12px;line-height:1.45;font-weight:850;color:#7b5800;}
 
 /* Active task: top mission summary + bottom controls */
-.map-task-status{
-  top:calc(env(safe-area-inset-top) + 12px);left:12px;right:12px;z-index:48;
-  min-height:116px;padding:15px 13px 15px 16px;border-radius:22px;background:rgba(255,255,255,.98)!important;
-  border:1px solid rgba(15,23,42,.08)!important;box-shadow:0 14px 36px rgba(15,23,42,.14);
-  display:grid;grid-template-columns:1fr 64px;align-items:center;gap:12px;
-}
+
 .simple-route-card-main{min-width:0;}
 .simple-route-card-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .simple-stage-chip{display:inline-flex;padding:5px 9px;border-radius:999px;background:#e9f4ff;color:#1477ef;font-size:12px;font-weight:1000;white-space:nowrap;}
@@ -2294,10 +2055,10 @@ body.has-new-task-card .order-card.ubee-task-card{
 .simple-route-address{margin-top:8px;font-size:12px;line-height:1.35;font-weight:850;color:#4f555d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .simple-route-nav-btn{width:60px;height:72px;border:0;border-left:1px solid #e9ebef;background:transparent;color:#1477ef;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:29px;font-weight:1000;}
 .simple-route-nav-btn small{font-size:12px;font-weight:1000;color:#111;}
-.map-task-status.stage-delivery .simple-stage-chip{background:#eaf9ee;color:#13803a;}
-.map-task-status.stage-arrived .simple-stage-chip{background:#fff4cd;color:#9a6b00;}
 
-body.has-active-task-card .bottom-panel{padding-bottom:10px;}
+
+
+
 body.has-active-task-card .order-card.ubee-task-card{background:transparent;border:0;box-shadow:none;overflow:visible;}
 .simple-active-action-card{padding:0;background:transparent;}
 .simple-active-primary{width:100%;min-height:54px;border:0;border-radius:16px;background:var(--ui-yellow);color:#111;font-size:17px;font-weight:1000;box-shadow:0 12px 28px rgba(255,196,0,.24);}
@@ -2307,8 +2068,8 @@ body.has-active-task-card .order-card.ubee-task-card{background:transparent;bord
 .simple-active-secondary button{min-height:58px;border:0;background:#fff;color:#24262a;font-size:12px;font-weight:900;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;}
 .simple-active-secondary button + button{border-left:1px solid var(--ui-line);}
 .simple-active-secondary .act-icon{font-size:19px;line-height:1;}
-.locate-btn{right:16px;bottom:calc(var(--ui-nav) + env(safe-area-inset-bottom) + 146px);z-index:49;width:46px;height:46px;background:#fff;}
-body.has-active-task-card .locate-btn{bottom:calc(var(--ui-nav) + env(safe-area-inset-bottom) + 146px)!important;}
+
+
 
 /* Application pages */
 .app-page{z-index:55;padding:calc(env(safe-area-inset-top) + 16px) 14px 0;background:var(--ubee-page-bg);color:var(--ubee-text);}
@@ -2412,13 +2173,13 @@ button.ubee-native-row:active{background:var(--ubee-surface-2)}
 .simple-login-field input{width:100%;border:0;outline:0;background:transparent;color:#111;font-size:20px;font-weight:1000;letter-spacing:.5px;}
 .simple-login-error{margin-top:12px;padding:10px 12px;border-radius:13px;background:#fff1f2;color:#b91c1c;font-size:12px;line-height:1.45;font-weight:850;}
 
-@media(max-width:390px){
+@media (max-width:390px){
   :root{--ui-header:0px;--ui-nav:72px;}
-  .bottom-panel{padding-left:9px;padding-right:9px;padding-bottom:9px;}
+  
   .simple-new-task-card{padding:15px 15px 12px;}
   .simple-task-meta{margin-left:-15px;margin-right:-15px;}
   .simple-active-secondary button{font-size:11px;}
-  .map-task-status{left:9px;right:9px;min-height:108px;padding:13px 10px 13px 14px;}
+  
   .simple-route-distance{font-size:25px;}
   .simple-profile-avatar{width:54px;height:54px;}
 }
@@ -2523,23 +2284,17 @@ button.ubee-native-row:active{background:var(--ubee-surface-2)}
 .ubee-native-shopping-main span{display:block;margin-top:3px;color:var(--ubee-muted);font-size:11px;line-height:1.5;font-weight:560}
 .ubee-native-task-privacy{padding:11px 13px;border-radius:14px;background:var(--ubee-surface-2);color:var(--ubee-muted);font-size:12px;line-height:1.55;font-weight:560}
 .ubee-native-task-empty{padding:18px 14px;color:var(--ubee-muted);text-align:center;font-size:13px;line-height:1.6;font-weight:560}
-@media(max-width:390px){.ubee-native-detail-row{grid-template-columns:82px minmax(0,1fr)}.ubee-native-task-detail-service{font-size:19px}}
+@media (max-width:390px){.ubee-native-detail-row{grid-template-columns:82px minmax(0,1fr)}.ubee-native-task-detail-service{font-size:19px}}
 
 /* 降低不必要的繪製成本，保留操作回饋 */
-.app-page,
-.order-card,
-.map-task-status{
+.app-page,.order-card{
   contain:layout paint style;
 }
-.page-scroll,
-.ubee-route-list,
-.order-card{
+.page-scroll,.ubee-route-list,.order-card{
   overscroll-behavior:contain;
 }
 @media (prefers-reduced-motion: reduce){
-  *,
-  *::before,
-  *::after{
+  *,*::before,*::after{
     scroll-behavior:auto !important;
     animation-duration:.01ms !important;
     animation-iteration-count:1 !important;
@@ -2553,7 +2308,7 @@ button.ubee-native-row:active{background:var(--ubee-surface-2)}
 .v4-shell{width:min(760px,100%);margin:0 auto}
 .v4-progress{margin-top:16px;height:9px;border-radius:999px;background:#e5e7eb;overflow:hidden}.v4-progress>span{display:block;height:100%;background:#facc15;border-radius:999px;transition:width .2s}.v4-progress-text{font-size:12px;font-weight:900;color:var(--ubee-muted);margin-top:7px}
 .v4-card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:16px;margin-top:11px;box-shadow:0 8px 24px rgba(15,23,42,.04)}.v4-card.done{border-color:#bbf7d0;background:#f0fdf4}.v4-card.warning{border-color:#fde68a;background:#fffbeb}.v4-card.danger{border-color:#fecaca;background:#fef2f2}.v4-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.v4-card-title{font-size:16px;font-weight:1000}.v4-card-desc{font-size:12px;color:var(--ubee-muted);line-height:1.6;font-weight:750;margin-top:5px}.v4-status{flex:0 0 auto;font-size:10px;font-weight:1000;padding:5px 8px;border-radius:999px;background:#f3f4f6}.v4-status.done{background:#dcfce7;color:#166534}.v4-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.v4-btn{min-height:42px;border:0;border-radius:13px;padding:10px 14px;background:#111827;color:#fff;font-size:13px;font-weight:1000}.v4-btn.yellow{background:#facc15;color:#111}.v4-btn.light{background:#f3f4f6;color:#111}.v4-btn.green{background:#16a34a;color:#fff}.v4-btn:disabled{opacity:.45}
-.v4-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:21px;font-weight:1000;letter-spacing:1px;margin-top:8px}.v4-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}@media(max-width:560px){.v4-grid{grid-template-columns:1fr}}
+.v4-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:21px;font-weight:1000;letter-spacing:1px;margin-top:8px}.v4-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}@media (max-width:560px){.v4-grid{grid-template-columns:1fr}}
 .v4-quiz-question{padding:14px;border:1px solid #e5e7eb;border-radius:16px;margin-top:10px}.v4-quiz-title{font-size:14px;font-weight:1000;line-height:1.55}.v4-quiz-option{display:flex;align-items:flex-start;gap:9px;padding:10px 0;font-size:13px;font-weight:800;line-height:1.5}.v4-quiz-option input{margin-top:3px}.v4-section-title{font-size:18px;font-weight:1000;margin:20px 2px 6px}.v4-small{font-size:11px;line-height:1.6;color:var(--ubee-muted);font-weight:750}.v4-close-session{width:100%;margin-top:18px;min-height:48px;border:1px solid #e5e7eb;background:#fff;border-radius:15px;font-weight:1000}
 .v4-mini-panel{margin:12px 0 0;padding:12px;border-radius:16px;background:#f8fafc;border:1px solid #e5e7eb}.v4-mini-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:850}.v4-mini-row:last-child{border-bottom:0}.v4-cert-chip{display:inline-flex;margin:4px 4px 0 0;padding:6px 9px;border-radius:999px;background:#f3f4f6;font-size:11px;font-weight:900}.v4-cert-chip.on{background:#dcfce7;color:#166534}
 
@@ -2568,7 +2323,7 @@ button.ubee-native-row:active{background:var(--ubee-surface-2)}
 .v4-check{display:flex;align-items:flex-start;gap:9px;padding:10px 0;border-bottom:1px solid #eef0f3;font-size:12px;line-height:1.55;font-weight:800}
 .v4-check:last-child{border-bottom:0}.v4-check input{margin-top:3px}
 .v4-apply-status{padding:16px;border-radius:18px;background:#f8fafc;border:1px solid #e5e7eb;margin-top:12px}
-@media(max-width:560px){.v4-form-grid,.v4-entry-actions{grid-template-columns:1fr}}
+@media (max-width:560px){.v4-form-grid,.v4-entry-actions{grid-template-columns:1fr}}
 
 </style>
 
@@ -2646,11 +2401,7 @@ body.ubee-before-login{
 }
 
 /* 未完成騎士登入前，既有地圖與 App Shell 不得露出。 */
-body.ubee-before-login #map,
-body.ubee-before-login #simpleMapDim,
-body.ubee-before-login .nav-bar,
-body.ubee-before-login .online-float,
-body.ubee-before-login .locate-btn{
+body.ubee-before-login #simpleMapDim,body.ubee-before-login .nav-bar,body.ubee-before-login .online-float{
   visibility:hidden !important;
   opacity:0 !important;
   pointer-events:none !important;
@@ -2807,14 +2558,12 @@ body.ubee-before-login .locate-btn{
 }
 
 /* Welcome */
-.ubee-welcome-screen,
-.ubee-login-screen{
+.ubee-welcome-screen,.ubee-login-screen{
   min-height:100dvh;
   background:#000000;
   padding:calc(24px + env(safe-area-inset-top)) 22px calc(22px + env(safe-area-inset-bottom));
 }
-.ubee-welcome-inner,
-.ubee-login-inner{
+.ubee-welcome-inner,.ubee-login-inner{
   width:100%;
   max-width:480px;
   min-height:100%;
@@ -2855,8 +2604,7 @@ body.ubee-before-login .locate-btn{
   gap:12px;
   padding-top:34px;
 }
-.ubee-preauth-primary,
-.ubee-preauth-secondary{
+.ubee-preauth-primary,.ubee-preauth-secondary{
   width:100%;
   min-height:58px;
   border-radius:18px;
@@ -2865,10 +2613,7 @@ body.ubee-before-login .locate-btn{
   letter-spacing:.1px;
   transition:transform .12s ease,opacity .12s ease;
 }
-.ubee-preauth-primary:active,
-.ubee-preauth-secondary:active,
-.ubee-preauth-link:active,
-.ubee-preauth-back:active{transform:scale(.985)}
+.ubee-preauth-primary:active,.ubee-preauth-secondary:active,.ubee-preauth-link:active,.ubee-preauth-back:active{transform:scale(.985)}
 .ubee-preauth-primary{
   border:0;
   background:#facc15;
@@ -2960,9 +2705,7 @@ body.ubee-before-login .locate-btn{
   letter-spacing:.3px;
   box-shadow:0 8px 24px rgba(0,0,0,.10);
 }
-.ubee-login-field input:-webkit-autofill,
-.ubee-login-field input:-webkit-autofill:hover,
-.ubee-login-field input:-webkit-autofill:focus{
+.ubee-login-field input:-webkit-autofill,.ubee-login-field input:-webkit-autofill:hover,.ubee-login-field input:-webkit-autofill:focus{
   -webkit-box-shadow:0 0 0 1000px #ffffff inset !important;
   box-shadow:0 0 0 1000px #ffffff inset !important;
   -webkit-text-fill-color:#111827 !important;
@@ -2986,13 +2729,13 @@ body.ubee-before-login .locate-btn{
 .ubee-login-actions{margin-top:auto;padding-top:22px}
 .ubee-login-actions .ubee-preauth-primary:disabled{opacity:.6}
 
-@media(max-width:390px){
+@media (max-width:390px){
   .ubee-welcome-screen,.ubee-login-screen{padding-left:18px;padding-right:18px}
   .ubee-welcome-logo{width:min(82vw,330px);margin-top:34px}
   .ubee-welcome-title{font-size:25px}
   .ubee-login-title{font-size:27px}
 }
-@media(prefers-reduced-motion:reduce){
+@media (prefers-reduced-motion:reduce){
   .ubee-splash-symbol,.ubee-splash-orbit-dot,.ubee-splash-diamond,.ubee-splash-diamond rect{animation-duration:.01ms !important;animation-iteration-count:1 !important}
   .ubee-preauth-screen{transition:none !important}
 }
@@ -3025,9 +2768,7 @@ body.ubee-before-login .locate-btn{
    UBee Rider 任務執行 V2 FINAL + 智慧定位跟隨 V2 FINAL
    2026-07-22 正式升級
    ========================================================= */
-body.has-active-task-card .bottom-panel{
-  padding:0 10px calc(10px + env(safe-area-inset-bottom));
-}
+
 .ubee-task-card{
   border-radius:26px !important;
   padding:16px !important;
@@ -3137,7 +2878,7 @@ body.has-active-task-card .bottom-panel{
   font-weight:900;
   color:#166534;
 }
-@media(max-width:390px){
+@media (max-width:390px){
   .ubee-task-card{max-height:55vh !important}
   .ubee-stage-name{font-size:20px}
   .simple-primary-btn{min-height:56px;font-size:17px}
@@ -6146,7 +5887,7 @@ async function ensureRiderNotificationRegistration(){
   }
 
   try{
-    const riderSwUrl="/ubee-web-push-sw.js?v=20260930-rider-v5-4-2-scheduled-offer-restore";
+    const riderSwUrl="/ubee-web-push-sw.js?v=20261001-rider-native-polish-cleanup-v1";
 
     const registration = await navigator.serviceWorker.register(riderSwUrl, {
       scope: "/",
@@ -22678,9 +22419,7 @@ body.v5-native-ready{
 }
 
 /* iPhone PWA：讓頂部 status bar / safe-area 與 App 背景一致，避免白色橫條 */
-html,
-body,
-body.v5-native-ready{
+html,body,body.v5-native-ready{
   background-color:var(--ubee-page-bg);
 }
 
@@ -22727,12 +22466,7 @@ body.v5-native-ready .page-title{
 }
 
 /* Bottom Sheet */
-body.v5-native-ready .bottom-panel{
-  bottom:calc(var(--v5-tab-height) + env(safe-area-inset-bottom));
-  padding:0 10px 10px;
-  z-index:60;
-  transition:transform .3s var(--v5-ease),opacity .2s ease;
-}
+
 body.v5-native-ready .order-card{
   position:relative;
   border-radius:var(--v5-sheet-radius);
@@ -22752,8 +22486,7 @@ body.v5-native-ready .order-card::before{
   border-radius:99px;
   background:#d1d5db;
 }
-body.v5-native-ready.has-active-task-card .order-card,
-body.v5-native-ready.has-new-task-card .order-card{
+body.v5-native-ready.has-active-task-card .order-card,body.v5-native-ready.has-new-task-card .order-card{
   animation:v5SheetUp .34s var(--v5-ease) both;
 }
 @keyframes v5SheetUp{
@@ -22762,17 +22495,9 @@ body.v5-native-ready.has-new-task-card .order-card{
 }
 
 /* 任務沉浸模式 */
-body.v5-native-ready.v5-task-mode #map{
-  filter:saturate(1.05) contrast(1.01);
-}
-body.v5-native-ready.v5-task-mode .map-task-status{
-  top:calc(76px + env(safe-area-inset-top));
-  border-radius:22px;
-  box-shadow:0 12px 32px rgba(15,23,42,.13);
-}
-body.v5-native-ready.v5-task-mode .locate-btn{
-  bottom:calc(var(--v5-tab-height) + 180px + env(safe-area-inset-bottom));
-}
+
+
+
 /* 上線按鈕改成原生主 CTA */
 body.v5-native-ready .online-float{
   bottom:calc(var(--v5-tab-height) + 14px + env(safe-area-inset-bottom));
@@ -22829,8 +22554,8 @@ body.v5-native-ready .online-toggle-btn.online-searching{width:auto;min-width:18
 }
 @keyframes v5Shimmer{to{transform:translateX(100%)}}
 
-@media(max-width:390px){
-  body.v5-native-ready .bottom-panel{padding-left:8px;padding-right:8px}
+@media (max-width:390px){
+  
   body.v5-native-ready .order-card{border-radius:24px;padding-left:13px;padding-right:13px}
 }
 </style>
@@ -23223,18 +22948,15 @@ body.v5-native-ready::before{background:var(--ubee-page-bg) !important;}#ubeePas
   box-shadow:0 14px 40px rgba(0,0,0,.22);
 }
 #ubeePassiveToast.show{display:block;}
-@media(max-width:390px){
-  .app-page,
-  body.v5-native-ready .app-page{
+@media (max-width:390px){
+  .app-page,body.v5-native-ready .app-page{
     padding:calc(env(safe-area-inset-top) + 10px) 10px 0 !important;
   }
 }
 
 
 
-body.ubee-online-idle #bottomPanel{
-  display:none !important;
-}
+
 
 :root{--ubee-nav-h:76px;}
 
@@ -23251,9 +22973,7 @@ body.ubee-online-idle #bottomPanel{
   flex:0 0 auto;min-width:96px;min-height:50px;border:0;border-radius:999px;
   background:#facc15;color:#111827;font-size:17px;font-weight:1000;
 }
-body:not(.ubee-before-login):not(.ubee-task-dock-active) #bottomPanel{
-  bottom:calc(var(--ubee-nav-h) + env(safe-area-inset-bottom) + 8px);
-}
+
 
 /* 執行任務：唯一 Task Dock。 */
 body.ubee-task-dock-active:not(.ubee-before-login) .nav-bar.v5-native-tabbar{
@@ -23286,25 +23006,11 @@ body.ubee-task-dock-active:not(.ubee-before-login) .nav-bar.v5-native-tabbar{
 body.ubee-task-dock-active #ubeeTaskExecutionDock{
   display:block!important;
 }
-body.ubee-task-dock-active #ubeeMapStatusDock,
-body.has-active-task-card #ubeeMapStatusDock,
-body.ubee-task-dock-active #mapTaskStatusBar,
-body.has-active-task-card #mapTaskStatusBar,
-body.ubee-task-dock-active #bottomPanel,
-body.has-active-task-card #bottomPanel{
-  display:none!important;
-  visibility:hidden!important;
-  pointer-events:none!important;
-}
-body.ubee-task-dock-active #ubeeMapSafetyBtn,
-body.ubee-task-dock-active #ubeeMapRecommendBtn,
-body.ubee-task-dock-active .ubee-task-detail-float{
+
+body.ubee-task-dock-active #ubeeMapSafetyBtn,body.ubee-task-dock-active #ubeeMapRecommendBtn,body.ubee-task-dock-active .ubee-task-detail-float{
   display:none!important;
 }
-body.ubee-task-dock-active #floatingLocateBtn,
-body.ubee-task-dock-active .locate-btn{
-  bottom:calc(var(--ubee-nav-h) + env(safe-area-inset-bottom) + 150px)!important;
-}
+
 
 .ubee-task-dock-top{
   display:flex;
@@ -23378,7 +23084,7 @@ body.ubee-task-dock-active .locate-btn{
   display:none!important;
 }
 
-@media(max-width:390px){
+@media (max-width:390px){
   
   #ubeeTaskExecutionDock{
     border-radius:20px;
@@ -23406,7 +23112,7 @@ body.ubee-task-dock-active .locate-btn{
 .ubee-my-task-actions button.primary{background:#facc15;border-color:#eab308;}
 .ubee-my-task-actions button.danger{background:#fff7f7;color:#b91c1c;border-color:rgba(220,38,38,.22);}
 
-@media(max-width:390px){
+@media (max-width:390px){
   body.ubee-task-dock-active #ubeeTaskExecutionDock{left:8px!important;right:8px!important;}
   .ubee-my-task-actions{grid-template-columns:1fr;}
 }
@@ -23415,23 +23121,9 @@ body.ubee-task-dock-active .locate-btn{
 }
 
 /* 首頁無任務時，不保留舊卡片空間。 */
-body:not(.has-active-task-card):not(.has-new-task-card) #bottomPanel,
-body.ubee-online-idle #bottomPanel{
-  display:none !important;
-  visibility:hidden !important;
-  height:0 !important;
-  min-height:0 !important;
-  padding:0 !important;
-  margin:0 !important;
-  pointer-events:none !important;
-}
 
-body.has-new-task-card #floatingLocateBtn,
-body.ubee-task-dock-active #floatingLocateBtn,
-body.has-active-task-card .locate-btn,
-body.has-new-task-card .locate-btn{
-  bottom:calc(var(--ubee-nav-total) + 146px) !important;
-}
+
+
 
 /* 非首頁不殘留任何地圖浮層。 */
 /* 接單設定｜手機 App 表單 */
@@ -23598,7 +23290,7 @@ body.has-new-task-card .locate-btn{
   font-size:14px;
 }
 
-@media(max-width:390px){
+@media (max-width:390px){
   .ubee-region-check-grid{gap:7px;}
   .ubee-region-check{padding:8px 10px;font-size:12px;}
 }
@@ -23631,9 +23323,7 @@ html.ubee-root-before-login{
   background:#000000 !important;
 }
 
-body,
-body.v5-native-ready,
-body.ubee-before-login{
+body,body.v5-native-ready,body.ubee-before-login{
   position:relative !important;
   inset:auto !important;
   top:auto !important;
@@ -23656,8 +23346,7 @@ body.ubee-before-login{
 }
 
 /* 登入 Gate 直接填滿完整 App Shell。 */
-#ubeePreAuthGate,
-.ubee-preauth-gate{
+#ubeePreAuthGate,.ubee-preauth-gate{
   position:absolute !important;
   inset:0 !important;
   width:100% !important;
@@ -23675,9 +23364,7 @@ body.ubee-before-login{
   content:none !important;
 }
 
-.ubee-preauth-screen,
-.ubee-welcome-screen,
-.ubee-login-screen{
+.ubee-preauth-screen,.ubee-welcome-screen,.ubee-login-screen{
   position:absolute !important;
   inset:0 !important;
   width:100% !important;
@@ -23686,16 +23373,14 @@ body.ubee-before-login{
   max-height:none !important;
 }
 
-.ubee-welcome-screen,
-.ubee-login-screen{
+.ubee-welcome-screen,.ubee-login-screen{
   padding:
     calc(18px + env(safe-area-inset-top))
     22px
     calc(14px + env(safe-area-inset-bottom)) !important;
 }
 
-.ubee-welcome-inner,
-.ubee-login-inner{
+.ubee-welcome-inner,.ubee-login-inner{
   height:100% !important;
   min-height:0 !important;
   overflow:auto !important;
@@ -23704,31 +23389,12 @@ body.ubee-before-login{
 }
 
 /* App 主要元件全部相對完整 Shell 定位，不再相對 iOS visual viewport。 */
-#map{
-  position:absolute !important;
-  top:0 !important;
-  right:0 !important;
-  bottom:var(--ubee-nav-total) !important;
-  left:0 !important;
-  inset:0 0 var(--ubee-nav-total) 0 !important;
-  width:auto !important;
-  height:auto !important;
-  min-height:0 !important;
-  margin:0 !important;
-  padding:0 !important;
-  background:#eef2f7 !important;
-}
 
-#map>div{
-  width:100% !important;
-  height:100% !important;
-}
+
+
 
 /* 頂部地圖元件也跟著 Shell，避免登入後 viewport 改變時漂移。 */
-.map-task-status,
-#mapTaskStatusBar{
-  position:absolute !important;
-}
+
 
 /* 五大導覽｜唯一正式版本：5 Tab + Safe Area + Theme Token */
 .nav-bar.v5-native-tabbar{
@@ -23790,8 +23456,7 @@ body.ubee-before-login{
 .nav-bar.v5-native-tabbar .nav-label{font-size:11px;font-weight:900;line-height:1.15;white-space:nowrap}
 
 /* 非首頁頁面只佔導覽列以上的完整 Shell。 */
-.app-page,
-body.v5-native-ready .app-page{
+.app-page,body.v5-native-ready .app-page{
   position:absolute !important;
   top:0 !important;
   right:0 !important;
@@ -23809,15 +23474,12 @@ body.v5-native-ready .app-page{
   opacity:1 !important;
 }
 
-.app-page.show,
-body.v5-native-ready .app-page.show{
+.app-page.show,body.v5-native-ready .app-page.show{
   display:flex !important;
   flex-direction:column !important;
 }
 
-.page-scroll,
-.app-page>.page-scroll,
-body.v5-native-ready .app-page>.page-scroll{
+.page-scroll,.app-page>.page-scroll,body.v5-native-ready .app-page>.page-scroll{
   position:relative !important;
   flex:1 1 auto !important;
   width:100% !important;
@@ -23832,58 +23494,30 @@ body.v5-native-ready .app-page>.page-scroll{
 }
 
 /* 所有首頁底部元件都與導覽列使用同一套 Shell 座標。 */
-.bottom-panel,
-body.v5-native-ready .bottom-panel{
-  position:absolute !important;
-  bottom:var(--ubee-nav-total) !important;
-}
 
-.online-float,
-body.v5-native-ready .online-float{
+
+.online-float,body.v5-native-ready .online-float{
   position:absolute !important;
   bottom:calc(var(--ubee-nav-total) + 14px) !important;
 }
 
-#floatingLocateBtn,
-.locate-btn{
-  position:absolute !important;
-  bottom:calc(var(--ubee-nav-total) + 116px) !important;
-}
-body.ubee-home-map-view #floatingLocateBtn{
-  right:14px !important;
-  bottom:calc(env(safe-area-inset-bottom) + 82px) !important;
-  width:50px !important;
-  height:50px !important;
-  border:1px solid var(--ubee-border) !important;
-  border-radius:50% !important;
-  background:color-mix(in srgb,var(--ubee-surface) 94%,transparent) !important;
-  color:var(--ubee-text) !important;
-  box-shadow:0 10px 28px rgba(0,0,0,.20) !important;
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  font-size:0 !important;
-}
-body.ubee-home-map-view #floatingLocateBtn .ubee-svg-icon{
-  width:23px;
-  height:23px;
-}
 
-@media(max-width:390px){
+
+
+
+@media (max-width:390px){
   :root{
     --ubee-nav-h:72px;
     --ubee-nav-total:92px;
     --ubee-page-tail-gap:14px;
   }
 
-  .ubee-welcome-screen,
-  .ubee-login-screen{
+  .ubee-welcome-screen,.ubee-login-screen{
     padding-left:18px !important;
     padding-right:18px !important;
   }
 }
 
-body.ubee-non-home-tab #map,
 body.ubee-non-home-tab .simple-map-dim{
   display:none !important;
   visibility:hidden !important;
@@ -23892,13 +23526,7 @@ body.ubee-non-home-tab .simple-map-dim{
 }
 
 /* 非首頁時，所有首頁專用元件一律退出畫面。 */
-body.ubee-non-home-tab #bottomPanel,
-body.ubee-non-home-tab #ubeeTaskExecutionDock,
-body.ubee-non-home-tab #onlineFloat,
-body.ubee-non-home-tab #mapTaskStatusBar,
-body.ubee-non-home-tab #floatingLocateBtn,
-body.ubee-non-home-tab #ubeeTaskDetailFloatBtn,
-body.ubee-non-home-tab .locate-btn{
+body.ubee-non-home-tab #ubeeTaskExecutionDock,body.ubee-non-home-tab #onlineFloat,body.ubee-non-home-tab #ubeeTaskDetailFloatBtn{
   display:none !important;
   visibility:hidden !important;
   opacity:0 !important;
@@ -23906,8 +23534,7 @@ body.ubee-non-home-tab .locate-btn{
 }
 
 /* 關閉的內容頁完全不參與繪製。 */
-.app-page:not(.show),
-body.v5-native-ready .app-page:not(.show){
+.app-page:not(.show),body.v5-native-ready .app-page:not(.show){
   display:none !important;
   visibility:hidden !important;
   opacity:0 !important;
@@ -23915,8 +23542,7 @@ body.v5-native-ready .app-page:not(.show){
 }
 
 /* 開啟的內容頁必須是完整、不透明、最高層的實色頁面。 */
-body.ubee-non-home-tab .app-page.show,
-body.ubee-non-home-tab.v5-native-ready .app-page.show{
+body.ubee-non-home-tab .app-page.show,body.ubee-non-home-tab.v5-native-ready .app-page.show{
   display:flex !important;
   visibility:visible !important;
   opacity:1 !important;
@@ -25759,16 +25385,6 @@ body[data-ubee-tab-direction="backward"] .ubee-native-tab-enter{
   to{opacity:1;transform:translate3d(0,0,0)}
 }
 
-.nav-bar.v5-native-tabbar .nav-btn,
-.ubee-v5-main-cta,
-.ubee-v5-offer-actions button,
-.ubee-task-dock-primary,
-.ubee-modal-close,
-.ubee-modal-secondary,
-.v4-native-btn,
-.ubee-native-task-inline-action{
-  will-change:transform;
-}
 .nav-bar.v5-native-tabbar .nav-btn:active,
 .ubee-v5-main-cta:active,
 .ubee-v5-offer-actions button:active,
@@ -25796,6 +25412,33 @@ body.v5-native-ready .ubee-modal:not(.hidden) .ubee-modal-card{animation-duratio
   .nav-bar.v5-native-tabbar .nav-btn,
   .ubee-v5-main-cta,.ubee-v5-offer-actions button,.ubee-task-dock-primary,
   .ubee-modal-close,.ubee-modal-secondary,.v4-native-btn{transition:none!important;}
+}
+
+/* 2026-10-01｜Canonical Native Interaction Polish：直接併入 V5 Native Experience。 */
+html,body{
+  min-height:100%;
+  overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+.app-page,.page-scroll,.ubee-v5-workbench-content,.ubee-modal-content{
+  scroll-behavior:auto!important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+}
+.nav-bar.v5-native-tabbar,
+.nav-bar.v5-native-tabbar .nav-btn,
+.ubee-v5-status-pill,
+.ubee-v5-main-cta,
+.ubee-v5-offer-actions button,
+.ubee-task-dock-primary,
+.ubee-native-row,
+.ubee-account-row{
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+@media(prefers-reduced-motion:reduce){
+  html:focus-within{scroll-behavior:auto!important}
 }
 </style>
 
