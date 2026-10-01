@@ -1,28 +1,20 @@
-// 2026-10-01｜Customer Native Notification Center V1：客戶 Inbox、未讀 Badge、單則／全部已讀、全體會員公告管理與 Web Push Deep Link；沿用既有 customerAccounts/{customerId}/notifications，不改下單／派單／計價核心。
-// 2026-10-01｜Finance Dispatch Hold V1：新增月結未回繳財務派單鎖；不改 ACTIVE／正式資格；財務確認結清後才可人工恢復新任務。
-// 2026-09-30｜Rider Notification Admin No-Key V1.2：修復其他 V4 管理路由 middleware 定義；通知管理 GET/POST 維持直接存取；發布加入冪等防重送。
-// 2026-09-30｜Rider V5.3 Native Notification Center：新增小U後端 Notification Inbox、已讀同步與 Badge count；整合任務完成收入、客戶取消、預約承接／確認／任務前提醒與資格狀態事件；Web Push 與 App Inbox 分工，不改派單／計價／Smart Stack 核心。
-// 2026-09-29｜Customer/Rider State Atomic Sync V1：騎士狀態更新同一 transaction 同步寫入 status / riderStatus / customerTrackingStatus 與毫秒版本；客戶 API 明確回傳狀態版本。 
-// 2026-09-29｜Rider Area MultiSelect V1：接單設定與小U申請的 serviceDistricts 移除 8 區硬上限；接單設定不再被初始申請服務區鎖住，可儲存多行政區偏好；代駕與客戶端既有 API 契約不變。
-// 2026-09-29｜Customer Active Meta Fix V1.4.1：單筆訂單 API 明確回傳 createdAtMs / updatedAtMs，供用戶端固定顯示建立時間；ETA canonical 欄位維持不變。
-// 2026-09-29｜Drive Semantic + Universal ETA V1.4：保留既有狀態碼與 API 契約；代駕對外狀態改用車輛所在地／車輛交接／代駕目的地語意；六大服務 Live ETA 繼續由後端 traffic-aware Routes 為唯一依據。
-// 2026-09-29｜Drive Service + Contact Removal V1.3：保留正式代駕服務與專用計價／結算契約；完整移除 Order Chat API、訊息儲存與 Chat Push。
-// 2026-09-25｜Rider Profile Photo UI V4.3.4：正式小U大頭照以短效 Signed URL 提供騎士本人顯示；我的首頁／帳號資料可安全載入，不公開 Storage。
-// 2026-09-25｜Rider Profile Supplement Auth Compatibility Fix：正式小U大頭照補件在 Token 過渡期允許既有手機登入身分 fallback；有 Bearer Token 時仍以 Token riderDocId 為唯一可信來源，RIDER_AUTH_ENFORCE=true 時仍強制 Token。
-// =====================================================
-// UBee Backend｜Release 2026-09-24
-// 2026-09-24｜Rider Application Native Onboarding V1：新申請改為 9 頁式流程；新增小U大頭照獨立資產、管理端預覽與審核 fail-closed；既有五份證件與資格硬鎖保持不變。
-// 2026-09-24｜Rider Completed Task Detail V1：完成任務新增騎士本人專屬詳情 API；補完整路線、聯絡、費用、Smart Stack 轉場補貼、時間軸與短效照片網址，不影響進行中任務。
-// 2026-09-24｜Finance Contract Sync V2：同步 Smart Stack 平台轉場補貼、平台待撥款語意與店家已付款財務閉環；補強財務稽核欄位。
-// 2026-09-24｜Queue ETA Engine V1：客戶最終送達 ETA 以每張訂單獨立計算；Smart Stack B 單包含 A 剩餘路程＋A→B 轉場＋B 取件處理＋B 配送，A ETA 不受 B 影響。
-// 2026-09-24｜Smart Stack Transfer Subsidy V1：疊單轉場不向 A/B 客戶加價；短轉場不補貼，合理轉場由平台分潤固定補貼小U，超過既有 3km/15min 仍禁止疊單。
-// 2026-09-23｜Rider Multi-stop Route Refresh V1：完成目前送達點後同步切換下一站座標/Place ID，騎士端可立即重算並重畫下一段路線。
-// 2026-09-23｜Customer Multi-stop Quote Lock Fix V1：修正多點報價快照 deliveryStops 字串/物件格式不一致，避免建立任務時誤判「多點送達路線已變更」。
-// 2026-09-23｜Rider Multi-stop Visibility V1：待接任務 Preview 補多點配送安全摘要；接單前只回行政區、站點數與多點費，不洩露完整地址。
-// 2026-09-23｜Customer Production Multi-stop UI V1：確認一般客戶多點配送契約；送達點 2 選填，僅有有效第二點時納入路線與多點配送費。
-// 2026-09-23｜Dispatch & Finance Contract Sync V1：調度 Dashboard 補完整多點配送／代墊欄位；財務契約維持後端唯一來源。
-// Core：App Access Hard Lock／Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking／Customer Cloud Draft
-// =====================================================
+// ============================================================
+// UBee Backend｜Latest Release 2026-10-01
+// Release: Dual Client Native Polish & Cleanup V1
+//
+// 本次整理：
+// - 客戶端／騎士端 PWA 發版同步與原生 App 操作層整理。
+// - 保留既有 Customer Notification Center、Rider Notification Center、
+//   Finance Dispatch Hold、狀態原子同步、代駕、多點、Smart Stack 與正式計價契約。
+// - 本檔不變更下單／派單／計價／財務核心 API 行為；僅整理發版註解與雙端相容基線。
+//
+// Canonical recent milestones:
+// 2026-10-01 Customer Native Notification Center V1 / Finance Dispatch Hold V1
+// 2026-09-30 Rider Native Notification Center V5.3 / Notification Admin V1.2
+// 2026-09-29 Customer/Rider State Atomic Sync / Drive Semantic / Universal ETA
+// 2026-09-24 Queue ETA / Smart Stack Transfer Subsidy / Completed Task Detail
+// 2026-09-23 Customer & Rider Multi-stop production contract
+// ============================================================
 require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
