@@ -1,7 +1,7 @@
 /* ============================================================
  * UBee 跑腿｜客戶端 Service Worker｜最新正式版 2026-10-01
- * Release: Customer Native Polish & Cleanup V1
- * Version: 20261001-customer-native-polish-cleanup-v1
+ * Release: Customer Native Controls V2
+ * Version: 20261001-customer-native-controls-v2
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-native-polish-cleanup-v1';
+const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-native-controls-v2';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
