@@ -1,12 +1,13 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-01
-// Release: Dual Client Native Polish & Cleanup V1
+// Release: Customer Native Primary Action V3 / Rider Native Clean Launch V3
 //
 // 本次整理：
-// - 客戶端／騎士端 PWA 發版同步與原生 App 操作層整理。
-// - 保留既有 Customer Notification Center、Rider Notification Center、
-//   Finance Dispatch Hold、狀態原子同步、代駕、多點、Smart Stack 與正式計價契約。
-// - 本檔不變更下單／派單／計價／財務核心 API 行為；僅整理發版註解與雙端相容基線。
+// - 客戶端主導航改為「首頁／訂單／發任務／我的」；店家探索下沉至首頁次要入口。
+// - 騎士端修正冷啟動／Session Restore 畫面殘留；正式目標頁 Ready 後才結束 Splash。
+// - 保留既有 Customer Notification Center、Rider Notification Center、Finance Dispatch Hold、
+//   狀態原子同步、代駕、多點、Smart Stack 與正式計價契約。
+// - 本檔不變更下單／派單／計價／財務核心 API 行為；僅同步正式 Release 註解。
 //
 // Canonical recent milestones:
 // 2026-10-01 Customer Native Notification Center V1 / Finance Dispatch Hold V1
