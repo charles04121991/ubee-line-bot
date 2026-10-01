@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-10-01｜Finance Dispatch Hold V1：月結未回繳可由財務中心暫停新任務；結清後仍需財務人工恢復。 -->
 <!-- 2026-09-29｜Drive Finance V1：代駕沿用既有 Finance Contract，平台費／小U收入／客戶總額不另建第二套帳。 -->
 <!-- 2026-09-24｜Finance Contract Sync V2：同步 Smart Stack 平台轉場補貼；街口／店家已付款統一為平台待撥款；補平台補貼稽核。 -->
 <!-- 2026-09-23｜Finance Contract Sync V1：移除已停用資格開通費；補完整費用明細與 V4 L4 管理。 -->
@@ -46,6 +47,13 @@ button{cursor:pointer}
 .btn.yellow{background:var(--yellow);border-color:var(--yellow);color:#111}
 .btn.red{background:#fff2f3;border-color:#ffd0d3;color:#bf252d}
 .btn.blue{background:#eef5ff;border-color:#d9e7ff;color:#1e63c7}
+.btn.green{background:#ecf8f1;border-color:#bfe8d0;color:#167047}
+.btn.orange{background:#fff8e8;border-color:#f8d58a;color:#9a6500}
+.finance-dispatch-box{margin-top:12px;padding:11px 12px;border-radius:14px;border:1px solid var(--line);background:#f8f9fa;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.finance-dispatch-box.held{background:#fff7f0;border-color:#ffd3a1}
+.finance-dispatch-box.ready{background:#f0fbf5;border-color:#bfe8d0}
+.finance-dispatch-main{min-width:0}.finance-dispatch-title{font-size:12px;font-weight:1000}.finance-dispatch-sub{font-size:11px;color:var(--muted);font-weight:800;line-height:1.55;margin-top:4px}.finance-dispatch-status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:1000;white-space:nowrap;background:#fff;border:1px solid var(--line)}
+.finance-dispatch-status.held{color:#a45100;border-color:#ffd3a1}.finance-dispatch-status.ready{color:#167047;border-color:#bfe8d0}.finance-dispatch-status.clear{color:#52606d}
 .btn.small{padding:8px 10px;font-size:12px;border-radius:10px}
 .tabs{display:flex;gap:8px;overflow:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
@@ -575,28 +583,64 @@ async function loadCashRemittances(silent=false){
     el.innerHTML=`<div class="empty">讀取現金回繳失敗：${esc(err.message)}</div>`;
   }
 }
+function financeDispatchStatusHtml(rider){
+  const hold=rider?.financeDispatchHold||{};
+  const held=hold.active===true;
+  const due=Math.max(0,Number(rider?.cashDueToPlatform||0));
+  if(held&&due<=0){
+    return `<div class="finance-dispatch-box ready"><div class="finance-dispatch-main"><div class="finance-dispatch-title">財務派單狀態</div><div class="finance-dispatch-sub">本期應繳回平台已歸零，等待財務人員最後確認後恢復派單。${hold.heldAtMs?`<br>暫停時間：${esc(formatTime(hold.heldAtMs))}`:''}</div></div><span class="finance-dispatch-status ready">已結清・待恢復</span></div>`;
+  }
+  if(held){
+    return `<div class="finance-dispatch-box held"><div class="finance-dispatch-main"><div class="finance-dispatch-title">財務派單狀態</div><div class="finance-dispatch-sub">因月結應繳回平台費用尚未完成，已禁止承接新任務。${hold.heldAtMs?`<br>暫停時間：${esc(formatTime(hold.heldAtMs))}`:''}${hold.heldBy?`・處理：${esc(hold.heldBy)}`:''}</div></div><span class="finance-dispatch-status held">財務暫停中</span></div>`;
+  }
+  return `<div class="finance-dispatch-box"><div class="finance-dispatch-main"><div class="finance-dispatch-title">財務派單狀態</div><div class="finance-dispatch-sub">目前未啟用財務派單鎖。</div></div><span class="finance-dispatch-status clear">正常派單</span></div>`;
+}
+function financeRiderPayload(rider){
+  return {
+    riderDocId:String(rider?.riderDocId||''),
+    riderId:String(rider?.riderId||''),
+    riderPhone:String(rider?.riderPhone||''),
+    riderLineUserId:String(rider?.riderLineUserId||''),
+    riderName:String(rider?.riderName||''),
+  };
+}
 function renderCash(){
   const query = normalizeSearch(document.getElementById('cashSearch')?.value);
   const riders = (state.cash?.riders || []).filter(r=>riderMatches(r,query));
   const el = document.getElementById('cashList');
-  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的小U待回繳現金。</div>';return;}
+  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的小U待回繳現金或財務派單鎖。</div>';return;}
   el.innerHTML = riders.map(rider=>{
     const orders = Array.isArray(rider.orders)?rider.orders:[];
     const incomeTotal = orders.reduce((s,o)=>s+Number(o.riderIncome||0),0);
     const advanceTotal = orders.reduce((s,o)=>s+Number(o.advancePayment||0),0);
     const orderIds = orders.map(o=>String(o.id||'')).filter(Boolean);
+    const hold = rider.financeDispatchHold||{};
+    const held = hold.active===true;
+    const due = Math.max(0,Number(rider.cashDueToPlatform||0));
+    const riderPayload = encodeURIComponent(JSON.stringify(financeRiderPayload(rider)));
+    const financeAction = held
+      ? (due<=0
+          ? `<button class="btn green" onclick="releaseFinanceDispatch('${riderPayload}',this)">恢復派單</button>`
+          : `<button class="btn orange" disabled>財務暫停中</button>`)
+      : (due>0
+          ? `<button class="btn orange" onclick="holdFinanceDispatch('${riderPayload}',${due},this)">暫停派單</button>`
+          : '');
+    const settleAction = orderIds.length
+      ? `<button class="btn red" onclick='settleCashBatch(${JSON.stringify(JSON.stringify(orderIds))},${JSON.stringify(rider.riderName||'此小U')},${due},this)'>確認此小U全部已回繳</button>`
+      : '';
     return `<article class="rider-card cash">
       <div class="rider-head">
         <div><div class="rider-name">${esc(rider.riderName || '未設定小U姓名')}</div><div class="rider-meta">電話：${esc(rider.riderPhone||'-')}<br>識別：${esc(rider.riderId||rider.riderDocId||rider.riderLineUserId||rider.riderKey||'-')}</div></div>
-        <div class="rider-total cash"><strong>${money(rider.cashDueToPlatform)}</strong><span>${Number(rider.orderCount||orders.length)} 筆待回繳</span></div>
+        <div class="rider-total cash"><strong>${money(due)}</strong><span>${Number(rider.orderCount||orders.length)} 筆待回繳</span></div>
       </div>
       <div class="summary-row">
         <div class="summary-mini"><span>客人現金代收</span><strong>${money(rider.cashCollectedTotal)}</strong></div>
         <div class="summary-mini"><span>小U任務收入</span><strong>${money(incomeTotal)}</strong></div>
         <div class="summary-mini"><span>小U代墊回收</span><strong>${money(advanceTotal)}</strong></div>
       </div>
-      <div class="rider-actions"><button class="btn red" onclick='settleCashBatch(${JSON.stringify(JSON.stringify(orderIds))},${JSON.stringify(rider.riderName||'此小U')},${Number(rider.cashDueToPlatform||0)},this)'>確認此小U全部已回繳</button></div>
-      <details><summary>查看 ${orders.length} 筆待回繳明細</summary><div class="order-list">
+      ${financeDispatchStatusHtml(rider)}
+      <div class="rider-actions">${settleAction}${financeAction}</div>
+      ${orders.length?`<details><summary>查看 ${orders.length} 筆待回繳明細</summary><div class="order-list">
         ${orders.map(order=>`<div class="order-card"><div class="order-top"><div class="order-no">${esc(order.orderNo||order.id||'-')}</div><span class="tag cash">尚未回繳</span></div><div class="rows">
           <div class="row"><span class="label">完成時間</span><span class="value">${esc(formatTime(order.completedAt))}</span></div>
           <div class="row"><span class="label">客人支付現金</span><span class="value">${money(order.customerTotal)}</span></div>
@@ -605,9 +649,32 @@ function renderCash(){
           ${Number(order.stackTransferSubsidy||0)>0?`<div class="row"><span class="label">平台轉場補貼</span><span class="value">${money(order.stackTransferSubsidy)}</span></div>`:''}
           <div class="row"><span class="label">應回繳平台</span><span class="value amount-red">${money(order.cashDueToPlatform)}</span></div>
         </div><button class="btn red small" onclick="settleCashSingle('${esc(order.id||'')}',${Number(order.cashDueToPlatform||0)},this)">確認此筆已回繳</button></div>`).join('')}
-      </div></details>
+      </div></details>`:''}
     </article>`;
   }).join('');
+}
+
+async function holdFinanceDispatch(riderPayloadEncoded,amount,button){
+  let rider={};try{rider=JSON.parse(decodeURIComponent(riderPayloadEncoded||''))}catch(e){}
+  const name=rider.riderName||'此小U';
+  if(!confirm(`確認暫停「${name}」承接新任務？\n\n目前應繳回平台：${money(amount)}\n\n暫停後不會中止正在執行的任務，但不能再上線、讀取或承接新的即時／預約／疊單任務。`))return;
+  const old=button?.textContent;if(button){button.disabled=true;button.textContent='暫停中...';}
+  try{
+    const data=await postJson('/api/admin/rider-finance-dispatch/hold',{...rider,operator:'finance_center',reasonLabel:'月結應繳回平台費用尚未完成回繳'});
+    showToast(`${data.riderName||name} 已暫停派單・待回繳 ${money(data.pendingDue)}`);
+    await Promise.all([loadCashRemittances(true),loadOverview(true)]);
+  }catch(err){alert('暫停派單失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
+}
+async function releaseFinanceDispatch(riderPayloadEncoded,button){
+  let rider={};try{rider=JSON.parse(decodeURIComponent(riderPayloadEncoded||''))}catch(e){}
+  const name=rider.riderName||'此小U';
+  if(!confirm(`確認財務已核對完成，要恢復「${name}」的新任務接單資格？\n\n後端會再次檢查是否仍有應繳回平台款項；只要還有未結清金額，就不會解鎖。`))return;
+  const old=button?.textContent;if(button){button.disabled=true;button.textContent='確認中...';}
+  try{
+    const data=await postJson('/api/admin/rider-finance-dispatch/release',{...rider,operator:'finance_center',releaseNote:'財務確認回繳完成，人工恢復派單'});
+    showToast(`${data.riderName||name} 的財務派單限制已解除`);
+    await Promise.all([loadCashRemittances(true),loadOverview(true)]);
+  }catch(err){alert('恢復派單失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
 }
 
 async function settleCashSingle(orderId,amount,button){
