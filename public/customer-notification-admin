@@ -1,0 +1,449 @@
+<!-- 2026-10-01｜Customer Notification Admin No-Key Light V1：沿用客戶通知管理安全操作鏈；預覽、發布前預檢、二次確認、發送中鎖定、失敗保留草稿、防重送。 -->
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f8">
+<title>UBee｜客戶通知管理</title>
+<style>
+
+:root{
+  color-scheme:light;
+  --bg:#f5f6f8;
+  --panel:#ffffff;
+  --panel2:#f3f4f6;
+  --line:#e3e5e8;
+  --text:#17181a;
+  --muted:#777b82;
+  --accent:#facc15;
+  --accent-soft:#fff8d8;
+  --danger:#d92d20;
+  --ok:#168a4a;
+  --shadow:0 10px 30px rgba(17,24,39,.06);
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;-webkit-font-smoothing:antialiased}
+.app{max-width:920px;margin:auto;padding:28px 18px 80px}
+.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px}
+.brand{font-size:13px;color:#9a7800;font-weight:850;letter-spacing:.08em}
+.title{font-size:30px;font-weight:850;margin:5px 0;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:14px;line-height:1.55}
+.btn{border:0;border-radius:14px;padding:12px 16px;font-weight:800;cursor:pointer;background:var(--panel2);color:var(--text);transition:transform .14s ease,background .14s ease,border-color .14s ease}
+.btn:active{transform:scale(.98)}.btn:disabled{opacity:.48;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--accent);color:#17181a}
+.btn.ghost{background:#fff;border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h2{font-size:17px;margin:0 0 16px}
+.field{margin-bottom:15px}
+.label{display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:750;margin-bottom:8px}
+.hint,.count{color:var(--muted);font-weight:500}
+.input,.select,.textarea{width:100%;border:1px solid #d9dce1;border-radius:14px;background:#fff;color:var(--text);padding:13px 14px;font:inherit;outline:none;box-shadow:0 1px 2px rgba(17,24,39,.02)}
+.input::placeholder,.textarea::placeholder{color:#a3a7ad}
+.input:focus,.select:focus,.textarea:focus{border-color:#c3a400;box-shadow:0 0 0 3px rgba(250,204,21,.16)}
+.textarea{min-height:170px;resize:vertical;line-height:1.6}
+.switchrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.switchrow:first-child{border-top:0}
+.switch{width:48px;height:28px;border-radius:999px;background:#d9dce1;position:relative;cursor:pointer;border:0}
+.switch:after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:white;top:3px;left:3px;transition:.18s;box-shadow:0 1px 4px rgba(17,24,39,.18)}
+.switch.on{background:var(--accent)}
+.switch.on:after{left:23px}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap}
+.notice{padding:12px 14px;border-radius:14px;background:#f7f8fa;color:var(--muted);font-size:13px;line-height:1.55;border:1px solid #eceef1}
+.preview{white-space:pre-wrap;line-height:1.65}
+.preview-title{font-size:18px;font-weight:850;margin-bottom:8px}
+.tag{display:inline-flex;padding:5px 9px;border-radius:999px;background:var(--accent-soft);color:#7b6200;font-size:12px;font-weight:800;margin-bottom:12px;border:1px solid #f5df78}
+.history-item{padding:15px 0;border-top:1px solid var(--line)}
+.history-item:first-child{border-top:0}
+.history-head{display:flex;justify-content:space-between;gap:12px}
+.history-title{font-weight:800}
+.history-meta{font-size:12px;color:var(--muted);margin-top:5px}
+.history-body{font-size:13px;color:#555a61;margin-top:9px;white-space:pre-wrap;line-height:1.55;max-height:82px;overflow:hidden}
+.status{font-size:12px;font-weight:800}
+.status.ok{color:var(--ok)}
+.empty{color:var(--muted);text-align:center;padding:24px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#17181a;color:#fff;padding:11px 16px;border-radius:999px;font-weight:750;opacity:0;pointer-events:none;transition:.2s;z-index:20;box-shadow:0 12px 30px rgba(17,24,39,.18)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+dialog{border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--text);padding:0;max-width:480px;width:calc(100% - 32px);box-shadow:0 24px 70px rgba(17,24,39,.18)}
+dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(2px)}
+.dialog-inner,.dialog-card{padding:20px}
+.dialog-inner h3,.dialog-title{margin:0 0 10px}
+.dialog-title{font-size:18px;font-weight:850}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+@media(max-width:720px){
+  .app{padding:22px 16px 70px}
+  .grid{grid-template-columns:1fr}
+  .top{display:block}
+  .top>.actions{justify-content:flex-start;margin-top:14px}
+  .top .btn{margin-top:0}
+  .title{font-size:26px}
+  .card{border-radius:18px;padding:16px}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top"><div><div class="brand">UBEE CUSTOMER ADMIN</div><div class="title">客戶通知管理</div><div class="sub">發布系統公告到 UBee 客戶 Notification Center，並可同步發送 Web Push。</div></div><div class="actions"><button class="btn ghost" onclick="loadAnnouncements()">重新整理</button></div></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>發布新通知</h2>
+      <div class="field"><div class="label">通知類型</div><select id="category" class="select"><option>系統公告</option><option>營運通知</option><option>重要提醒</option><option>優惠活動</option></select></div>
+      <div class="field"><div class="label">通知標題 <span id="titleCount" class="count">0 / 160</span></div><input id="noticeTitle" class="input" maxlength="160" placeholder="例如：UBee 系統服務更新"></div>
+      <div class="field"><div class="label">通知內容 <span id="bodyCount" class="count">0 / 2000</span></div><textarea id="noticeBody" class="textarea" maxlength="2000" placeholder="輸入要發布給客戶的完整通知內容…"></textarea></div>
+      <div class="notice">發送對象：<b style="color:var(--text)">全體正常 UBee 會員（優惠活動依會員偏好）</b></div>
+      <div style="margin-top:14px">
+        <div class="switchrow"><div><b>同步 Web Push</b><div class="hint">已開啟 Web Push 的會員會收到手機通知。</div></div><button id="pushSwitch" class="switch on" aria-label="同步 Web Push" onclick="togglePush()"></button></div>
+      </div>
+      <div class="actions"><button id="previewBtn" class="btn ghost" type="button">預覽</button><button id="publishBtn" class="btn primary" type="button" disabled>發布通知</button></div>
+    </div>
+
+    <div>
+      <div class="card"><h2>通知預覽</h2><div id="previewEmpty" class="empty">輸入通知內容後，可先預覽客戶看到的資訊。</div><div id="previewBox" hidden><div id="previewCategory" class="tag">系統公告</div><div id="previewTitle" class="preview-title"></div><div id="previewBody" class="preview"></div></div></div>
+      <div class="card"><h2>發布說明</h2><div id="backendStatus" class="notice">正在檢查通知服務…</div><div class="notice" style="margin-top:10px">發布前會再次檢查通知服務並顯示最後確認內容。發布期間會鎖定欄位；若網路中斷，草稿會保留，可安全重試。</div></div>
+    </div>
+  </div>
+
+  <div class="card"><h2>已發布通知</h2><div id="history"><div class="empty">尚未載入</div></div></div>
+</div>
+
+<dialog id="confirmDialog"><div class="dialog-inner">
+      <h3>發布前最後確認</h3>
+      <div id="confirmText" class="notice"></div>
+      <div class="dialog-actions">
+        <button id="cancelPublishBtn" class="btn ghost" type="button">取消</button>
+        <button id="confirmPublishBtn" class="btn primary" type="button">確認發布</button>
+      </div>
+    </div></dialog>
+<div id="toast" class="toast"></div>
+<script>
+const API_BASE = location.origin;
+const $ = id => document.getElementById(id);
+
+let pushEnabled = true;
+let backendReady = false;
+let publishInFlight = false;
+let draftIdentity = null;
+let draftAttempted = false;
+
+function esc(v=''){
+  return String(v).replace(/[&<>"']/g, m => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[m]));
+}
+
+function toast(msg, duration=2800){
+  const el = $('toast');
+  el.textContent = String(msg || '');
+  el.classList.add('show');
+  clearTimeout(window.__tt);
+  window.__tt = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function values(){
+  return {
+    category: $('category').value,
+    title: $('noticeTitle').value.trim(),
+    message: $('noticeBody').value.trim(),
+    webPush: pushEnabled,
+  };
+}
+
+function resetDraftIdentity(){
+  draftIdentity = null;
+  draftAttempted = false;
+}
+
+function ensureDraftIdentity(){
+  if (draftIdentity) return draftIdentity;
+  const rand = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+    ? globalThis.crypto.randomUUID().replace(/-/g,'').slice(0,20)
+    : Math.random().toString(36).slice(2,14);
+  const stamp = Date.now().toString(36);
+  const token = `customer_admin_${stamp}_${rand}`.slice(0,78);
+  draftIdentity = { announcementId:token, revision:token };
+  return draftIdentity;
+}
+
+function updateCounts(){
+  $('titleCount').textContent = `${$('noticeTitle').value.length} / 160`;
+  $('bodyCount').textContent = `${$('noticeBody').value.length} / 2000`;
+}
+
+function updateActionState(){
+  const v = values();
+  $('previewBtn').disabled = !(v.title || v.message) || publishInFlight;
+  $('publishBtn').disabled = !(v.title && v.message) || !backendReady || publishInFlight;
+}
+
+function setBackendStatus(ok, text){
+  backendReady = ok === true;
+  const el = $('backendStatus');
+  el.textContent = text;
+  el.style.borderColor = ok ? '#b7e3c8' : '#f1c0bd';
+  el.style.background = ok ? '#f0fbf4' : '#fff4f3';
+  el.style.color = ok ? '#176b3a' : '#a52a21';
+  updateActionState();
+}
+
+function renderPreview(){
+  const v = values();
+  if (!v.title && !v.message) {
+    $('previewBox').hidden = true;
+    $('previewEmpty').hidden = false;
+    return false;
+  }
+  $('previewEmpty').hidden = true;
+  $('previewBox').hidden = false;
+  $('previewCategory').textContent = v.category;
+  $('previewTitle').textContent = v.title || '（尚未輸入標題）';
+  $('previewBody').textContent = v.message || '（尚未輸入內容）';
+  return true;
+}
+
+function previewNotice(){
+  if (!renderPreview()) {
+    toast('請先輸入通知標題或內容');
+    return;
+  }
+  toast('預覽已更新');
+}
+
+function togglePush(){
+  if (publishInFlight) return;
+  pushEnabled = !pushEnabled;
+  $('pushSwitch').classList.toggle('on', pushEnabled);
+  $('pushSwitch').setAttribute('aria-pressed', pushEnabled ? 'true' : 'false');
+}
+
+async function api(path, opt={}, timeoutMs=20000){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const headers = {'Content-Type':'application/json', ...(opt.headers || {})};
+    const res = await fetch(API_BASE + path, {
+      ...opt,
+      headers,
+      credentials:'same-origin',
+      cache:'no-store',
+      signal:controller.signal,
+    });
+
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+
+    if (!res.ok || data.success === false) {
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    return data;
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('連線逾時，請確認後端狀態後再試。');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function checkBackendReady(showToast=false){
+  setBackendStatus(false, '正在檢查通知服務…');
+  try {
+    const data = await api('/api/admin/customer-notifications/announcements?limit=1', {}, 15000);
+    if (!Array.isArray(data.announcements)) {
+      throw new Error('後端回傳格式不正確');
+    }
+    setBackendStatus(true, '通知服務正常，可以預覽與發布。');
+    if (showToast) toast('通知服務正常');
+    return true;
+  } catch (err) {
+    setBackendStatus(false, `通知服務目前不可用：${err.message || '未知錯誤'}`);
+    if (showToast) toast('通知服務目前不可用，已禁止發布', 3600);
+    return false;
+  }
+}
+
+async function confirmPublish(){
+  if (publishInFlight) return;
+
+  const v = values();
+  if (!v.title || !v.message) {
+    toast('通知標題與內容都必須填寫');
+    updateActionState();
+    return;
+  }
+
+  renderPreview();
+
+  const ready = await checkBackendReady(false);
+  if (!ready) {
+    toast('後端檢查未通過，已取消發布', 3600);
+    return;
+  }
+
+  ensureDraftIdentity();
+
+  $('confirmText').innerHTML =
+    `<b>${esc(v.category)}｜${esc(v.title)}</b>` +
+    `<br><br>${esc(v.message).replace(/\n/g,'<br>')}` +
+    `<br><br><b>發送對象：</b>全體正常 UBee 會員（優惠活動依會員偏好）` +
+    `<br><b>Web Push：</b>${v.webPush ? '同步發送' : '不發送'}`;
+
+  $('confirmDialog').showModal();
+  $('confirmPublishBtn').focus();
+}
+
+async function publishNotice(){
+  if (publishInFlight) return;
+
+  const v = values();
+  if (!v.title || !v.message) {
+    $('confirmDialog').close();
+    toast('通知標題或內容不完整，請重新確認');
+    return;
+  }
+
+  const identity = ensureDraftIdentity();
+  draftAttempted = true;
+  publishInFlight = true;
+
+  $('confirmDialog').close();
+  $('publishBtn').textContent = '發布中…';
+  $('publishBtn').disabled = true;
+  $('previewBtn').disabled = true;
+  $('confirmPublishBtn').disabled = true;
+
+  $('category').disabled = true;
+  $('noticeTitle').disabled = true;
+  $('noticeBody').disabled = true;
+  $('pushSwitch').disabled = true;
+
+  try {
+    const data = await api('/api/admin/customer-notifications/announcement', {
+      method:'POST',
+      body:JSON.stringify({
+        ...v,
+        ...identity,
+        active:true,
+      }),
+    }, 120000);
+
+    if (data.success !== true || !data.announcementId) {
+      throw new Error('後端沒有回傳完整發布結果');
+    }
+
+    const d = data.delivery || {};
+    const eligible = Number(d.eligible || 0);
+    const created = Number(d.created || 0);
+    const failed = Number(d.failed || 0);
+
+    await loadAnnouncements(false);
+
+    if (failed > 0) {
+      toast(`部分發布未完成：成功 ${created}、失敗 ${failed}。內容已保留，可直接重試。`, 5200);
+      return;
+    }
+
+    toast(
+      data.idempotent === true
+        ? '此通知先前已發布完成，本次沒有重複發送。'
+        : `發布完成：${created} / ${eligible} 位符合資格會員已建立通知`,
+      4200
+    );
+
+    $('noticeTitle').value = '';
+    $('noticeBody').value = '';
+    $('previewBox').hidden = true;
+    $('previewEmpty').hidden = false;
+    resetDraftIdentity();
+    updateCounts();
+  } catch (err) {
+    toast(`發布失敗：${err.message || '未知錯誤'}。內容已保留，可直接重試。`, 5200);
+  } finally {
+    publishInFlight = false;
+    $('publishBtn').textContent = '發布通知';
+    $('confirmPublishBtn').disabled = false;
+    $('category').disabled = false;
+    $('noticeTitle').disabled = false;
+    $('noticeBody').disabled = false;
+    $('pushSwitch').disabled = false;
+    updateActionState();
+  }
+}
+
+async function loadAnnouncements(updateStatus=true){
+  try {
+    const data = await api('/api/admin/customer-notifications/announcements?limit=50', {}, 20000);
+    renderHistory(Array.isArray(data.announcements) ? data.announcements : []);
+    if (updateStatus) {
+      setBackendStatus(true, '通知服務正常，可以預覽與發布。');
+    }
+    return true;
+  } catch (err) {
+    $('history').innerHTML = `<div class="empty">${esc(err.message || '讀取失敗')}</div>`;
+    if (updateStatus) {
+      setBackendStatus(false, `通知服務目前不可用：${err.message || '未知錯誤'}`);
+    }
+    return false;
+  }
+}
+
+function renderHistory(items){
+  if (!items.length) {
+    $('history').innerHTML = '<div class="empty">目前沒有已發布通知</div>';
+    return;
+  }
+
+  $('history').innerHTML = items.map(n => {
+    const d = n.delivery || {};
+    const dt = n.createdAtMs
+      ? new Date(n.createdAtMs).toLocaleString('zh-TW', {hour12:false})
+      : '—';
+
+    return `<div class="history-item">
+      <div class="history-head">
+        <div>
+          <div class="history-title">${esc(n.title)}</div>
+          <div class="history-meta">${esc(n.category)} ・ ${esc(dt)}</div>
+        </div>
+        <div class="status ok">${n.active ? '已發布' : '停用'}</div>
+      </div>
+      <div class="history-body">${esc(n.message)}</div>
+      <div class="history-meta">
+        Inbox ${Number(d.created || 0)} / 符合資格會員 ${Number(d.eligible || 0)}
+        ${Number(d.failed || 0) > 0 ? ` ・ 失敗 ${Number(d.failed || 0)}` : ''}
+        ${n.webPush !== false ? ' ・ Push 已啟用' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function onDraftEdited(){
+  updateCounts();
+  renderPreview();
+
+  if (draftAttempted && !publishInFlight) {
+    resetDraftIdentity();
+  }
+  updateActionState();
+}
+
+$('previewBtn').addEventListener('click', previewNotice);
+$('publishBtn').addEventListener('click', confirmPublish);
+$('cancelPublishBtn').addEventListener('click', () => $('confirmDialog').close());
+$('confirmPublishBtn').addEventListener('click', publishNotice);
+$('noticeTitle').addEventListener('input', onDraftEdited);
+$('noticeBody').addEventListener('input', onDraftEdited);
+$('category').addEventListener('change', onDraftEdited);
+$('pushSwitch').setAttribute('aria-pressed','true');
+
+updateCounts();
+updateActionState();
+loadAnnouncements(true);
+</script>
+</body>
+</html>
