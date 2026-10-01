@@ -1,13 +1,12 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-01
-// Release: Customer Native Notification Tab V4 / Rider Native Clean Launch V3
+// Release: 2026_1001_2109｜Customer Notification Tab V4 / Rider Application + Approval Login Lock
 //
 // 本次整理：
-// - 客戶端主導航正式改為「首頁／訂單／通知／我的」；舊「發任務」主 Tab 已移除。
-// - 客戶端通知中心升級為獨立主 Tab；「我的」內舊通知入口與子頁路由已移除。
-// - action=new 僅保留 PWA／網址快捷下單；店家探索維持首頁次要入口。
-// - 騎士端延續 Rider Native Clean Launch V3。
-// - 本檔不變更下單／派單／計價／財務／通知 API 行為；僅同步正式 Release 註解。
+// - 修正 Rider Clean Launch 對申請／進度 Native Gate 的前端阻斷（前端檔同步）。
+// - Rider Login / Session / Rider API 採 fail-closed 審核鎖：只有正式 ridersV2 且審核通過才可使用騎士端。
+// - 申請中／未審核／未通過只存在 riderApplicationsV2，不建立登入權限；登入 API 回傳明確申請狀態訊息。
+// - Customer Native Notification Tab V4、下單／派單／計價／財務／通知契約維持不變。
 //
 // Canonical recent milestones:
 // 2026-10-01 Customer Native Notification Tab V4 / Customer Notification Center / Finance Dispatch Hold V1
@@ -7119,11 +7118,43 @@ function getRiderV4Progress(rider = {}) {
 
 
 function isApprovedRiderData(riderData) {
-  if (!riderData) return false;
+  if (!riderData || riderData.approved !== true) return false;
+
+  const reviewStatus = String(
+    riderData.reviewStatus || ''
+  ).trim().toLowerCase();
+  const status = String(
+    riderData.status || ''
+  ).trim().toLowerCase();
+  const lifecycle = getRiderV4LifecycleStatus(riderData);
+
+  // Approval Login Lock：approved flag 必須成立，而且不能仍處於申請／待審／拒絕狀態。
+  // 正式審核完成後允許 TRAINING 登入完成數位入職；ACTIVE / RETRAINING / RESTRICTED
+  // 仍屬已審核正式帳號。SUSPENDED / BANNED 會先由 isBlockedRiderData() 阻擋。
+  if (['submitted', 'pending', 'under_review', 'rejected'].includes(reviewStatus)) {
+    return false;
+  }
+
+  if (['submitted', 'pending', 'under_review', 'rejected'].includes(status)) {
+    return false;
+  }
+
+  if ([
+    RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+    RIDER_V4_LIFECYCLE.REJECTED,
+  ].includes(lifecycle)) {
+    return false;
+  }
 
   return (
-    riderData.approved === true ||
-    String(riderData.status || '').trim().toLowerCase() === 'approved'
+    reviewStatus === 'approved' ||
+    ['approved', 'training', 'active', 'retraining', 'restricted'].includes(status) ||
+    [
+      RIDER_V4_LIFECYCLE.TRAINING,
+      RIDER_V4_LIFECYCLE.ACTIVE,
+      RIDER_V4_LIFECYCLE.RETRAINING,
+      RIDER_V4_LIFECYCLE.RESTRICTED,
+    ].includes(lifecycle)
   );
 }
 
@@ -7331,10 +7362,53 @@ async function findRiderByPhoneForLogin(phone) {
   let riderDoc = found.riderDoc;
 
   if (!riderDoc || !riderDoc.exists) {
+    // 新申請只存在 riderApplicationsV2；未正式審核通過前絕不能被當成可登入小U。
+    const applicationDoc = await db
+      .collection(RIDER_V2_COLLECTIONS.applications)
+      .doc(cleanPhone)
+      .get();
+
+    if (applicationDoc.exists) {
+      const application = applicationDoc.data() || {};
+      const applicationStatus = String(application.status || '').trim().toLowerCase();
+      const reviewStatus = String(application.reviewStatus || '').trim().toLowerCase();
+
+      if (applicationStatus === 'rejected' || reviewStatus === 'rejected') {
+        return {
+          ok: false,
+          statusCode: 403,
+          code: 'RIDER_APPLICATION_REJECTED',
+          message: '你的小U申請目前未通過審核，無法登入騎士端。請先查詢申請進度或聯繫 UBee 客服。',
+        };
+      }
+
+      if (
+        application.approved === true ||
+        reviewStatus === 'approved' ||
+        ['approved', 'training', 'active'].includes(applicationStatus)
+      ) {
+        // 申請資料顯示已核准但正式 ridersV2 尚不存在，採 fail-closed，避免半套資料取得登入權限。
+        return {
+          ok: false,
+          statusCode: 409,
+          code: 'RIDER_APPROVAL_SYNC_REQUIRED',
+          message: '你的申請已進入核准流程，但正式小U帳號尚未完成同步，暫時無法登入。請聯繫 UBee 辦公室確認。',
+        };
+      }
+
+      return {
+        ok: false,
+        statusCode: 403,
+        code: 'RIDER_APPLICATION_UNDER_REVIEW',
+        message: '你的小U申請尚在審核中；必須審核通過後才能登入騎士端。',
+      };
+    }
+
     return {
       ok: false,
       statusCode: 404,
-      message: '找不到此手機號碼的小U資料，請回到 UBee 騎士端點選「申請成為小U」完成申請。',
+      code: 'RIDER_APPLICATION_NOT_FOUND',
+      message: '找不到此手機號碼的小U申請資料，請先完成「申請成為小U」。',
     };
   }
 
@@ -7344,6 +7418,7 @@ async function findRiderByPhoneForLogin(phone) {
     return {
       ok: false,
       statusCode: 403,
+      code: 'RIDER_ACCOUNT_BLOCKED',
       message: '此騎士帳號目前無法登入，請聯繫 UBee 跑腿管理員。',
     };
   }
@@ -7352,7 +7427,8 @@ async function findRiderByPhoneForLogin(phone) {
     return {
       ok: false,
       statusCode: 403,
-      message: '你的騎士資料尚未審核通過，暫時無法登入騎士端。',
+      code: 'RIDER_REVIEW_NOT_APPROVED',
+      message: '你的小U資格尚未完成正式審核，審核通過後才能登入騎士端。',
     };
   }
 
@@ -7388,6 +7464,7 @@ app.post('/api/rider/login', async (req, res) => {
     if (!result.ok) {
       return res.status(result.statusCode).json({
         success: false,
+        code: result.code || 'RIDER_LOGIN_DENIED',
         message: result.message,
       });
     }
@@ -7500,7 +7577,8 @@ app.get('/api/rider/session', riderAuthMiddleware, async (req, res) => {
     if (!isApprovedRiderData(riderData)) {
       return res.status(403).json({
         success: false,
-        message: '你的騎士資格目前尚未啟用，請聯繫 UBee 跑腿管理員。',
+        code: 'RIDER_REVIEW_NOT_APPROVED',
+        message: '你的小U資格尚未完成正式審核，審核通過後才能登入騎士端。',
       });
     }
 
@@ -20237,13 +20315,19 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    if (
-      finalServiceArea.length < 2 ||
-      finalServiceArea.length > 80
-    ) {
+    if (finalServiceArea.length < 2) {
       return res.status(400).json({
         success: false,
-        message: '可服務區域請填寫 2～80 字。',
+        message: '請至少選擇一個可服務行政區。',
+      });
+    }
+
+    // Area MultiSelect：前端已支援跨縣市多行政區，不再保留舊 80 字上限。
+    // Firestore 正式欄位本來即以 4000 字保存；此處同步資料契約，避免多選合法區域被誤擋。
+    if (finalServiceArea.length > 4000) {
+      return res.status(400).json({
+        success: false,
+        message: '可服務區域資料過長，請重新選擇。',
       });
     }
 
