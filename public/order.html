@@ -3,27 +3,26 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-01
-  Release: Customer Native Polish & Cleanup V1
-  PWA: 20261001-customer-native-polish-cleanup-v1
+  Release: Customer Native Controls V2
+  PWA: 20261001-customer-native-controls-v2
 
   本次整理：
-  1. 原生 App 操作層：觸控回饋、捲動、Safe Area、鍵盤與底部導航維持單一正式規格。
-  2. 首頁多點配送文案收斂：送達點 2 保留選填與 +NT$50 規則，移除重複工程提示。
-  3. 清除 No-Map 後已無 DOM 的舊首頁地圖視覺／匿名小U Marker 顯示層與舊首頁地圖呼叫。
-  4. 保留 Google Places／Geocode／Routes、定位、估價、下單、ETA、通知與會員核心。
-  5. 舊 Step 1～4 只作資料／契約相容橋接，不再作為客戶可見 UI。
+  1. 可見 Select 統一改為 Native Picker / Bottom Sheet；原 Select 僅保留資料契約與 change event。
+  2. 會員註冊縣市／行政區、預約目標、代駕排檔、意見類型與既有選擇欄位使用同一互動規格。
+  3. Native Picker 支援 Safe Area、背景鎖定、選取回饋、Disabled 同步與動態 options 更新。
+  4. 既有 Production Flow 的 Listbox／Chip 維持唯一正式選擇 UI，不建立重複元件。
+  5. 計價、下單、Routes、定位、ETA、通知、會員與後端 API 契約完全不變。
 
   Canonical recent milestones:
-  - 2026-10-01 Customer Native Notification Center V1
+  - 2026-10-01 Customer Native Controls V2 / Notification Center / Native Cleanup
   - 2026-09-29 State Sync / Rating Lock / No-Map + Universal ETA / Drive Semantic
   - 2026-09-24 Order Lifecycle / Segmented Live Progress / Final Delivery ETA
   - 2026-09-23 Multi-stop / Cloud Draft
-  - 2026-09-16 Native Experience V2 / Growth Engine
 ========================================================= -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-native-polish-cleanup-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-native-controls-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -21933,7 +21932,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-polish-cleanup-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-controls-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -28877,6 +28876,176 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
 
 
+
+
+
+<!-- =========================================================
+  2026-10-01｜Customer Native Controls V2
+  可見原生選擇器統一層：保留既有 select 作資料契約，畫面使用同一 Bottom Sheet。
+  不修改估價、下單、會員、通知與 API 資料格式。
+========================================================= -->
+<style id="ubee-customer-native-picker-v2-style">
+.ubee-native-picker-source{
+  position:absolute!important;width:1px!important;height:1px!important;min-width:1px!important;min-height:1px!important;
+  padding:0!important;margin:0!important;border:0!important;opacity:0!important;overflow:hidden!important;
+  clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;pointer-events:none!important;
+}
+.ubee-native-picker-trigger{
+  box-sizing:border-box;width:100%;min-height:52px;padding:0 14px;border:1px solid #e5e7eb;border-radius:14px;
+  background:#fff;color:#17191c;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.ubee-native-picker-trigger:active{background:#f7f8f9;transform:scale(.995)}
+.ubee-native-picker-trigger:disabled{opacity:.46;cursor:default;transform:none}
+.ubee-native-picker-trigger-value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:760;color:#202327}
+.ubee-native-picker-trigger.is-placeholder .ubee-native-picker-trigger-value{color:#8a9096;font-weight:650}
+.ubee-native-picker-trigger-chevron{flex:0 0 auto;color:#9aa0a6;font-size:22px;line-height:1;transform:rotate(90deg)}
+.uca-field>.ubee-native-picker-trigger{margin-top:0;min-height:54px;border-color:#dfe2e6;background:#fff}
+.input-wrap>.ubee-native-picker-trigger{flex:1;min-width:0;min-height:50px;border:0;border-radius:0;background:transparent;padding:0 10px}
+.input-wrap>.ubee-native-picker-trigger:active{background:rgba(0,0,0,.025)}
+#productionOrderFlow .ubee-native-form-row>.ubee-native-picker-trigger{
+  min-height:38px;border:0;border-radius:0;background:transparent;padding:2px 0;justify-content:flex-end;
+}
+#productionOrderFlow .ubee-native-form-row>.ubee-native-picker-trigger .ubee-native-picker-trigger-value{text-align:right;font-size:16px;font-weight:700}
+#productionOrderFlow .ubee-native-form-row>.ubee-native-picker-trigger:active{background:transparent;opacity:.62}
+#productionOrderFlow .ubee-native-form-row>.ubee-native-picker-trigger-chevron{font-size:20px}
+.ubee-native-picker-overlay{
+  position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;
+  padding:0;background:rgba(15,23,42,.34);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+  opacity:0;pointer-events:none;transition:opacity .18s ease;
+}
+.ubee-native-picker-overlay.is-open{opacity:1;pointer-events:auto}
+.ubee-native-picker-sheet{
+  width:min(100%,680px);max-height:min(76vh,680px);display:flex;flex-direction:column;background:#fff;color:#17191c;
+  border-radius:24px 24px 0 0;box-shadow:0 -16px 44px rgba(15,23,42,.18);
+  transform:translateY(18px);transition:transform .22s cubic-bezier(.2,.8,.2,1);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.ubee-native-picker-overlay.is-open .ubee-native-picker-sheet{transform:none}
+.ubee-native-picker-head{min-height:58px;padding:8px 12px 8px 18px;border-bottom:1px solid #eceef0;display:grid;grid-template-columns:44px 1fr 44px;align-items:center}
+.ubee-native-picker-head strong{text-align:center;font-size:16px;font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ubee-native-picker-close{width:42px;height:42px;border:0;border-radius:50%;background:#f3f4f6;color:#3f444a;font-size:22px;display:flex;align-items:center;justify-content:center}
+.ubee-native-picker-list{overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 12px 14px;overscroll-behavior:contain}
+.ubee-native-picker-option{width:100%;min-height:58px;padding:10px 12px;border:0;border-bottom:1px solid #eef0f2;background:#fff;color:#202327;display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;gap:12px;text-align:left;font-size:15px;font-weight:720}
+.ubee-native-picker-option:last-child{border-bottom:0}.ubee-native-picker-option:active{background:#f7f8f9}
+.ubee-native-picker-option.is-selected{font-weight:850}.ubee-native-picker-check{color:#b88f00;font-size:19px;text-align:center}
+body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
+@media(prefers-reduced-motion:reduce){.ubee-native-picker-overlay,.ubee-native-picker-sheet{transition:none!important}}
+</style>
+<script id="ubee-customer-native-picker-v2-script">
+(()=>{
+  'use strict';
+  if(window.__UBEE_CUSTOMER_NATIVE_PICKER_V2__) return;
+  window.__UBEE_CUSTOMER_NATIVE_PICKER_V2__=true;
+
+  const configs={
+    ucaRegisterCity:'常用縣市',
+    ucaRegisterDistrict:'常用行政區',
+    itemSize:'商品體積',
+    upstairsOption:'交付需求',
+    taskPickupPaid:'付款狀態',
+    taskReplacementPolicy:'缺貨處理',
+    taskInvoice:'發票需求',
+    proofRequired:'完成證明',
+    scheduleGoal:'預約方式',
+    flowDriveTransmission:'排檔方式',
+    flowScheduleGoal:'預約目標',
+    ubeeMyFeedbackType:'意見類型'
+  };
+  let activeSelect=null;
+  let activeTrigger=null;
+  let previousOverflow='';
+
+  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  function optionText(select){
+    const option=select?.options?.[select.selectedIndex];
+    return String(option?.textContent||'').trim();
+  }
+  function isPlaceholder(select){return !String(select?.value||'').trim()}
+  function triggerFor(select){return select?.parentElement?.querySelector?.(`.ubee-native-picker-trigger[data-native-select-for="${CSS.escape(select.id)}"]`)||null}
+  function syncOne(select){
+    if(!select||!select.id)return;
+    const trigger=triggerFor(select);if(!trigger)return;
+    const text=optionText(select)||'請選擇';
+    trigger.querySelector('.ubee-native-picker-trigger-value').textContent=text;
+    trigger.classList.toggle('is-placeholder',isPlaceholder(select));
+    trigger.disabled=select.disabled===true;
+    trigger.setAttribute('aria-disabled',trigger.disabled?'true':'false');
+  }
+  function closePicker(){
+    const overlay=document.getElementById('ubeeCustomerNativePicker');
+    if(!overlay)return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden','true');
+    document.body.classList.remove('ubee-native-picker-open');
+    document.documentElement.style.overflow=previousOverflow;
+    activeTrigger?.setAttribute('aria-expanded','false');
+    const returnTarget=activeTrigger;
+    activeSelect=null;activeTrigger=null;
+    setTimeout(()=>{if(returnTarget&&document.contains(returnTarget))returnTarget.focus({preventScroll:true})},30);
+  }
+  function ensureOverlay(){
+    let overlay=document.getElementById('ubeeCustomerNativePicker');
+    if(overlay)return overlay;
+    overlay=document.createElement('div');
+    overlay.id='ubeeCustomerNativePicker';
+    overlay.className='ubee-native-picker-overlay';
+    overlay.setAttribute('aria-hidden','true');
+    overlay.innerHTML=`<div class="ubee-native-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="ubeeCustomerNativePickerTitle"><div class="ubee-native-picker-head"><span></span><strong id="ubeeCustomerNativePickerTitle">請選擇</strong><button class="ubee-native-picker-close" type="button" aria-label="關閉">×</button></div><div class="ubee-native-picker-list" id="ubeeCustomerNativePickerList"></div></div>`;
+    overlay.addEventListener('click',event=>{if(event.target===overlay||event.target.closest('.ubee-native-picker-close'))closePicker()});
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+  function openPicker(select,trigger){
+    if(!select||select.disabled)return;
+    const overlay=ensureOverlay();
+    const list=overlay.querySelector('#ubeeCustomerNativePickerList');
+    const title=configs[select.id]||select.getAttribute('aria-label')||'請選擇';
+    overlay.querySelector('#ubeeCustomerNativePickerTitle').textContent=title;
+    const options=[...select.options].filter(option=>String(option.value||'').trim()!==''&&!option.disabled);
+    list.innerHTML=options.length?options.map(option=>`<button type="button" class="ubee-native-picker-option ${String(option.value)===String(select.value)?'is-selected':''}" data-value="${esc(option.value)}"><span>${esc(option.textContent.trim())}</span><span class="ubee-native-picker-check">${String(option.value)===String(select.value)?'✓':''}</span></button>`).join(''):'<div style="padding:28px 14px;text-align:center;color:#8a9096;font-size:14px">目前沒有可選項目</div>';
+    list.querySelectorAll('.ubee-native-picker-option').forEach(button=>button.addEventListener('click',()=>{
+      const next=String(button.dataset.value||'');
+      if(String(select.value)!==next){select.value=next;select.dispatchEvent(new Event('input',{bubbles:true}));select.dispatchEvent(new Event('change',{bubbles:true}));}
+      try{navigator.vibrate?.(8)}catch(_){ }
+      syncOne(select);closePicker();
+    }));
+    activeSelect=select;activeTrigger=trigger;
+    trigger?.setAttribute('aria-expanded','true');
+    previousOverflow=document.documentElement.style.overflow||'';
+    document.documentElement.style.overflow='hidden';
+    document.body.classList.add('ubee-native-picker-open');
+    overlay.classList.add('is-open');overlay.setAttribute('aria-hidden','false');
+    requestAnimationFrame(()=>list.querySelector('.is-selected')?.scrollIntoView({block:'center'}));
+  }
+  function enhance(select){
+    if(!select||!configs[select.id]||select.dataset.nativePickerEnhanced==='1')return;
+    select.dataset.nativePickerEnhanced='1';
+    select.classList.add('ubee-native-picker-source');
+    select.setAttribute('aria-hidden','true');
+    select.tabIndex=-1;
+    const trigger=document.createElement('button');
+    trigger.type='button';
+    trigger.className='ubee-native-picker-trigger';
+    trigger.dataset.nativeSelectFor=select.id;
+    trigger.setAttribute('aria-haspopup','dialog');
+    trigger.setAttribute('aria-expanded','false');
+    trigger.innerHTML='<span class="ubee-native-picker-trigger-value"></span><span class="ubee-native-picker-trigger-chevron" aria-hidden="true">›</span>';
+    select.insertAdjacentElement('afterend',trigger);
+    trigger.addEventListener('click',()=>openPicker(select,trigger));
+    select.addEventListener('change',()=>syncOne(select));
+    select.addEventListener('input',()=>syncOne(select));
+    select.addEventListener('focus',()=>{if(!select.disabled){trigger.focus({preventScroll:true});openPicker(select,trigger)}});
+    new MutationObserver(()=>syncOne(select)).observe(select,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});
+    syncOne(select);
+  }
+  function scan(root=document){Object.keys(configs).forEach(id=>{const el=(root.getElementById?root.getElementById(id):document.getElementById(id));if(el instanceof HTMLSelectElement)enhance(el)})}
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.getElementById('ubeeCustomerNativePicker')?.classList.contains('is-open')){event.preventDefault();closePicker()}});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>scan(),{once:true});else scan();
+  new MutationObserver(records=>{for(const record of records){for(const node of record.addedNodes){if(node.nodeType===1){scan(node);Object.keys(configs).forEach(id=>{const el=node.querySelector?.(`#${CSS.escape(id)}`);if(el instanceof HTMLSelectElement)enhance(el)})}}}}).observe(document.documentElement,{childList:true,subtree:true});
+  window.UBeeCustomerNativePicker=Object.freeze({scan,open:id=>{const select=document.getElementById(id);if(select instanceof HTMLSelectElement)openPicker(select,triggerFor(select))},close:closePicker});
+})();
+</script>
 
 </body>
 </html>
