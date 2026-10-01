@@ -3,18 +3,18 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-01
-  Release: Customer Native Controls V2
-  PWA: 20261001-customer-native-controls-v2
+  Release: Customer Native Primary Action V3
+  PWA: 20261001-customer-native-primary-action-v3
 
   本次整理：
-  1. 可見 Select 統一改為 Native Picker / Bottom Sheet；原 Select 僅保留資料契約與 change event。
-  2. 會員註冊縣市／行政區、預約目標、代駕排檔、意見類型與既有選擇欄位使用同一互動規格。
-  3. Native Picker 支援 Safe Area、背景鎖定、選取回饋、Disabled 同步與動態 options 更新。
-  4. 既有 Production Flow 的 Listbox／Chip 維持唯一正式選擇 UI，不建立重複元件。
-  5. 計價、下單、Routes、定位、ETA、通知、會員與後端 API 契約完全不變。
+  1. 底部主導航改為「首頁／訂單／發任務／我的」；店家探索移出主 Tab，保留於首頁次要入口。
+  2. 「發任務」改為 UBee 黃色 Native Primary Action，點擊後建立全新任務並回到六大服務選擇。
+  3. action=new、瀏覽器 History／PWA Shortcut 與 Bottom Navigation 使用同一正式導航契約。
+  4. 延續 Native Picker / Bottom Sheet、Safe Area、鍵盤避讓、通知與既有原生操作規格。
+  5. 計價、下單、Routes、定位、ETA、店家資料、會員與後端 API 契約完全不變。
 
   Canonical recent milestones:
-  - 2026-10-01 Customer Native Controls V2 / Notification Center / Native Cleanup
+  - 2026-10-01 Customer Native Primary Action V3 / Native Controls V2 / Notification Center
   - 2026-09-29 State Sync / Rating Lock / No-Map + Universal ETA / Drive Semantic
   - 2026-09-24 Order Lifecycle / Segmented Live Progress / Final Delivery ETA
   - 2026-09-23 Multi-stop / Cloud Draft
@@ -22,7 +22,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-native-controls-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-native-primary-action-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -13081,7 +13081,8 @@ function getInitialOpenAction(){
   if(['orders','my-orders','tasks','task'].includes(directOpen)) return 'task';
   if(['profile','my','account'].includes(directOpen)) return 'my';
   if(['stores','store','merchant'].includes(directOpen)) return 'store';
-  if(['new','home'].includes(directOpen)) return 'home';
+  if(['new','create','order'].includes(directOpen)) return 'new';
+  if(directOpen==='home') return 'home';
   return '';
 }
 
@@ -13101,6 +13102,7 @@ function handleInitialOpenAction(){
   }
 
   if(action === 'task') return window.openUBeeTaskPage?.();
+  if(action === 'new') return window.openUBeeNewTaskPage?.() || window.openUBeeSystemOrderFlow?.({fresh:true,source:'initial-url'});
   if(action === 'store') return window.openUBeeStorePage?.();
   if(action === 'my') return window.openUBeeProfilePage?.();
   return window.openUBeeHomePage?.() || showHomeTab();
@@ -19383,6 +19385,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <span class="flow-service-label">代駕</span>
 </button>
 </div>
+<button class="flow-home-store-shortcut" data-home-nav="store" type="button" aria-label="開啟附近店家">
+  <span class="flow-home-store-shortcut-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9h16l-1-5H5L4 9Z"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/></svg></span>
+  <span class="flow-home-store-shortcut-copy"><strong>附近店家</strong><small>需要代買時再找店家，不佔用主導航</small></span>
+  <span class="flow-home-store-shortcut-arrow" aria-hidden="true">›</span>
+</button>
 <div class="flow-location-line"><span class="flow-location-dot"></span><span id="flowLocationText">正在確認目前服務地區</span></div>
 <div class="flow-route-card">
 <button class="flow-address-button" id="flowPickupButton" type="button">
@@ -20082,7 +20089,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <nav aria-label="主要導覽" class="ubee-primary-bottom-nav" id="ubeePersistentBottomNav">
 <button aria-label="首頁" aria-current="page" class="active" data-nav-target="home" id="flowNavHome" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.8l8.5 6.7"/><path d="M5.5 9.8V20h13V9.8M9.3 20v-6.2h5.4V20"/></svg></span><span class="flow-nav-label">首頁</span></button>
 <button aria-label="訂單" data-nav-target="task" id="flowNavTasks" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 1.8 1.8 3.2-3.2M8.5 16h7"/></svg></span><span class="flow-nav-label">訂單</span></button>
-<button aria-label="店家" data-nav-target="store" id="flowNavStores" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M4 9h16l-1-5H5L4 9Z"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6M4 9c0 1.7 1.1 3 2.5 3S9 10.7 9 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.1 3 2.5 3S20 10.7 20 9"/></svg></span><span class="flow-nav-label">店家</span></button>
+<button aria-label="發任務" class="ubee-nav-primary-action" data-nav-target="new" id="flowNavCreate" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="flow-nav-label">發任務</span></button>
 <button aria-label="我的" data-nav-target="my" id="flowNavMy" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20.5c.8-4.1 3.2-6.2 7-6.2s6.2 2.1 7 6.2"/></svg></span><span class="flow-nav-label">我的</span></button>
 </nav>
 <script id="ubee-production-flow-v4-script">
@@ -21852,6 +21859,16 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   window.openUBeeSystemOrderFlow=(options={})=>
     showFlow({fresh:options.fresh!==false});
 
+  window.openUBeeNewTaskPage=function(){
+    window.UBeePrimaryNavigation?.activate('new');
+    showFlow({fresh:true});
+    requestAnimationFrame(()=>{
+      const serviceList=$('flowServiceTabs');
+      try{serviceList?.scrollIntoView({block:'start',behavior:'auto'});}catch(_){ }
+    });
+    return true;
+  };
+
   window.openUBeeStorePurchase=function(rawStore={}){
     const store=rawStore&&typeof rawStore==='object'?rawStore:{};
     const name=String(store.name||'指定店家').trim()||'指定店家';
@@ -21932,7 +21949,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-controls-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-primary-action-v3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26008,7 +26025,7 @@ body{
 /* =========================================================
    UBee 用戶端 V2.9｜唯一正式底部導航
    - 全站只保留 #ubeePersistentBottomNav 一套導航。
-   - 首頁／任務／店家／我的使用一致的純線條 SVG。
+   - 首頁／訂單／發任務／我的使用一致的純線條 SVG；發任務使用 UBee 黃色主操作。
    - active 狀態不改變按鈕尺寸，避免切換時跳動。
    - 不使用 blur、transform、動畫或重複 fixed 元件。
    ========================================================= */
@@ -26210,6 +26227,117 @@ body.flow-active{
 }
 @media (hover:hover){
   body > #ubeePersistentBottomNav > button:hover{background:#fffdf4!important;}
+}
+</style>
+<style id="ubee-customer-native-primary-action-v3-style">
+/* 2026-10-01｜Customer Native Primary Action V3
+   主導航只保留高頻功能；店家探索下沉至首頁，發任務成為唯一主要操作。 */
+body > #ubeePersistentBottomNav > #flowNavCreate{
+  overflow:visible!important;
+  background:#fff!important;
+  color:#111!important;
+}
+body > #ubeePersistentBottomNav > #flowNavCreate::before{
+  display:none!important;
+  content:none!important;
+}
+body > #ubeePersistentBottomNav > #flowNavCreate .flow-nav-icon{
+  width:42px!important;
+  height:42px!important;
+  flex:0 0 42px!important;
+  margin-top:-8px!important;
+  border:1px solid rgba(17,17,17,.08)!important;
+  border-radius:15px!important;
+  background:#facc15!important;
+  color:#111!important;
+  box-shadow:0 6px 15px rgba(17,24,39,.14)!important;
+  transform:translateY(1px)!important;
+  transition:transform .12s ease,box-shadow .12s ease!important;
+}
+body > #ubeePersistentBottomNav > #flowNavCreate .ubee-nav-line{
+  width:22px!important;
+  height:22px!important;
+  stroke-width:2.15!important;
+}
+body > #ubeePersistentBottomNav > #flowNavCreate .flow-nav-label{
+  margin-top:-4px!important;
+  color:#111!important;
+  font-size:11px!important;
+  font-weight:950!important;
+}
+body > #ubeePersistentBottomNav > #flowNavCreate.ubee-nav-pressed .flow-nav-icon{
+  transform:translateY(1px) scale(.94)!important;
+  box-shadow:0 3px 9px rgba(17,24,39,.10)!important;
+}
+body > #ubeePersistentBottomNav > #flowNavCreate.active{
+  background:#fff!important;
+}
+#productionOrderFlow .flow-home-store-shortcut{
+  width:100%;
+  min-height:50px;
+  margin:10px 0 12px;
+  padding:9px 12px;
+  border:1px solid #e4e6e8;
+  border-radius:16px;
+  background:#fff;
+  color:#111;
+  display:grid;
+  grid-template-columns:32px minmax(0,1fr) 18px;
+  align-items:center;
+  gap:10px;
+  text-align:left;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+#productionOrderFlow .flow-home-store-shortcut:active{
+  transform:scale(.988);
+  background:#f8f9fa;
+}
+#productionOrderFlow .flow-home-store-shortcut-icon{
+  width:32px;
+  height:32px;
+  border-radius:11px;
+  background:#f4f5f6;
+  display:grid;
+  place-items:center;
+}
+#productionOrderFlow .flow-home-store-shortcut-icon svg{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.9;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+#productionOrderFlow .flow-home-store-shortcut-copy{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+#productionOrderFlow .flow-home-store-shortcut-copy strong{
+  font-size:13px;
+  line-height:1.35;
+  font-weight:950;
+}
+#productionOrderFlow .flow-home-store-shortcut-copy small{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#777d84;
+  font-size:10px;
+  line-height:1.35;
+  font-weight:750;
+}
+#productionOrderFlow .flow-home-store-shortcut-arrow{
+  color:#a8adb3;
+  font-size:22px;
+  line-height:1;
+}
+@media (prefers-reduced-motion:reduce){
+  body > #ubeePersistentBottomNav > #flowNavCreate .flow-nav-icon,
+  #productionOrderFlow .flow-home-store-shortcut{transition:none!important}
 }
 </style>
 
@@ -27435,7 +27563,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   window.__UBEE_CUSTOMER_NAVIGATION_STACK_V2__=true;
 
   const STATE_KEY='ubeeCustomerNavigationV2';
-  const PRIMARY=new Set(['home','task','store','my']);
+  const PRIMARY=new Set(['home','task','new','store','my']);
   const MY_SECTIONS=new Set(['account','rewards','settings','feedback','privacy','notifications']);
   const GROWTH_DETAILS=new Set(['benefits','tasks','achievements','history']);
   let applying=false;
@@ -27571,26 +27699,29 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   else syncViewport();
 })();
 </script>
-<script id="ubee-bottom-navigation-controller-v29">
+<script id="ubee-bottom-navigation-controller-v30">
 (() => {
   'use strict';
-  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V29__) return;
-  window.__UBEE_BOTTOM_NAV_CONTROLLER_V29__=true;
+  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V30__) return;
+  window.__UBEE_BOTTOM_NAV_CONTROLLER_V30__=true;
 
-  const targetToId={home:'flowNavHome',task:'flowNavTasks',store:'flowNavStores',my:'flowNavMy'};
+  const targetToId={home:'flowNavHome',task:'flowNavTasks',new:'flowNavCreate',my:'flowNavMy'};
+  const supportedTargets=new Set(['home','task','new','store','my']);
   let navigation=null;
   let navigationToken=0;
   let activeTarget='home';
   let userHasNavigated=false;
 
   function normalizeTarget(target){
-    return targetToId[target]?target:'home';
+    const safe=String(target||'').trim().toLowerCase();
+    return supportedTargets.has(safe)?safe:'home';
   }
 
   function setActive(target){
     activeTarget=normalizeTarget(target);
     if(document.body) document.body.dataset.ubeePrimaryNav=activeTarget;
-    const activeId=targetToId[activeTarget];
+    const visualTarget=activeTarget==='store'?'home':activeTarget;
+    const activeId=targetToId[visualTarget]||targetToId.home;
     navigation?.querySelectorAll(':scope > button').forEach(button=>{
       const active=button.id===activeId;
       button.classList.toggle('active',active);
@@ -27609,6 +27740,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
       return window.openUBeeHomePage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-navigation'});
     }
     if(target==='task') return window.openUBeeTaskPage?.();
+    if(target==='new') return window.openUBeeNewTaskPage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:true,source:'primary-action'});
     if(target==='store') return window.openUBeeStorePage?.();
     if(target==='my') return window.openUBeeProfilePage?.({navMode:'my'});
   }
@@ -27658,6 +27790,14 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
     const target=normalizeTarget(button.dataset.navTarget||'home');
     window.__UBEE_PENDING_INITIAL_NAV__='';
+
+    // Native Primary Action：重複點「發任務」只回到目前任務首頁，不清掉已填內容。
+    if(target==='new'&&target===activeTarget){
+      window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-action-repeat'});
+      requestAnimationFrame(scrollCurrentPageToTop);
+      return;
+    }
+
     if(target===activeTarget) scrollCurrentPageToTop();
     navigate(target,{source:'user'});
   }
@@ -27678,7 +27818,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     if(!existing||!document.body) return;
 
     const clean=existing.cloneNode(true);
-    clean.dataset.ubeeNavController='v29';
+    clean.dataset.ubeeNavController='v30';
     existing.replaceWith(clean);
     navigation=clean;
 
