@@ -1,3 +1,4 @@
+// 2026-10-01｜Finance Dispatch Hold V1：新增月結未回繳財務派單鎖；不改 ACTIVE／正式資格；財務確認結清後才可人工恢復新任務。
 // 2026-09-30｜Rider Notification Admin No-Key V1.2：修復其他 V4 管理路由 middleware 定義；通知管理 GET/POST 維持直接存取；發布加入冪等防重送。
 // 2026-09-30｜Rider V5.3 Native Notification Center：新增小U後端 Notification Inbox、已讀同步與 Badge count；整合任務完成收入、客戶取消、預約承接／確認／任務前提醒與資格狀態事件；Web Push 與 App Inbox 分工，不改派單／計價／Smart Stack 核心。
 // 2026-09-29｜Customer/Rider State Atomic Sync V1：騎士狀態更新同一 transaction 同步寫入 status / riderStatus / customerTrackingStatus 與毫秒版本；客戶 API 明確回傳狀態版本。 
@@ -2888,7 +2889,7 @@ async function sendNewOrderPushToRiders(
             rider.status === "active";
 
           const riderDispatchEligible =
-            canRiderAcceptOrdersV4(rider) &&
+            canRiderReceiveDispatch(rider) &&
             riderMeetsOrderV4Requirements(rider, order);
 
           const riderPresence =
@@ -6618,6 +6619,93 @@ function canRiderAcceptOrdersV4(rider = {}) {
 }
 
 // =====================================================
+// UBee Finance Dispatch Hold V1
+// - 財務派單鎖與正式小U資格完全分離，不修改 ACTIVE / approved / canAcceptOrders。
+// - active=true 時只禁止「新任務」：任務池、上線、預約承接、一般接單、Smart Stack 與派單推播。
+// - 已經承接／執行中的任務不會因財務鎖被中止。
+// =====================================================
+function getRiderFinanceDispatchState(rider = {}) {
+  const raw =
+    rider.financeDispatchHold &&
+    typeof rider.financeDispatchHold === 'object'
+      ? rider.financeDispatchHold
+      : {};
+
+  const active = raw.active === true;
+  const releasedAtMs = Math.max(0, Number(raw.releasedAtMs || 0));
+
+  return {
+    version: 'finance-dispatch-hold-v1',
+    active,
+    state: active ? 'HELD' : (releasedAtMs > 0 ? 'RELEASED' : 'CLEAR'),
+    reason: String(raw.reason || ''),
+    reasonLabel: String(raw.reasonLabel || ''),
+    periodLabel: String(raw.periodLabel || ''),
+    amountAtHold: Math.max(0, Math.round(Number(raw.amountAtHold || 0))),
+    pendingOrderCountAtHold: Math.max(0, Math.round(Number(raw.pendingOrderCountAtHold || 0))),
+    heldAtMs: Math.max(0, Number(raw.heldAtMs || 0)),
+    heldBy: String(raw.heldBy || ''),
+    releasedAtMs,
+    releasedBy: String(raw.releasedBy || ''),
+    releaseNote: String(raw.releaseNote || ''),
+  };
+}
+
+function getRiderDispatchEligibilityState(rider = {}) {
+  const qualificationEligible = canRiderAcceptOrdersV4(rider);
+  const financeDispatchHold = getRiderFinanceDispatchState(rider);
+
+  let code = 'OK';
+  if (!qualificationEligible) {
+    code = 'RIDER_DISPATCH_NOT_ELIGIBLE';
+  } else if (financeDispatchHold.active) {
+    code = 'RIDER_FINANCE_DISPATCH_HOLD';
+  }
+
+  return {
+    eligible:
+      qualificationEligible === true &&
+      financeDispatchHold.active !== true,
+    code,
+    qualificationEligible,
+    financeDispatchHold,
+  };
+}
+
+function canRiderReceiveDispatch(rider = {}) {
+  return getRiderDispatchEligibilityState(rider).eligible === true;
+}
+
+function buildRiderDispatchDeniedPayload(
+  rider = {},
+  qualificationMessage = '目前尚未取得正式接單資格，請先確認小U資格狀態。'
+) {
+  const dispatch = getRiderDispatchEligibilityState(rider);
+
+  if (dispatch.code === 'RIDER_FINANCE_DISPATCH_HOLD') {
+    return {
+      success: false,
+      code: 'RIDER_FINANCE_DISPATCH_HOLD',
+      message:
+        '你的帳戶目前因月結款尚待 UBee 財務確認而暫停承接新任務。完成回繳並經財務確認後即可恢復接單。',
+      financeDispatchHold: dispatch.financeDispatchHold,
+      lifecycleStatus: getRiderV4LifecycleStatus(rider),
+      qualificationHardLock: getRiderV4HardLockState(rider),
+      appAccess: buildRiderAppAccessState(rider),
+    };
+  }
+
+  return {
+    success: false,
+    code: 'RIDER_DISPATCH_NOT_ELIGIBLE',
+    message: qualificationMessage,
+    lifecycleStatus: getRiderV4LifecycleStatus(rider),
+    qualificationHardLock: getRiderV4HardLockState(rider),
+    appAccess: buildRiderAppAccessState(rider),
+  };
+}
+
+// =====================================================
 // UBee Rider App Access V1
 // 後端為唯一權限來源：只有 ACTIVE + 完整 Hard Lock 通過的小U
 // 才能進工作地圖、切換上線、讀取即時／預約任務池。
@@ -6631,11 +6719,15 @@ function buildRiderAppAccessState(rider = {}) {
 
   const reviewApproved = hardLock.reviewApproved === true;
   const blocked = isBlockedRiderData(rider);
-  const workAccess =
+  const financeDispatchHold = getRiderFinanceDispatchState(rider);
+  const qualificationAccess =
     blocked !== true &&
     reviewApproved === true &&
     lifecycleStatus === RIDER_V4_LIFECYCLE.ACTIVE &&
     hardLock.canAcceptOrders === true;
+  const workAccess =
+    qualificationAccess === true &&
+    financeDispatchHold.active !== true;
 
   let startupRoute = 'QUALIFICATION';
   let accessState = 'QUALIFICATION';
@@ -6643,6 +6735,10 @@ function buildRiderAppAccessState(rider = {}) {
   if (blocked) {
     startupRoute = 'BLOCKED';
     accessState = 'BLOCKED';
+  } else if (qualificationAccess && financeDispatchHold.active) {
+    // 財務鎖不是資格撤銷：仍留在工作地圖，但所有新任務能力由後端鎖住。
+    startupRoute = 'WORK_MAP';
+    accessState = 'FINANCE_HOLD';
   } else if (workAccess) {
     startupRoute = 'WORK_MAP';
     accessState = 'ACTIVE';
@@ -6671,6 +6767,7 @@ function buildRiderAppAccessState(rider = {}) {
     canViewTaskPool: workAccess,
     canViewImmediateOrders: workAccess,
     canViewScheduledOrders: workAccess,
+    financeDispatchHold,
   };
 }
 
@@ -10273,16 +10370,14 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
     const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
 
-    // Qualification Hard Lock V1：未完成完整五段式資格，不回傳待接任務池。
-    if (!canRiderAcceptOrdersV4(rider)) {
-      return res.status(403).json({
-        success: false,
-        code: 'RIDER_DISPATCH_NOT_ELIGIBLE',
-        message: '尚未完成完整入職與測驗，或正式接單資格目前受限，無法讀取待接任務。',
-        lifecycleStatus: getRiderV4LifecycleStatus(rider),
-        qualificationHardLock: getRiderV4HardLockState(rider),
-        appAccess: buildRiderAppAccessState(rider),
-      });
+    // 新任務 Hard Lock：正式資格與財務派單鎖統一由後端判斷。
+    if (!canRiderReceiveDispatch(rider)) {
+      return res.status(403).json(
+        buildRiderDispatchDeniedPayload(
+          rider,
+          '尚未完成完整入職與測驗，或正式接單資格目前受限，無法讀取待接任務。'
+        )
+      );
     }
 
     const identity = buildRiderApiIdentity(riderDoc, rider, {
@@ -10419,12 +10514,13 @@ app.get('/api/rider/stack-candidates', riderAuthMiddleware, async (req, res) => 
     const rider = riderResult.rider || {};
     const identity = buildRiderApiIdentity(riderDoc, rider, { lineUserId, phone, riderId });
 
-    if (!canRiderAcceptOrdersV4(rider)) {
-      return res.status(403).json({
-        success:false,
-        code:'RIDER_DISPATCH_NOT_ELIGIBLE',
-        message:'目前不具備正式接單資格。',
-      });
+    if (!canRiderReceiveDispatch(rider)) {
+      return res.status(403).json(
+        buildRiderDispatchDeniedPayload(
+          rider,
+          '目前不具備正式接單資格。'
+        )
+      );
     }
 
     const currentOrderId = smartStackSafeOrderId(rider.currentOrderId);
@@ -11429,19 +11525,28 @@ app.post(
             );
           }
 
-          if (
-            !canRiderAcceptOrdersV4(
-              riderResult.rider || {}
-            )
-          ) {
+          // 預約承接也必須以 transaction 內最新的小U資料重查，
+          // 避免財務剛鎖定時仍用舊快照承接成功。
+          const latestRiderDoc =
+            await transaction.get(riderResult.riderDoc.ref);
+          const latestRider =
+            latestRiderDoc.exists
+              ? (latestRiderDoc.data() || {})
+              : {};
+          const latestDispatch =
+            getRiderDispatchEligibilityState(latestRider);
+
+          if (!latestDispatch.eligible) {
             throw new Error(
-              'RIDER_NOT_ELIGIBLE'
+              latestDispatch.code === 'RIDER_FINANCE_DISPATCH_HOLD'
+                ? 'RIDER_FINANCE_DISPATCH_HOLD'
+                : 'RIDER_NOT_ELIGIBLE'
             );
           }
 
           if (
             !riderMeetsOrderV4Requirements(
-              riderResult.rider || {},
+              latestRider,
               order
             )
           ) {
@@ -11452,7 +11557,7 @@ app.post(
 
           if (
             !riderMatchesScheduledOrderAvailability(
-              riderResult.rider || {},
+              latestRider,
               order
             )
           ) {
@@ -11580,6 +11685,8 @@ app.post(
           [409, '此預約任務尚未符合承接條件。'],
         RIDER_NOT_ELIGIBLE:
           [403, '你的帳號目前無法承接任務，請先確認接單資格。'],
+        RIDER_FINANCE_DISPATCH_HOLD:
+          [403, '你的帳戶目前有尚待財務確認的月結款，因此暫停承接新任務。完成回繳並經 UBee 財務確認後即可恢復。'],
         RIDER_V4_QUALIFICATION_REQUIRED:
           [403, '你的資格目前不符合這筆任務。'],
         RIDER_SCHEDULE_NOT_MATCHED:
@@ -13093,6 +13200,108 @@ function getFinanceRiderIdentity(order = {}) {
   };
 }
 
+function buildFinanceRiderOrderQueryPairs(identity = {}) {
+  const pairs = [];
+  const add = (field, value) => {
+    const safe = String(value || '').trim();
+    if (!safe || pairs.some(([f, v]) => f === field && v === safe)) return;
+    pairs.push([field, safe]);
+  };
+
+  add('riderDocId', identity.riderDocId);
+  add('riderId', identity.riderId);
+  add('riderPhone', normalizePhone(identity.riderPhone || identity.phone || ''));
+  add('riderLineUserId', identity.riderLineUserId || identity.lineUserId);
+
+  if (identity.riderLineUserId || identity.lineUserId) {
+    const lineUserId = String(identity.riderLineUserId || identity.lineUserId).trim();
+    add('riderId', lineUserId);
+    add('driverId', lineUserId);
+  }
+
+  if (identity.riderId) {
+    add('driverId', identity.riderId);
+  }
+
+  return pairs;
+}
+
+async function getFinancePendingCashForRider(identity = {}) {
+  const queryPairs = buildFinanceRiderOrderQueryPairs(identity);
+  const byId = new Map();
+
+  for (const [field, value] of queryPairs) {
+    const snap = await db
+      .collection('orders')
+      .where(field, '==', value)
+      .limit(500)
+      .get()
+      .catch(() => null);
+
+    if (!snap) continue;
+    snap.docs.forEach(doc => {
+      byId.set(doc.id, { id: doc.id, ...(doc.data() || {}) });
+    });
+  }
+
+  let totalDue = 0;
+  const orderIds = [];
+
+  for (const order of byId.values()) {
+    const status = String(order.status || '').trim().toLowerCase();
+    if (!['completed', 'done'].includes(status)) continue;
+    if (!isCashPaymentOrder(order)) continue;
+    if (isCashRemittanceSettled(order)) continue;
+
+    const cashAmounts = getFinanceCashAmounts(order);
+    const due = Math.max(0, Math.round(Number(cashAmounts.cashDueToPlatform || 0)));
+    if (due <= 0) continue;
+
+    totalDue += due;
+    orderIds.push(order.id);
+  }
+
+  return {
+    totalDue: Math.max(0, Math.round(totalDue)),
+    pendingOrderCount: orderIds.length,
+    orderIds,
+  };
+}
+
+async function resolveFinanceDispatchRider(body = {}) {
+  const riderDocId = String(body.riderDocId || '').trim();
+
+  if (riderDocId) {
+    const exact = await db
+      .collection(RIDER_V2_COLLECTIONS.riders)
+      .doc(riderDocId)
+      .get()
+      .catch(() => null);
+    if (exact?.exists) return exact;
+  }
+
+  const found = await findRiderDocumentV2First({
+    phone: body.riderPhone || body.phone || '',
+    riderId: body.riderId || riderDocId || '',
+    lineUserId: body.riderLineUserId || body.lineUserId || '',
+  });
+
+  return found.riderDoc && found.riderDoc.exists
+    ? found.riderDoc
+    : null;
+}
+
+function buildFinanceIdentityFromRiderDoc(riderDoc) {
+  const rider = riderDoc?.data?.() || {};
+  return {
+    riderDocId: riderDoc?.id || '',
+    riderId: String(rider.riderId || riderDoc?.id || '').trim(),
+    riderPhone: normalizePhone(rider.phone || riderDoc?.id || ''),
+    riderLineUserId: String(rider.lineUserId || '').trim(),
+    riderName: String(rider.name || rider.riderName || '').trim(),
+  };
+}
+
 function isFinancePaidJkoOrder(order = {}) {
   const paymentMethod = getOrderPaymentMethod(order);
   const paymentStatus = getOrderPaymentStatus(order);
@@ -14301,20 +14510,81 @@ app.get(
         pendingOrderCount += 1;
       });
 
-      const riders =
-        Array.from(
-          riderMap.values()
-        );
+      // 財務派單鎖狀態：
+      // 1. 待回繳名單補上 ridersV2 的 financeDispatchHold。
+      // 2. 已經全部回繳但仍「待人工恢復」的小U，也必須繼續留在此頁，否則管理員看不到恢復按鈕。
+      const riderGroups = Array.from(riderMap.values());
 
-      // 金額較高的騎士排在前面
+      await Promise.all(
+        riderGroups.map(async group => {
+          const riderDoc = await resolveFinanceDispatchRider(group).catch(() => null);
+          if (!riderDoc?.exists) {
+            group.financeDispatchHold = getRiderFinanceDispatchState({});
+            group.dispatchAllowed = false;
+            group.riderRecordFound = false;
+            return;
+          }
+
+          const riderData = riderDoc.data() || {};
+          group.riderDocId = group.riderDocId || riderDoc.id;
+          group.riderId = group.riderId || String(riderData.riderId || riderDoc.id || '');
+          group.riderPhone = group.riderPhone || normalizePhone(riderData.phone || riderDoc.id || '');
+          group.riderLineUserId = group.riderLineUserId || String(riderData.lineUserId || '');
+          group.riderName = group.riderName || String(riderData.name || riderData.riderName || '未設定騎士姓名');
+          group.financeDispatchHold = getRiderFinanceDispatchState(riderData);
+          group.dispatchAllowed = canRiderReceiveDispatch(riderData);
+          group.riderRecordFound = true;
+        })
+      );
+
+      const heldSnap = await db
+        .collection(RIDER_V2_COLLECTIONS.riders)
+        .where('financeDispatchHold.active', '==', true)
+        .limit(500)
+        .get()
+        .catch(() => null);
+
+      if (heldSnap) {
+        heldSnap.docs.forEach(riderDoc => {
+          const riderData = riderDoc.data() || {};
+          const riderIdentity = buildFinanceIdentityFromRiderDoc(riderDoc);
+          const existing = riderGroups.find(group =>
+            [
+              group.riderDocId && riderIdentity.riderDocId && group.riderDocId === riderIdentity.riderDocId,
+              group.riderId && riderIdentity.riderId && group.riderId === riderIdentity.riderId,
+              group.riderPhone && riderIdentity.riderPhone && group.riderPhone === riderIdentity.riderPhone,
+              group.riderLineUserId && riderIdentity.riderLineUserId && group.riderLineUserId === riderIdentity.riderLineUserId,
+            ].some(Boolean)
+          );
+          if (existing) return;
+
+          riderGroups.push({
+            riderKey: riderIdentity.riderDocId || riderIdentity.riderId || riderIdentity.riderPhone,
+            ...riderIdentity,
+            cashCollectedTotal: 0,
+            cashDueToPlatform: 0,
+            orderCount: 0,
+            orderIds: [],
+            orders: [],
+            financeDispatchHold: getRiderFinanceDispatchState(riderData),
+            dispatchAllowed: canRiderReceiveDispatch(riderData),
+            riderRecordFound: true,
+          });
+        });
+      }
+
+      const riders = riderGroups;
+
+      // 金額較高的騎士排在前面；同額時財務鎖中的小U優先，方便先處理。
       riders.sort(
-        (a, b) =>
-          Number(
-            b.cashDueToPlatform || 0
-          ) -
-          Number(
-            a.cashDueToPlatform || 0
-          )
+        (a, b) => {
+          const amountDiff =
+            Number(b.cashDueToPlatform || 0) -
+            Number(a.cashDueToPlatform || 0);
+          if (amountDiff !== 0) return amountDiff;
+          return Number(b.financeDispatchHold?.active === true) -
+            Number(a.financeDispatchHold?.active === true);
+        }
       );
 
       // 每名騎士的訂單以完成時間新到舊排列
@@ -14412,6 +14682,230 @@ app.get(
     }
   }
 );
+
+// ===== UBee 財務中心：月結未回繳 → 財務派單鎖 =====
+app.post('/api/admin/rider-finance-dispatch/hold', async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const riderDoc = await resolveFinanceDispatchRider(body);
+
+    if (!riderDoc?.exists) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到對應的小U正式資料，無法暫停派單。',
+      });
+    }
+
+    const rider = riderDoc.data() || {};
+    const identity = buildFinanceIdentityFromRiderDoc(riderDoc);
+    const pending = await getFinancePendingCashForRider(identity);
+
+    if (pending.totalDue <= 0) {
+      return res.status(409).json({
+        success: false,
+        code: 'NO_PENDING_REMITTANCE',
+        message: '目前查不到尚待回繳的平台款項，因此不需要啟用財務派單鎖。',
+      });
+    }
+
+    const nowMs = Date.now();
+    const operator = String(
+      body.operator || body.heldBy || body.adminUserId || 'finance_center'
+    ).trim().slice(0, 100);
+    const periodLabel = String(body.periodLabel || '').trim().slice(0, 100);
+    const reasonLabel = String(
+      body.reasonLabel || '月結應繳回平台費用尚未完成回繳'
+    ).trim().slice(0, 200);
+
+    const operationalRefs = riderV2OperationalRefs(riderDoc.id);
+    const batch = db.batch();
+    batch.set(operationalRefs.rider, {
+      financeDispatchHold: {
+        active: true,
+        state: 'HELD',
+        reason: 'MONTHLY_REMITTANCE_PENDING',
+        reasonLabel,
+        periodLabel,
+        amountAtHold: pending.totalDue,
+        pendingOrderCountAtHold: pending.pendingOrderCount,
+        heldAtMs: nowMs,
+        heldBy: operator,
+        releasedAtMs: 0,
+        releasedBy: '',
+        releaseNote: '',
+      },
+      // 財務鎖生效後立即退出新任務派單；既有 currentOrderId / busy 不動。
+      online: false,
+      acceptingOrders: false,
+      dispatchPresenceState: 'PAUSED_FINANCE',
+      onlineUpdatedAt: nowMs,
+      onlineUpdatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    }, { merge: true });
+    batch.set(operationalRefs.presence, {
+      riderDocId: riderDoc.id,
+      riderId: rider.riderId || riderDoc.id,
+      phone: normalizePhone(rider.phone || riderDoc.id || ''),
+      lineUserId: String(rider.lineUserId || '').trim(),
+      name: cleanText(rider.name || rider.riderName || '', 80),
+      online: false,
+      acceptingOrders: false,
+      // 忙碌與目前任務保留，避免正在執行的任務被中斷。
+      busy: rider.busy === true,
+      currentOrderId: String(rider.currentOrderId || ''),
+      backgroundPushReady: false,
+      dispatchPresenceState: 'PAUSED_FINANCE',
+      lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastSeenAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+      dataVersion: RIDER_V2_DATA_VERSION,
+    }, { merge: true });
+    await batch.commit();
+
+    await createRiderInboxNotification(riderDoc.id, {
+      eventKey: `finance_dispatch_hold:${nowMs}`,
+      revision: '1',
+      type: 'finance_dispatch_hold',
+      category: '財務',
+      title: '新任務接單已暫停',
+      message: `目前尚有 ${pending.totalDue} 元月結款待 UBee 財務確認，完成回繳並經確認後即可恢復接單。`,
+      actionType: 'none',
+      metadata: {
+        amount: pending.totalDue,
+        pendingOrderCount: pending.pendingOrderCount,
+        periodLabel,
+      },
+      webPush: true,
+    }).catch(() => {});
+
+    return res.json({
+      success: true,
+      riderDocId: riderDoc.id,
+      riderName: identity.riderName,
+      pendingDue: pending.totalDue,
+      pendingOrderCount: pending.pendingOrderCount,
+      financeDispatchHold: {
+        active: true,
+        state: 'HELD',
+        amountAtHold: pending.totalDue,
+        heldAtMs: nowMs,
+        heldBy: operator,
+        periodLabel,
+      },
+      message: '已啟用財務派單鎖；此小U不能承接新任務。',
+    });
+  } catch (err) {
+    console.error('❌ 財務暫停派單失敗：', err);
+    return res.status(500).json({
+      success: false,
+      message: '財務暫停派單失敗。',
+      error: err.message,
+    });
+  }
+});
+
+app.post('/api/admin/rider-finance-dispatch/release', async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const riderDoc = await resolveFinanceDispatchRider(body);
+
+    if (!riderDoc?.exists) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到對應的小U正式資料，無法恢復派單。',
+      });
+    }
+
+    const rider = riderDoc.data() || {};
+    const currentHold = getRiderFinanceDispatchState(rider);
+    const identity = buildFinanceIdentityFromRiderDoc(riderDoc);
+
+    // 最重要的 fail-closed：不相信前端顯示，後端重新掃描該小U所有尚未結清的現金訂單。
+    const pending = await getFinancePendingCashForRider(identity);
+    if (pending.totalDue > 0 || pending.pendingOrderCount > 0) {
+      return res.status(409).json({
+        success: false,
+        code: 'REMITTANCE_STILL_PENDING',
+        message: `目前仍有 ${pending.pendingOrderCount} 筆、共 NT$${pending.totalDue} 應繳回平台，尚不能恢復派單。`,
+        pendingDue: pending.totalDue,
+        pendingOrderCount: pending.pendingOrderCount,
+      });
+    }
+
+    const nowMs = Date.now();
+    const operator = String(
+      body.operator || body.releasedBy || body.adminUserId || 'finance_center'
+    ).trim().slice(0, 100);
+    const releaseNote = String(
+      body.releaseNote || '財務確認回繳完成，人工恢復派單'
+    ).trim().slice(0, 300);
+
+    await riderDoc.ref.set({
+      financeDispatchHold: {
+        ...currentHold,
+        active: false,
+        state: 'RELEASED',
+        releasedAtMs: nowMs,
+        releasedBy: operator,
+        releaseNote,
+      },
+      // 只解除財務鎖，不代替小U自己上線。
+      // online 維持 false；小U需回到騎士端自行切換「開始接單」。
+      online: false,
+      acceptingOrders: false,
+      dispatchPresenceState: 'PAUSED',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    }, { merge: true });
+
+    const presenceRef = riderV2OperationalRefs(riderDoc.id).presence;
+    await presenceRef.set({
+      online: false,
+      acceptingOrders: false,
+      backgroundPushReady: false,
+      dispatchPresenceState: 'PAUSED',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+      dataVersion: RIDER_V2_DATA_VERSION,
+    }, { merge: true }).catch(() => {});
+
+    await createRiderInboxNotification(riderDoc.id, {
+      eventKey: `finance_dispatch_release:${nowMs}`,
+      revision: '1',
+      type: 'finance_dispatch_release',
+      category: '財務',
+      title: '月結款已確認完成',
+      message: 'UBee 財務已確認本次回繳完成，你可以重新開啟接單。',
+      actionType: 'none',
+      metadata: { releasedAtMs: nowMs },
+      webPush: true,
+    }).catch(() => {});
+
+    return res.json({
+      success: true,
+      riderDocId: riderDoc.id,
+      riderName: identity.riderName,
+      financeDispatchHold: {
+        ...currentHold,
+        active: false,
+        state: 'RELEASED',
+        releasedAtMs: nowMs,
+        releasedBy: operator,
+        releaseNote,
+      },
+      message: '財務已確認無未繳款，派單限制已解除。小U可自行重新上線接單。',
+    });
+  } catch (err) {
+    console.error('❌ 財務恢復派單失敗：', err);
+    return res.status(500).json({
+      success: false,
+      message: '財務恢復派單失敗。',
+      error: err.message,
+    });
+  }
+});
 
 // ===== UBee 財務中心：確認騎士現金已回繳 =====
 
@@ -23181,15 +23675,13 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
     const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
 
-    if (online === true && !canRiderAcceptOrdersV4(rider)) {
-      return res.status(403).json({
-        success: false,
-        code: 'RIDER_DISPATCH_NOT_ELIGIBLE',
-        message: '尚未完成「審核 → 入職 → 測驗 → ACTIVE」完整資格，或資格目前受限，不能上線接單。',
-        lifecycleStatus: getRiderV4LifecycleStatus(rider),
-        qualificationHardLock: getRiderV4HardLockState(rider),
-        appAccess: buildRiderAppAccessState(rider),
-      });
+    if (online === true && !canRiderReceiveDispatch(rider)) {
+      return res.status(403).json(
+        buildRiderDispatchDeniedPayload(
+          rider,
+          '尚未完成「審核 → 入職 → 測驗 → ACTIVE」完整資格，或資格目前受限，不能上線接單。'
+        )
+      );
     }
 
     const nowMs = Date.now();
@@ -37883,12 +38375,13 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
     const rider = riderResult.rider || {};
     const identity = buildRiderApiIdentity(riderDoc, rider, { lineUserId, phone, riderId });
 
-    if (!canRiderAcceptOrdersV4(rider)) {
-      return res.status(403).json({
-        success:false,
-        code:'RIDER_DISPATCH_NOT_ELIGIBLE',
-        message:'目前不具備正式接單資格。',
-      });
+    if (!canRiderReceiveDispatch(rider)) {
+      return res.status(403).json(
+        buildRiderDispatchDeniedPayload(
+          rider,
+          '目前不具備正式接單資格。'
+        )
+      );
     }
 
     const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
@@ -37945,7 +38438,14 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       if (!latestRiderDoc.exists) throw new Error('RIDER_NOT_FOUND');
 
       const latestRider = latestRiderDoc.data() || {};
-      if (!canRiderAcceptOrdersV4(latestRider)) throw new Error('RIDER_DISPATCH_NOT_ELIGIBLE');
+      const latestDispatch = getRiderDispatchEligibilityState(latestRider);
+      if (!latestDispatch.eligible) {
+        throw new Error(
+          latestDispatch.code === 'RIDER_FINANCE_DISPATCH_HOLD'
+            ? 'RIDER_FINANCE_DISPATCH_HOLD'
+            : 'RIDER_DISPATCH_NOT_ELIGIBLE'
+        );
+      }
 
       const currentOrderId = smartStackSafeOrderId(latestRider.currentOrderId);
       if (!currentOrderId) throw new Error('STACK_CURRENT_ORDER_REQUIRED');
@@ -38221,6 +38721,7 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
     const map = {
       RIDER_NOT_FOUND:[404,'找不到小U資料。'],
       RIDER_DISPATCH_NOT_ELIGIBLE:[403,'目前不具備正式接單資格。'],
+      RIDER_FINANCE_DISPATCH_HOLD:[403,'你的帳戶目前有尚待財務確認的月結款，因此暫停承接新任務。'],
       STACK_CURRENT_ORDER_REQUIRED:[409,'目前沒有可建立疊單的進行中任務。'],
       STACK_CURRENT_ORDER_NOT_FOUND:[409,'目前任務已更新，請重新整理。'],
       STACK_STATE_CHANGED:[409,'目前任務狀態已更新，請重新整理後再試。'],
@@ -38278,8 +38779,8 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       riderId,
     });
 
-    // Qualification Hard Lock V1：先做一次快速資格拒絕；
-    // Transaction 內仍會再讀最新 ridersV2 並二次驗證，避免資格在接單瞬間被撤銷的競態。
+    // 先只檢查正式資格。財務鎖是否阻擋要等讀到訂單後判斷：
+    // 已提前承接的預約屬既有承諾，可繼續執行；其他新任務仍由財務鎖禁止。
     if (!canRiderAcceptOrdersV4(rider)) {
       return res.status(403).json({
         success: false,
@@ -38287,6 +38788,7 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         message: '目前尚未取得正式接單資格，請先完成入職與測驗並確認帳號為 ACTIVE。',
         lifecycleStatus: getRiderV4LifecycleStatus(rider),
         qualificationHardLock: getRiderV4HardLockState(rider),
+        appAccess: buildRiderAppAccessState(rider),
       });
     }
 
@@ -38316,8 +38818,27 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       const latestRiderDoc = await transaction.get(riderRef);
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
 
-      if (!canRiderAcceptOrdersV4(latestRider)) {
+      const orderStatus =
+        String(order.status || '').trim();
+
+      const isScheduledReservedForThisRider =
+        [
+          'scheduled_reserved',
+          'scheduled_confirmed',
+        ].includes(orderStatus) &&
+        String(
+          order.reservedRiderDocId || ''
+        ).trim() === identity.riderDocId;
+
+      const latestDispatch = getRiderDispatchEligibilityState(latestRider);
+      if (!latestDispatch.qualificationEligible) {
         throw new Error('RIDER_DISPATCH_NOT_ELIGIBLE');
+      }
+      if (
+        latestDispatch.financeDispatchHold.active === true &&
+        !isScheduledReservedForThisRider
+      ) {
+        throw new Error('RIDER_FINANCE_DISPATCH_HOLD');
       }
 
       if (!riderMeetsOrderV4Requirements(latestRider, order)) {
@@ -38340,18 +38861,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
           }
         }
       }
-
-      const orderStatus =
-        String(order.status || '').trim();
-
-      const isScheduledReservedForThisRider =
-        [
-          'scheduled_reserved',
-          'scheduled_confirmed',
-        ].includes(orderStatus) &&
-        String(
-          order.reservedRiderDocId || ''
-        ).trim() === identity.riderDocId;
 
       if (
         orderStatus !== 'pending_dispatch' &&
@@ -38582,6 +39091,14 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
 
   } catch (error) {
     console.error('❌ 騎士網頁接單失敗：', error);
+
+    if (error.message === 'RIDER_FINANCE_DISPATCH_HOLD') {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_FINANCE_DISPATCH_HOLD',
+        message: '你的帳戶目前有尚待財務確認的月結款，因此暫停承接新任務。完成回繳並經 UBee 財務確認後即可恢復。',
+      });
+    }
 
     if (error.message === 'RIDER_DISPATCH_NOT_ELIGIBLE') {
       return res.status(403).json({
