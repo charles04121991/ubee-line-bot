@@ -25816,9 +25816,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   color:#765e00;
 }
 #productionOrderFlow .ubee-notification-message{
-  display:-webkit-box;
-  -webkit-line-clamp:3;
-  -webkit-box-orient:vertical;
+  display:block;
+  max-height:6.6em;
   overflow:hidden;
   margin:9px 0 0;
   color:#5f646a;
@@ -25831,16 +25830,29 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   tab-size:4;
 }
 #productionOrderFlow .ubee-customer-notification-item.is-expanded .ubee-notification-message{
-  display:block;
+  max-height:none;
   overflow:visible;
 }
 #productionOrderFlow .ubee-notification-action-hint{
   display:block;
-  margin-top:9px;
+  margin-top:10px;
   color:#9b7900;
   font-size:10px;
   font-weight:850;
+  line-height:1.45;
 }
+#productionOrderFlow .ubee-notification-action-hint.is-expand-control{display:none}
+#productionOrderFlow .ubee-customer-notification-item.can-expand .ubee-notification-action-hint.is-expand-control{display:flex;align-items:center;gap:4px}
+#productionOrderFlow .ubee-notification-action-hint .when-expanded{display:none}
+#productionOrderFlow .ubee-customer-notification-item.is-expanded .ubee-notification-action-hint .when-collapsed{display:none}
+#productionOrderFlow .ubee-customer-notification-item.is-expanded .ubee-notification-action-hint .when-expanded{display:inline}
+#productionOrderFlow .ubee-notification-expand-chevron{
+  display:inline-block;
+  font-size:11px;
+  line-height:1;
+  transition:transform .18s ease;
+}
+#productionOrderFlow .ubee-customer-notification-item.is-expanded .ubee-notification-expand-chevron{transform:rotate(180deg)}
 #productionOrderFlow .ubee-notification-loading,
 #productionOrderFlow .ubee-notification-error{
   padding:30px 14px;
@@ -25857,6 +25869,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 }
 </style>
 
+<!-- 2026-10-01｜Customer Notification Card UX Fix：收合摘要與完整展開分離，避免提示文字與內容重疊。 -->
 <script id="ubee-customer-notification-center-v1-controller">
 (()=>{
   'use strict';
@@ -25960,14 +25973,30 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       const id = esc(item.notificationId || '');
       const orderId = esc(item.orderId || '');
       const hasOrderAction = Boolean(orderId || item.actionType === 'order');
-      parts.push(`<button type="button" class="ubee-customer-notification-item${item.read ? '' : ' is-unread'}" data-notification-id="${id}" data-order-id="${orderId}" aria-label="${esc(item.title || 'UBee 通知')}">
+      parts.push(`<button type="button" class="ubee-customer-notification-item${item.read ? '' : ' is-unread'}" data-notification-id="${id}" data-order-id="${orderId}" aria-expanded="false" aria-label="${esc(item.title || 'UBee 通知')}">
         <span class="ubee-notification-item-head"><strong>${esc(item.title || 'UBee 通知')}</strong><time>${esc(timeText(item.createdAtMs))}</time></span>
         <span class="ubee-notification-category">${esc(item.category || '通知')}</span>
         <span class="ubee-notification-message">${esc(item.message || '')}</span>
-        ${hasOrderAction ? '<span class="ubee-notification-action-hint">查看訂單 ›</span>' : '<span class="ubee-notification-action-hint">點一下展開／收合</span>'}
+        ${hasOrderAction ? '<span class="ubee-notification-action-hint">查看訂單 ›</span>' : '<span class="ubee-notification-action-hint is-expand-control"><span class="when-collapsed">查看完整內容</span><span class="when-expanded">收合內容</span><span class="ubee-notification-expand-chevron" aria-hidden="true">⌄</span></span>'}
       </button>`);
     });
     target.innerHTML = parts.join('');
+    requestAnimationFrame(syncExpandableNotifications);
+  }
+
+  function syncExpandableNotifications(){
+    const rows = document.querySelectorAll('#ubeeMyNotificationsContent .ubee-customer-notification-item');
+    rows.forEach(row=>{
+      if(String(row.dataset.orderId || '').trim()) return;
+      const message = row.querySelector('.ubee-notification-message');
+      if(!message) return;
+      const wasExpanded = row.classList.contains('is-expanded');
+      if(wasExpanded) row.classList.remove('is-expanded');
+      const needsExpand = message.scrollHeight > message.clientHeight + 2;
+      row.classList.toggle('can-expand', needsExpand);
+      if(wasExpanded && needsExpand) row.classList.add('is-expanded');
+      row.setAttribute('aria-expanded', row.classList.contains('is-expanded') ? 'true' : 'false');
+    });
   }
 
   async function refreshSummary(force=false){
@@ -26006,7 +26035,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
         requestAnimationFrame(()=>{
           const item = document.querySelector(`#ubeeMyNotificationsContent [data-notification-id="${CSS.escape(focusId)}"]`);
           if(item){
-            item.classList.add('is-expanded');
+            syncExpandableNotifications();
+            if(item.classList.contains('can-expand')){
+              item.classList.add('is-expanded');
+              item.setAttribute('aria-expanded','true');
+            }
             item.scrollIntoView({block:'center',behavior:'smooth'});
           }
         });
@@ -26091,7 +26124,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       return;
     }
     const current = document.querySelector(`#ubeeMyNotificationsContent [data-notification-id="${CSS.escape(notificationId)}"]`);
-    current?.classList.toggle('is-expanded');
+    if(current && current.classList.contains('can-expand')){
+      const expanded = current.classList.toggle('is-expanded');
+      current.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
   }
 
   function openFromUrl(){
