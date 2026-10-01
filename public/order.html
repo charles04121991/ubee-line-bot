@@ -3,8 +3,8 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-01
-  Release: Customer U Coin Native V4
-  PWA: 20261001-customer-ucoin-native-v4
+  Release: Customer U Coin Native V5
+  PWA: 20261001-customer-ucoin-native-v5
 
   本次整理：
   1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
@@ -21,7 +21,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-ucoin-native-v4" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-ucoin-native-v5" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -29404,6 +29404,28 @@ body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
 </script>
+
+<style id="ubee-customer-global-type-scale-v5">
+/* V5：全客戶端文字微幅放大 6%，保留原有標題與內文層級。 */
+html,
+body{
+  -webkit-text-size-adjust:106%!important;
+  text-size-adjust:106%!important;
+}
+
+/* 表單原本固定為 16px 以避免 iPhone 聚焦縮放，V5 同步微調為 17px。 */
+#productionOrderFlow input,
+#productionOrderFlow textarea,
+#productionOrderFlow select,
+body:not(.flow-active) .app input,
+body:not(.flow-active) .app textarea,
+body:not(.flow-active) .app select,
+#ubeeCustomerAuthRoot input,
+#ubeeCustomerAuthRoot textarea,
+#ubeeCustomerAuthRoot select{
+  font-size:17px!important;
+}
+</style>
 
 </body>
 </html>
