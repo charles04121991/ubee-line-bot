@@ -3,22 +3,21 @@
 <head>
 <!-- =========================================================
   UBee Driver｜騎士端最新正式版｜2026-10-01
-  Release: Rider Native Polish & Cleanup V1
-  PWA: 20261001-rider-native-polish-cleanup-v1
+  Release: Rider Native Controls V2
+  PWA: 20261001-rider-native-controls-v2
 
   本次整理：
-  1. V5 Workbench／Task Center／Notification Center／我的頁維持唯一正式 Native Shell。
-  2. 清除已無 DOM／Runtime 的舊地圖工作台視覺層，避免舊樣式干擾 V5 Workbench。
-  3. 原生捲動、觸控回饋、Safe Area、Reduced Motion 與 Tab 切換收斂為單一 Native Experience 規格。
-  4. 移除長駐 will-change GPU layer，降低長時間 PWA 使用的繪製與記憶體負擔。
-  5. 保留派單、Presence、Smart Stack、多點、代駕、收入、資格、福利、通知與外部導航核心。
+  1. 接單設定與任務回報中的可見 Select 統一改為 Rider Native Picker；原 Select 僅保留資料契約。
+  2. 小U申請的居住地區／服務區域改為真正 Native Choice Page，不再於可見子頁顯示瀏覽器 Select。
+  3. 移除 Native Application oldSet / oldRender 二次包覆；正式 render / step 函式直接同步 Native UI。
+  4. 保留 V5 Workbench、Task Center、Notification Center、Income、Benefits 與既有原生導航架構。
+  5. 派單、Presence、Smart Stack、多點、代駕、收入、資格與 API 契約完全不變。
 
   Canonical recent milestones:
-  - 2026-10-01 Native Benefits Recovery / Native Polish & Cleanup
+  - 2026-10-01 Rider Native Controls V2 / Native Benefits Recovery / Native Cleanup
   - 2026-09-30 V5.4 Workbench / Scheduled Offer / Native Notification Center / Native Income
   - 2026-09-29 V5 Clean Architecture / Drive Semantic / Area MultiSelect
   - 2026-09-25 Native Application / Profile Photo
-  - 2026-09-24 Completed Detail / Queue ETA / Smart Stack Subsidy
 ========================================================= -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -41,7 +40,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/ubee-rider-icon-192.png?v=20260722-logo-v2">
 <link rel="icon" type="image/png" sizes="512x512" href="/ubee-rider-icon.png?v=20260722-logo-v2">
 <link rel="shortcut icon" type="image/png" href="/ubee-rider-icon.png?v=20260722-logo-v2">
-<link rel="manifest" href="/rider-manifest.json?v=20261001-rider-native-polish-cleanup-v1">
+<link rel="manifest" href="/rider-manifest.json?v=20261001-rider-native-controls-v2">
   
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="UBee Driver">
@@ -5887,7 +5886,7 @@ async function ensureRiderNotificationRegistration(){
   }
 
   try{
-    const riderSwUrl="/ubee-web-push-sw.js?v=20261001-rider-native-polish-cleanup-v1";
+    const riderSwUrl="/ubee-web-push-sw.js?v=20261001-rider-native-controls-v2";
 
     const registration = await navigator.serviceWorker.register(riderSwUrl, {
       scope: "/",
@@ -20492,6 +20491,7 @@ function renderV4IntegratedApplication(identity={}){
       </section>
     </form>
   </div><div id="v4ApplicationSubpage" class="ubee-v3-subpage" hidden></div>`;
+  requestAnimationFrame(()=>window.v4NativeV4Refresh?.());
 }
 function v4SetApplicationStepNative(step){
   v4CloseApplicationSubpage();
@@ -20506,6 +20506,7 @@ function v4SetApplicationStepNative(step){
   if(counter)counter.textContent=`${v4ApplicationStepNative} / 9`;
   if(v4ApplicationStepNative===9)v4RefreshApplicationReviewSummary();
   document.getElementById('v4Gate')?.scrollTo({top:0,behavior:'smooth'});
+  window.v4NativeV4Refresh?.();
 }
 function v4ApplicationBackNative(){if(v4ApplicationStepNative>1)v4SetApplicationStepNative(v4ApplicationStepNative-1);else returnToRiderLogin();}
 function v4NextApplicationStepNative(next){
@@ -25108,6 +25109,11 @@ body.ubee-non-home-tab .app-page.show > .page-scroll{
 .ubee-v4-subbar{height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 10px 0;display:grid;grid-template-columns:52px 1fr 52px;align-items:center;border-bottom:1px solid var(--ubee-border);background:var(--ubee-nav-bg);pointer-events:auto!important}.ubee-v4-subbar button{width:44px;height:44px;border:0;background:transparent;color:var(--ubee-text);font-size:30px;text-align:left;pointer-events:auto!important;touch-action:manipulation}.ubee-v4-subbar strong{text-align:center;font-size:16px}.ubee-v4-subbody{position:relative;z-index:2;flex:1;overflow:auto;padding:22px 18px calc(104px + env(safe-area-inset-bottom));pointer-events:auto!important;-webkit-overflow-scrolling:touch}.ubee-v4-subbody h1{margin:4px 0 7px;font-size:28px;line-height:1.15;letter-spacing:-.45px}.ubee-v4-subbody>p{margin:0 0 24px;color:var(--ubee-muted);font-size:13px;line-height:1.6}.ubee-v4-subactions{position:fixed;left:0;right:0;bottom:0;z-index:4;padding:10px 18px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--ubee-border);background:var(--ubee-nav-bg);pointer-events:auto!important}.ubee-v4-subactions button{width:100%;min-height:56px;border:0;border-radius:14px;background:var(--ubee-accent);color:#111827;font-size:16px;font-weight:800;pointer-events:auto!important;touch-action:manipulation} .ubee-v4-subpage input,.ubee-v4-subpage select,.ubee-v4-subpage button{pointer-events:auto!important}
 .ubee-v4-master-agree{margin:18px 0 0;padding:15px 16px;border:1px solid var(--ubee-border);border-radius:14px;background:var(--ubee-surface);display:flex;gap:11px;align-items:flex-start;color:var(--ubee-text);font-size:13px;line-height:1.55}.ubee-v4-master-agree input{width:21px;height:21px;margin:0;accent-color:var(--ubee-accent);flex:0 0 auto}
 #v4Gate.ubee-rider-application-mode [data-native-step="8"] .ubee-v3-form-group{border:0;background:transparent}#v4Gate.ubee-rider-application-mode [data-native-step="8"] #v4ApplyPlateField{padding:0;border:0;background:transparent}#v4Gate.ubee-rider-application-mode [data-native-step="8"] #v4ApplyPlateField label{display:none}#v4Gate.ubee-rider-application-mode [data-native-step="8"] #v4ApplyPlate{min-height:72px;text-align:center;font-size:30px;letter-spacing:1.5px;border:0;border-bottom:2px solid var(--ubee-border);border-radius:0;background:transparent!important;text-transform:uppercase}
+
+.ubee-v4-native-caption{margin:22px 3px 9px;color:var(--ubee-muted);font-size:12px;font-weight:750;letter-spacing:.1px}
+.ubee-v4-native-empty{padding:22px 14px;border:1px dashed var(--ubee-border);border-radius:14px;color:var(--ubee-muted);text-align:center;font-size:13px;font-weight:600}
+.ubee-v4-city-choice-strip{display:flex;gap:8px;overflow:auto;padding:0 0 6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}.ubee-v4-city-choice-strip::-webkit-scrollbar{display:none}
+.ubee-v4-city-chip{flex:0 0 auto;min-height:40px;padding:0 13px;border:1px solid var(--ubee-border);border-radius:999px;background:var(--ubee-surface);color:var(--ubee-text);font-size:13px;font-weight:720;touch-action:manipulation}.ubee-v4-city-chip.selected{background:var(--ubee-accent);border-color:var(--ubee-accent);color:#111827}.ubee-v4-city-chip:active{transform:scale(.985)}
 @media(prefers-reduced-motion:reduce){.ubee-v4-subpage{animation:none}}
 </style>
 
@@ -25135,14 +25141,48 @@ body.ubee-non-home-tab .app-page.show > .page-scroll{
  let v4ProfilePhotoPreuploadPromise=null;
  window.v4MaybePreuploadProfilePhoto=function(){const phone=normalizeRiderPhoneClient(document.getElementById('v4ApplyPhone')?.value||'');if(!/^09\d{8}$/.test(phone)||!v4ApplicationProfilePhotoFile||v4ApplicationProfilePhotoUpload?.storagePath)return Promise.resolve(v4ApplicationProfilePhotoUpload||null);if(v4ProfilePhotoPreuploadPromise)return v4ProfilePhotoPreuploadPromise;v4ProfilePhotoPreuploadPromise=v4EnsureProfilePhotoUploaded().catch(()=>null).finally(()=>{v4ProfilePhotoPreuploadPromise=null});return v4ProfilePhotoPreuploadPromise};
  window.v4OpenFieldEditor=function(id,title,type='text'){const src=document.getElementById(id);if(!src)return;if(src.disabled){showUBeeNativeAlert('此資料已與已上傳的大頭照／證件綁定；如需更改手機號碼，請先重新設定驗證資料。');return;}const el=subpage(title,`<h1>${esc(title)}</h1><p>完成後會自動帶回申請資料。</p><div class="ubee-v4-single-input"><label>${esc(title)}</label><input id="ubeeV4EditInput" type="${esc(type)}" value="${esc(src.value)}" ${type==='tel'?'inputmode="numeric" maxlength="10" autocomplete="tel"':''}></div>`,()=>{const input=document.getElementById('ubeeV4EditInput');if(!input)return;src.value=input.value;if(id==='v4ApplyPhone'){src.dispatchEvent(new Event('input',{bubbles:true}));setTimeout(()=>v4MaybePreuploadProfilePhoto(),0)}v4CloseNativeV4Subpage()});const input=el.querySelector('#ubeeV4EditInput');if(input){try{input.focus({preventScroll:true})}catch(_){try{input.focus()}catch(__){}}if(type==='date'&&typeof input.showPicker==='function'){try{input.showPicker()}catch(_){}}}};
- window.v4OpenSelectEditor=function(id,title){const src=document.getElementById(id);if(!src)return;const choices=[...src.options].filter(o=>o.value).map(o=>`<button type="button" class="ubee-v4-choice ${o.value===src.value?'selected':''}" data-value="${esc(o.value)}"><span>${esc(o.text)}</span><span>${o.value===src.value?'✓':''}</span></button>`).join('');let chosen=src.value;const el=subpage(title,`<h1>${esc(title)}</h1><p>選擇最符合目前狀況的項目。</p><div class="ubee-v4-choice-grid">${choices}</div>`,()=>{if(chosen){src.value=chosen;src.dispatchEvent(new Event('change',{bubbles:true}))}v4CloseNativeV4Subpage()});el.querySelectorAll('.ubee-v4-choice').forEach(b=>b.onclick=()=>{chosen=b.dataset.value;el.querySelectorAll('.ubee-v4-choice').forEach(x=>{x.classList.toggle('selected',x===b);x.lastElementChild.textContent=x===b?'✓':''})})};
- window.v4OpenResidenceEditor=function(){const city=document.getElementById('v4ApplyCity'),dist=document.getElementById('v4ApplyDistrict');const el=subpage('居住地區',`<h1>居住地區</h1><p>先選擇縣市，再選擇行政區。</p><div class="ubee-v4-single-input"><label>縣市</label><select id="ubeeV4City" class="ubee-v4-native-control">${city.innerHTML}</select></div><div class="ubee-v4-single-input"><label>行政區</label><select id="ubeeV4District" class="ubee-v4-native-control"></select></div>`,()=>{city.value=document.getElementById('ubeeV4City').value;syncV4ResidenceDistricts();dist.value=document.getElementById('ubeeV4District').value;v4CloseNativeV4Subpage()});const c=el.querySelector('#ubeeV4City'),d=el.querySelector('#ubeeV4District');c.value=city.value;const fill=()=>{d.innerHTML=`<option value="">請選擇行政區</option>${ubeeTaiwanDistrictOptions(c.value)}`;if(c.value===city.value)d.value=dist.value};c.onchange=fill;fill()};
- window.v4OpenServiceAreaEditor=function(){const serviceCity=document.getElementById('v4ApplyServiceCity');const el=subpage('服務區域',`<h1>服務區域</h1><p>可跨縣市與行政區多選，不限制固定數量。</p><div class="ubee-v4-single-input"><label>縣市</label><select id="ubeeV4ServiceCity" class="ubee-v4-native-control">${serviceCity.innerHTML}</select></div><div id="ubeeV4DistrictChoices" class="ubee-v4-choice-grid" style="margin-top:18px"></div>`,()=>{serviceCity.value=document.getElementById('ubeeV4ServiceCity').value;syncV4ServiceDistrictPicker();syncV4ServiceAreaValue();v4CloseNativeV4Subpage()});const c=el.querySelector('#ubeeV4ServiceCity'),box=el.querySelector('#ubeeV4DistrictChoices');const residenceCity=String(document.getElementById('v4ApplyCity')?.value||'');c.value=serviceCity.value||residenceCity||'';const draw=()=>{box.innerHTML=(UBEE_TAIWAN_REGIONS[c.value]||[]).map(d=>{const full=ubeeFullDistrict(c.value,d),sel=ubeeV4SelectedServiceDistricts.includes(full);return `<button type="button" class="ubee-v4-choice ${sel?'selected':''}" data-full="${esc(full)}"><span>${esc(d)}</span><span>${sel?'✓':''}</span></button>`}).join('');box.querySelectorAll('button').forEach(b=>b.onclick=()=>{const full=b.dataset.full,has=ubeeV4SelectedServiceDistricts.includes(full);ubeeV4SelectedServiceDistricts=has?ubeeV4SelectedServiceDistricts.filter(x=>x!==full):[...ubeeV4SelectedServiceDistricts,full];draw()})};c.onchange=draw;draw()};
+ window.v4OpenSelectEditor=function(id,title){
+   const src=document.getElementById(id);if(!src)return;
+   const choices=[...src.options].filter(o=>o.value);
+   const el=subpage(title,`<h1>${esc(title)}</h1><p>選擇最符合目前狀況的項目。</p><div class="ubee-v4-choice-grid">${choices.map(o=>`<button type="button" class="ubee-v4-choice ${o.value===src.value?'selected':''}" data-value="${esc(o.value)}"><span>${esc(o.text)}</span><span>${o.value===src.value?'✓':''}</span></button>`).join('')}</div>`,()=>v4CloseNativeV4Subpage());
+   el.querySelectorAll('.ubee-v4-choice').forEach(button=>button.onclick=()=>{
+     src.value=button.dataset.value||'';
+     src.dispatchEvent(new Event('input',{bubbles:true}));
+     src.dispatchEvent(new Event('change',{bubbles:true}));
+     try{navigator.vibrate?.(8)}catch(_){ }
+     v4CloseNativeV4Subpage();
+   });
+ };
+ window.v4OpenResidenceEditor=function(){
+   const city=document.getElementById('v4ApplyCity'),dist=document.getElementById('v4ApplyDistrict');if(!city||!dist)return;
+   let chosenCity=String(city.value||'');let chosenDistrict=String(dist.value||'');
+   const cityOptions=[...city.options].filter(o=>o.value).map(o=>({value:o.value,text:o.textContent.trim()}));
+   const el=subpage('居住地區',`<h1>居住地區</h1><p>先選擇縣市，再選擇行政區。</p><div class="ubee-v4-native-caption">縣市</div><div class="ubee-v4-choice-grid" id="ubeeV4ResidenceCities"></div><div class="ubee-v4-native-caption">行政區</div><div class="ubee-v4-choice-grid" id="ubeeV4ResidenceDistricts"></div>`,()=>{
+     if(!chosenCity||!chosenDistrict){showUBeeNativeAlert('請完整選擇居住縣市與行政區。');return;}
+     city.value=chosenCity;city.dispatchEvent(new Event('change',{bubbles:true}));
+     dist.value=chosenDistrict;dist.dispatchEvent(new Event('change',{bubbles:true}));
+     v4CloseNativeV4Subpage();
+   });
+   const cityBox=el.querySelector('#ubeeV4ResidenceCities'),distBox=el.querySelector('#ubeeV4ResidenceDistricts');
+   const drawDistricts=()=>{const list=UBEE_TAIWAN_REGIONS[chosenCity]||[];if(!list.includes(chosenDistrict))chosenDistrict='';distBox.innerHTML=list.length?list.map(name=>`<button type="button" class="ubee-v4-choice ${name===chosenDistrict?'selected':''}" data-district="${esc(name)}"><span>${esc(name)}</span><span>${name===chosenDistrict?'✓':''}</span></button>`).join(''):'<div class="ubee-v4-native-empty">請先選擇縣市</div>';distBox.querySelectorAll('button').forEach(button=>button.onclick=()=>{chosenDistrict=button.dataset.district||'';drawDistricts()})};
+   const drawCities=()=>{cityBox.innerHTML=cityOptions.map(option=>`<button type="button" class="ubee-v4-choice ${option.value===chosenCity?'selected':''}" data-city="${esc(option.value)}"><span>${esc(option.text)}</span><span>${option.value===chosenCity?'✓':''}</span></button>`).join('');cityBox.querySelectorAll('button').forEach(button=>button.onclick=()=>{chosenCity=button.dataset.city||'';chosenDistrict='';drawCities();drawDistricts()})};
+   drawCities();drawDistricts();
+ };
+ window.v4OpenServiceAreaEditor=function(){
+   const serviceCity=document.getElementById('v4ApplyServiceCity');if(!serviceCity)return;
+   const residenceCity=String(document.getElementById('v4ApplyCity')?.value||'');
+   let chosenCity=String(serviceCity.value||residenceCity||'');
+   const cityOptions=[...serviceCity.options].filter(o=>o.value).map(o=>({value:o.value,text:o.textContent.trim()}));
+   const el=subpage('服務區域',`<h1>服務區域</h1><p>可跨縣市與行政區多選，不限制固定數量。</p><div class="ubee-v4-native-caption">目前查看縣市</div><div class="ubee-v4-city-choice-strip" id="ubeeV4ServiceCities"></div><div class="ubee-v4-native-caption">可服務行政區</div><div class="ubee-v4-choice-grid" id="ubeeV4DistrictChoices"></div>`,()=>{
+     serviceCity.value=chosenCity;serviceCity.dispatchEvent(new Event('change',{bubbles:true}));syncV4ServiceDistrictPicker();syncV4ServiceAreaValue();v4CloseNativeV4Subpage();
+   });
+   const cityBox=el.querySelector('#ubeeV4ServiceCities'),box=el.querySelector('#ubeeV4DistrictChoices');
+   const draw=()=>{cityBox.innerHTML=cityOptions.map(option=>`<button type="button" class="ubee-v4-city-chip ${option.value===chosenCity?'selected':''}" data-city="${esc(option.value)}">${esc(option.text)}</button>`).join('');cityBox.querySelectorAll('button').forEach(button=>button.onclick=()=>{chosenCity=button.dataset.city||'';draw()});box.innerHTML=(UBEE_TAIWAN_REGIONS[chosenCity]||[]).map(d=>{const full=ubeeFullDistrict(chosenCity,d),sel=ubeeV4SelectedServiceDistricts.includes(full);return `<button type="button" class="ubee-v4-choice ${sel?'selected':''}" data-full="${esc(full)}"><span>${esc(d)}</span><span>${sel?'✓':''}</span></button>`}).join('')||'<div class="ubee-v4-native-empty">請先選擇縣市</div>';box.querySelectorAll('button').forEach(button=>button.onclick=()=>{const full=button.dataset.full||'',has=ubeeV4SelectedServiceDistricts.includes(full);ubeeV4SelectedServiceDistricts=has?ubeeV4SelectedServiceDistricts.filter(x=>x!==full):[...ubeeV4SelectedServiceDistricts,full];draw()})};
+   draw();
+ };
  window.v4OpenEmergencyEditor=function(){const ids=['v4ApplyEmergencyName','v4ApplyEmergencyRelationship','v4ApplyEmergencyPhone'];const vals=ids.map(value);const el=subpage('緊急聯絡人',`<h1>緊急聯絡人</h1><p>僅在事故、失聯或重大任務異常時必要聯繫。</p>${['姓名','關係','手機'].map((x,i)=>`<div class="ubee-v4-single-input"><label>${x}</label><input id="ubeeV4Emergency${i}" ${i===2?'inputmode="numeric" maxlength="10"':''} value="${esc(vals[i])}"></div>`).join('')}`,()=>{ids.forEach((id,i)=>document.getElementById(id).value=document.getElementById('ubeeV4Emergency'+i).value);v4CloseNativeV4Subpage()})};
  function v4EnhanceReview(){const step=document.querySelector('[data-native-step="9"]');if(!step)return;const cg=step.querySelector('.ubee-v3-consent-group');if(cg&&!cg.classList.contains('ubee-v4-hidden-contract'))cg.classList.add('ubee-v4-hidden-contract');let host=step.querySelector('#ubeeV4PolicyRows');if(!host){host=document.createElement('div');host.id='ubeeV4PolicyRows';cg?.before(host)}const agreements=[...step.querySelectorAll('.v4ApplyAgreeV2')];host.innerHTML=`<div class="ubee-v4-group">${row('小U合作與任務規範','查看完整內容',"v4OpenPolicyPage('合作與任務規範',0)")}${row('個人資料告知事項','查看完整內容',"v4OpenPolicyPage('個人資料告知事項',1)")}${row('定位、車輛與資格聲明','查看完整內容',"v4OpenPolicyPage('定位、車輛與資格聲明',2)")}</div><label class="ubee-v4-master-agree"><input id="ubeeV4MasterAgree" type="checkbox" ${agreements.length&&agreements.every(x=>x.checked)?'checked':''}><span>我已閱讀並同意以上申請、合作、個資與任務相關規範。</span></label>`;host.querySelector('#ubeeV4MasterAgree').onchange=e=>agreements.forEach(x=>x.checked=e.target.checked)}
  window.v4OpenPolicyPage=function(title,index){const texts=[['UBee 為任務媒合與營運管理平台，合作屬接案性質。小U應遵守平台規範，不私接、不私下加價、不繞過平台交易，也不得偽造任務紀錄。','接單前應自行確認能力、車況與安全條件；交通、貨損、代墊與任務執行風險依規範處理。'],['UBee 會在申請審核、聯繫、派單及必要營運範圍處理申請資料。調度中心不顯示身分證、駕照、行照與保險影像。','申請者聲明上傳資料真實、完整、未變造；偽造或冒用資料可取消資格。'],['申請使用的機車或汽車，其駕照、行照、車輛授權與強制險須合法有效，並同意 UBee 必要查核。','上線與執行任務期間提供必要定位資料，用於派單、任務安全與異常處置。審核通過後仍須完成平台要求的入職項目才會開通完整接單資格。']][index]||[];subpage(title,`<h1>${esc(title)}</h1>${texts.map(t=>`<p style="font-size:15px;line-height:1.8;color:var(--ubee-text)">${esc(t)}</p>`).join('')}`,()=>v4CloseNativeV4Subpage())};
- const oldSet=window.v4SetApplicationStepNative;window.v4SetApplicationStepNative=function(step){oldSet(step);setTimeout(v4NativeV4Refresh,0)};
- const oldRender=window.renderV4IntegratedApplication;window.renderV4IntegratedApplication=function(identity={}){oldRender(identity);setTimeout(v4NativeV4Refresh,0)};
  window.addEventListener('popstate',()=>{if(document.getElementById('ubeeV4NavigationSubpage'))v4CloseNativeV4Subpage()});
 })();
 </script>
@@ -25690,6 +25730,44 @@ body.ubee-task-dock-active #ubeeRiderHomeV5Content{padding-bottom:230px!importan
   #taskPage .ubee-task-center-segmented button,.ubee-task-center-accept{transition:none!important;}
 }
 </style>
+
+
+
+<!-- =========================================================
+  2026-10-01｜Rider Native Controls V2
+  接單設定／任務回報可見 Select 統一 Rider Bottom Sheet；資料契約維持既有 select value/change。
+========================================================= -->
+<style id="ubee-rider-native-picker-v2-style">
+.ubee-rider-picker-source{position:absolute!important;width:1px!important;height:1px!important;min-width:1px!important;min-height:1px!important;padding:0!important;margin:0!important;border:0!important;opacity:0!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;pointer-events:none!important}
+.ubee-rider-picker-trigger{box-sizing:border-box;width:100%;min-height:50px;padding:0 12px;border:0;border-radius:12px;background:var(--ubee-surface-2);color:var(--ubee-text);display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;font:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.ubee-rider-picker-trigger:active{opacity:.66;transform:scale(.995)}.ubee-rider-picker-trigger:disabled{opacity:.45;transform:none}
+.ubee-rider-picker-trigger-value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:720}.ubee-rider-picker-trigger-chevron{flex:0 0 auto;color:var(--ubee-muted-2);font-size:22px;transform:rotate(90deg)}
+.ubee-account-field>.ubee-rider-picker-trigger{min-height:44px;background:transparent;padding:0;justify-content:flex-end}.ubee-account-field>.ubee-rider-picker-trigger .ubee-rider-picker-trigger-value{text-align:right}
+.ubee-form-row>.ubee-rider-picker-trigger{margin-top:7px;min-height:52px;border:1px solid var(--ubee-border);background:var(--ubee-surface)}
+.ubee-rider-picker-overlay{position:fixed;inset:0;z-index:2147483100;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .18s ease}
+.ubee-rider-picker-overlay.is-open{opacity:1;pointer-events:auto}.ubee-rider-picker-sheet{width:min(100%,680px);max-height:min(78vh,700px);display:flex;flex-direction:column;border:1px solid var(--ubee-border);border-bottom:0;border-radius:24px 24px 0 0;background:var(--ubee-page-bg);color:var(--ubee-text);box-shadow:0 -16px 48px rgba(0,0,0,.28);padding-bottom:env(safe-area-inset-bottom);transform:translateY(18px);transition:transform .22s cubic-bezier(.2,.8,.2,1)}.ubee-rider-picker-overlay.is-open .ubee-rider-picker-sheet{transform:none}
+.ubee-rider-picker-head{min-height:58px;padding:8px 12px 8px 18px;border-bottom:1px solid var(--ubee-border);display:grid;grid-template-columns:44px 1fr 44px;align-items:center;background:var(--ubee-nav-bg)}.ubee-rider-picker-head strong{text-align:center;font-size:16px;font-weight:800}.ubee-rider-picker-close{width:42px;height:42px;border:0;border-radius:50%;background:var(--ubee-surface-2);color:var(--ubee-text);font-size:22px}
+.ubee-rider-picker-list{overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 12px 14px}.ubee-rider-picker-option{width:100%;min-height:60px;padding:10px 12px;border:0;border-bottom:1px solid var(--ubee-border);background:transparent;color:var(--ubee-text);display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;gap:12px;text-align:left;font-size:15px;font-weight:650}.ubee-rider-picker-option:last-child{border-bottom:0}.ubee-rider-picker-option:active{background:var(--ubee-surface-2)}.ubee-rider-picker-option.is-selected{font-weight:820}.ubee-rider-picker-check{color:var(--ubee-accent);font-size:19px;text-align:center}
+body.ubee-rider-picker-open{overflow:hidden!important;touch-action:none}@media(prefers-reduced-motion:reduce){.ubee-rider-picker-overlay,.ubee-rider-picker-sheet{transition:none!important}}
+</style>
+<script id="ubee-rider-native-picker-v2-script">
+(()=>{
+ 'use strict';if(window.__UBEE_RIDER_NATIVE_PICKER_V2__)return;window.__UBEE_RIDER_NATIVE_PICKER_V2__=true;
+ const configs={prefServiceCity:'主要服務縣市',prefMaxAdvance:'可接受代墊上限',prefMaxDistance:'可接距離範圍',ubeeItemSizeReportValue:'實際商品體積'};
+ let activeTrigger=null;const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ function getTrigger(select){return select?.parentElement?.querySelector?.(`.ubee-rider-picker-trigger[data-rider-select-for="${CSS.escape(select.id)}"]`)||null}
+ function sync(select){const button=getTrigger(select);if(!button)return;const option=select.options?.[select.selectedIndex];button.querySelector('.ubee-rider-picker-trigger-value').textContent=String(option?.textContent||'請選擇').trim();button.disabled=select.disabled===true}
+ function ensure(){let root=document.getElementById('ubeeRiderNativePicker');if(root)return root;root=document.createElement('div');root.id='ubeeRiderNativePicker';root.className='ubee-rider-picker-overlay';root.setAttribute('aria-hidden','true');root.innerHTML=`<div class="ubee-rider-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="ubeeRiderPickerTitle"><div class="ubee-rider-picker-head"><span></span><strong id="ubeeRiderPickerTitle">請選擇</strong><button class="ubee-rider-picker-close" type="button" aria-label="關閉">×</button></div><div class="ubee-rider-picker-list" id="ubeeRiderPickerList"></div></div>`;root.addEventListener('click',event=>{if(event.target===root||event.target.closest('.ubee-rider-picker-close'))close()});document.body.appendChild(root);return root}
+ function close(){const root=document.getElementById('ubeeRiderNativePicker');if(!root)return;root.classList.remove('is-open');root.setAttribute('aria-hidden','true');document.body.classList.remove('ubee-rider-picker-open');activeTrigger?.setAttribute('aria-expanded','false');const target=activeTrigger;activeTrigger=null;setTimeout(()=>target?.focus?.({preventScroll:true}),25)}
+ function open(select,trigger){if(!select||select.disabled)return;const root=ensure(),list=root.querySelector('#ubeeRiderPickerList');root.querySelector('#ubeeRiderPickerTitle').textContent=configs[select.id]||'請選擇';const options=[...select.options].filter(o=>String(o.value||'').trim()&&!o.disabled);list.innerHTML=options.map(o=>`<button type="button" class="ubee-rider-picker-option ${String(o.value)===String(select.value)?'is-selected':''}" data-value="${esc(o.value)}"><span>${esc(o.textContent.trim())}</span><span class="ubee-rider-picker-check">${String(o.value)===String(select.value)?'✓':''}</span></button>`).join('');list.querySelectorAll('button').forEach(button=>button.onclick=()=>{const next=button.dataset.value||'';if(String(select.value)!==next){select.value=next;select.dispatchEvent(new Event('input',{bubbles:true}));select.dispatchEvent(new Event('change',{bubbles:true}))}try{navigator.vibrate?.(8)}catch(_){ }sync(select);close()});activeTrigger=trigger;trigger?.setAttribute('aria-expanded','true');document.body.classList.add('ubee-rider-picker-open');root.classList.add('is-open');root.setAttribute('aria-hidden','false');requestAnimationFrame(()=>list.querySelector('.is-selected')?.scrollIntoView({block:'center'}))}
+ function enhance(select){if(!select||!configs[select.id]||select.dataset.riderNativePicker==='1')return;select.dataset.riderNativePicker='1';select.classList.add('ubee-rider-picker-source');select.setAttribute('aria-hidden','true');select.tabIndex=-1;const button=document.createElement('button');button.type='button';button.className='ubee-rider-picker-trigger';button.dataset.riderSelectFor=select.id;button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-expanded','false');button.innerHTML='<span class="ubee-rider-picker-trigger-value"></span><span class="ubee-rider-picker-trigger-chevron" aria-hidden="true">›</span>';select.insertAdjacentElement('afterend',button);button.onclick=()=>open(select,button);select.addEventListener('change',()=>sync(select));select.addEventListener('input',()=>sync(select));select.addEventListener('focus',()=>{if(!select.disabled){button.focus({preventScroll:true});open(select,button)}});new MutationObserver(()=>sync(select)).observe(select,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});sync(select)}
+ function scan(root=document){Object.keys(configs).forEach(id=>{const select=(root.getElementById?root.getElementById(id):document.getElementById(id));if(select instanceof HTMLSelectElement)enhance(select)})}
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.getElementById('ubeeRiderNativePicker')?.classList.contains('is-open')){event.preventDefault();close()}});
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>scan(),{once:true});else scan();
+ new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1){scan(node);Object.keys(configs).forEach(id=>{const el=node.querySelector?.(`#${CSS.escape(id)}`);if(el instanceof HTMLSelectElement)enhance(el)})}}).observe(document.documentElement,{childList:true,subtree:true});
+ window.UBeeRiderNativePicker=Object.freeze({scan,close});
+})();
+</script>
 
 </body>
 </html>
