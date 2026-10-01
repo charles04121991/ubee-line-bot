@@ -1,3 +1,4 @@
+/* 2026-10-01｜Customer Native Notification Center V1：支援 Inbox notificationId、通知中心 Deep Link 與 Push 點擊訊息路由。 */
 /* 2026-09-29｜Customer Critical Sync V1.4.4：修復完成訂單誤生草稿與 Rider/Customer 狀態同步。 */
 /* 2026-09-29｜Customer Rating Lock V1.4.3：同步評價完成後永久鎖定再次評價入口。 */
 /* 2026-09-29｜Customer State Sync V1.4.2：主訂單狀態優先、備援防回退、2 秒前景同步。 */
@@ -59,7 +60,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-critical-sync-v1-4-4';
+const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-notification-center-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
@@ -338,10 +339,13 @@ self.addEventListener('push', event => {
     data.id ||
     ''
   ).trim().toUpperCase();
+  const notificationId = String(data.notificationId || '').trim();
 
   const fallbackUrl = orderId
     ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
-    : '/order.html?source=push';
+    : notificationId
+      ? `/order.html?action=notifications&notificationId=${encodeURIComponent(notificationId)}&source=push`
+      : '/order.html?action=notifications&source=push';
 
   const targetUrl = String(
     data.url ||
@@ -361,6 +365,7 @@ self.addEventListener('push', event => {
     renotify: data.renotify !== false,
     data: {
       orderId,
+      notificationId,
       url: targetUrl,
       type: data.type || 'UBEE_CUSTOMER_PUSH'
     }
@@ -389,10 +394,13 @@ self.addEventListener('notificationclick', event => {
   const orderId = String(data.orderId || '')
     .trim()
     .toUpperCase();
+  const notificationId = String(data.notificationId || '').trim();
 
   const fallbackPath = orderId
     ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
-    : '/order.html?source=push';
+    : notificationId
+      ? `/order.html?action=notifications&notificationId=${encodeURIComponent(notificationId)}&source=push`
+      : '/order.html?action=notifications&source=push';
 
   let targetUrl = new URL(fallbackPath, self.location.origin).href;
   try {
@@ -422,9 +430,13 @@ self.addEventListener('notificationclick', event => {
 
           await client.focus();
 
-          client.postMessage({
+          client.postMessage(orderId ? {
             type: 'UBEE_CUSTOMER_OPEN_ORDER',
             orderId,
+            url: targetUrl
+          } : {
+            type: 'UBEE_CUSTOMER_OPEN_NOTIFICATION',
+            notificationId,
             url: targetUrl
           });
 
