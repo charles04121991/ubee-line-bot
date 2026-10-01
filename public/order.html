@@ -1,69 +1,29 @@
-<!-- 2026-10-01｜Customer Native Notification Center V1：首頁通知鈴鐺、未讀 Badge、通知 Inbox、單則／全部已讀與 Push Deep Link。 -->
 <!DOCTYPE html>
-<!-- 2026-09-29｜Customer Critical Sync V1.4.4：修復正式訂單完成後舊表單被 autosave 成「未完成任務」草稿；主訂單與 tracking 狀態改為同請求 canonical 狀態，補強狀態版本與前景立即同步。 -->
-<!-- 2026-09-29｜Customer Rating Lock V1.4.3：評價成功後立即永久鎖定該訂單的再次評價入口；Server riderRatingSubmitted + 本機即時鎖雙重判斷，列表／詳情／完成任務 Gate 共用同一狀態。 -->
-<!-- 2026-09-29｜Customer State Sync V1.4.2：以主訂單 API 為唯一優先狀態來源，追蹤摘要只在主同步失聯時備援；加入版本時間防回退、統一 canonical status，並將可見頁輪詢縮短為 2 秒。 -->
-<!-- 2026-09-29｜Customer Active Meta Fix V1.4.1：修復建立時間使用 createdAtMs；進行中任務新增固定可見「建立時間／預計幾分鐘抵達」資訊列；ETA 同時支援 tracking summary 與 customerLiveEta canonical fallback。 -->
-<!-- 2026-09-29｜Customer No-Map + Universal ETA + Drive Semantic V1.4：用戶端移除所有可視地圖；保留定位、地址搜尋、Geocode、Routes、距離、ETA、正式估價。六大服務共用階段 ETA，代駕使用獨立車輛／交接語意。 -->
-<!-- 2026-09-29｜Customer Contact Removal V1.3：完整移除 Order Chat 即時對話 UI、事件與 API 呼叫；保留既有 PWA、通知、地址、估價與訂單核心。 -->
-<!-- 2026-09-29｜Drive Service V1：六服務 3×2 Native Grid 與代駕專用表單；訂單聊天室功能已於 Contact Removal V1.3 移除。 -->
-<!-- 2026-09-24｜Customer Order Lifecycle V1：訂單總覽改為進行中 5 段動態進度／完成待評價／已評價三種原生狀態卡；沿用既有 Rider Rating API 與 Final Delivery ETA。 -->
-<!-- 2026-09-24｜Customer Segmented Live Progress V2：動態進度由 8 段精簡為 5 段短線；保留細部訂單狀態與目前段流動動畫。 -->
-<!-- 2026-09-24｜Customer Segmented Live Progress V1：現在訂單與首頁進行中任務改為外送平台式多段動態進度條；移除四節點文字／圓點與重複 ETA 卡內顯示。 -->
-<!-- 2026-09-24｜Customer Platform Home V3：首頁改為外送平台式資訊架構；移除城市節點動畫／大 Hero，五大正式服務（幫我送／幫我取／幫我買／幫排隊／全能跑腿）完全保留；進行中任務有單才顯示，運力資訊移至下單區下方。 -->
-<!-- 2026-09-24｜Customer Home Dynamic Hero V2：恢復既有正式首頁與五大服務（幫我送／幫我取／幫我買／幫排隊／全能跑腿）；只移除首頁 Google Map，原位置改為城市任務動態 Hero；有進行中訂單時同區塊切換為 ETA＋4 節點進度。 -->
-<!-- 2026-09-24｜Customer Service Home + Linear Progress V1：進行中任務固定 4 節點線性進度（媒合→取件→配送→完成），沿用 Final Delivery ETA；V2 已撤回 V1 的首頁服務重新編排，恢復既有正式首頁服務結構。 -->
-<!-- 2026-09-24｜Customer Final Delivery ETA V2：訂單頁背景靜默刷新、防重複請求；Smart Stack B 升為 CURRENT 後不顯示舊排隊 ETA。 -->
-<!-- 2026-09-24｜Customer Final Delivery ETA V1：進行中主畫面、底部「訂單」清單與訂單明細統一顯示後端最終送達 ETA；Smart Stack B 單以 Queue ETA 顯示，不暴露 A 客戶資料。 -->
-<!-- 2026-09-23 Production Audit：已核對 index / order / rider API 與多點配送契約；本檔無需功能修正。 -->
-<!-- 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；留空不阻擋流程，有填才納入多點路線並加收 NT$50。 -->
-<!-- 2026-09-23｜Customer Multi-stop Fee V1：送達點 1 必填、送達點 2 選填；每新增 1 個有效送達點固定加 NT$50，正式報價與建單一致。 -->
-<!-- 2026-09-23｜Customer Cloud Draft V1：會員未完成任務同步至 Firestore；支援跨手機恢復、本機離線備援、7 日有效期與成功建單／捨棄後雲端清除。 -->
-<!-- 2026-09-23｜Customer Local State Fix V1：修正定位偏好尊重使用者設定、恢復未完成任務草稿、草稿／常用地址依會員隔離、統一 App/PWA Release。 -->
-<!-- 2026-09-23｜Customer Multi-stop Delivery V1：送達點 1 必填、送達點 2 選填；多點路線、估價、建單、雲端草稿與騎士多點流程正式串接。 -->
-<!-- 2026-09-20｜Customer Rider Rating V1：完成任務後可對實際承接小U評價；每單一次、1～5 星、標籤與選填留言；已完成訂單明細可補評。 -->
-<!-- 2026-09-19｜Customer Cancel UX V1：我的訂單列表、訂單詳情、進行中任務皆直接提供取消入口。 -->
-<!-- 2026-09-18｜UBee Smart Stack V1.1：QUEUED 顯示 A 真實剩餘道路 ETA + A→B 真實道路 ETA；不暴露前序訂單資料。 -->
-<!-- 2026-09-18｜UBee Smart Stack V1：客戶追蹤支援 QUEUED 前序任務狀態，不暴露其他客戶訂單資訊。 -->
-<!-- 2026-09-17｜Profit Pricing V1 / Route Pricing V4：用戶端只呈現後端鎖價；一般長途採平滑分段費率，急件與排隊平台管理費納入「平台服務費」，不減少小U既有收入。 -->
-<!-- 2026-09-16｜UBee Native Experience V2：Release Sync／Cold Launch Only Splash／Navigation Stack／VisualViewport Keyboard／Customer SW Isolation。 -->
-<!-- 2026-09-16｜UBee Growth Engine V1.3 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
-
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
-<!-- 2026-09-17｜Customer Member Level Progress V1：階級與權益頁改為會員等級進度卡、動態下一級進度條與等級總覽成長路徑；Growth Engine 規則不變。 -->
-<!-- 2026-09-17｜Customer Legal & Privacy UX V1：移除規範與隱私頁預設「規範說明」區塊；只保留四個正式入口，條款內容改為點選後才顯示。 -->
-<!-- 2026-09-17｜Customer Notification Settings V3：通知頁改為獨立 ubee-notify 元件，切斷舊 settings row 樣式，修正窄欄斷字、超長狀態膠囊與 Switch 位置。 -->
-<!-- 2026-09-16｜Customer Notification Settings V2：通知設定改為原生 Switch；必要通知固定啟用、可選通知即時儲存、加入系統通知權限狀態。 -->
-<!-- 2026-09-16｜Customer Account UX V2：會員帳號主頁移除登出／刪除入口；通知偏好改為通知設定；登出與刪除申請下沉至帳號與安全。 -->
 <head>
-<!-- 2026-09-14｜Customer Native System V1.5 / Live Tracking Accept Sync V1：主訂單輪詢直接接收後端安全 tracking 摘要；已接單與 ETA 不再依賴 5 秒備援追蹤才更新；客戶端不需要 riderDocId / riderPhone。 -->
-<!-- 2026-09-11｜Customer Native System V1.4 / Route Pricing V3：刪除舊 base_km_minute 與一般配送時間費顯示；fareMode 以後端正式報價為唯一來源；一般路線費用明細改為單一「路線配送費」，避免起步價／距離費／配送費重複呈現。 -->
-<!-- 2026-09-09｜Customer Native System V1.3 / Live ETA V1：修復 Native Active Task 漏失 step5LiveStatusPanel ID；ETA 改為「剩餘分鐘＋預計抵達時間＋GPS 新鮮度」，定位超過 5 分鐘停止顯示精準 ETA，並讀取後端 traffic-aware ETA。 -->
-<!-- 2026-09-09｜Customer Native System V1.2：先刪除任務內容大 Card、配送方案 Card、確認訂單 Summary/Price Card 視覺，再建立 Native Form Sections／Selection Rows／Checkout Summary；估價、建單、派單、付款與地圖 API contract 保留。 -->
-<!-- 2026-09-09｜Customer Dispatch Recovery V1：建立訂單後立即以 Native Confirm 完成現金單確認，避免任務停在 pending_payment；確認成功後等待後端正式啟動全區派單。 -->
-<!-- 2026-09-09｜Customer Native System V1：刪除舊 Step 5 可見頁、訂單 Card／Detail Hero／照片 Card；進行中任務正式併入 productionOrderFlow，訂單列表改 Native Flat List、詳情改 Grouped Detail、照片改 Timeline；首頁與正式下單 API contract 保留。 -->
-<!-- 2026-09-08｜Customer Global Supply V1：用戶端首頁即時運力改為全區可媒合小U；刪除附近公里數優先顯示與擴大媒合文案，避免與騎士端全區待接任務池衝突。 -->
-<!-- 2026-09-07｜Customer Advance Payment V1：最高自動代墊上限調整為 NT$1,500；超過 NT$1,500 才需客服人工確認；同步升級 Manifest 與 Customer Service Worker 快取版本。 -->
-<!-- 2026-09-03｜Customer Location Bootstrap V3.3：DOM 完成後立即啟動首次定位；首頁地圖建立前必須等待定位成功／失敗，未取得結果前維持定位占位，禁止先建立城市預設中心地圖。 -->
-<!-- 2026-09-03｜Customer Location Lock V3.2：首頁地圖建立前強制等待首次定位嘗試完成；未取得座標前只顯示定位中的地圖占位，不建立城市預設中心地圖，徹底避免首頁先跳到其他地區。 -->
-<!-- 2026-09-03｜Customer Arrival Photo Proof V1：所有服務均顯示小U到場照片；取件／任務地點與各送達點照片由後端短效簽名網址安全回傳，任務進行中即可查看。 -->
-<!-- 2026-09-03｜Customer Task Contract V3 Full Flow：補上全能任務「同地點完成」單點模式，估價／鎖價／建單一致；完成後顯示小U文字／照片／交接回報結果。 -->
-<!-- 2026-09-03｜Customer Task Contract V2：全能任務的現場回報／交接由畫面選項正式寫入 taskDetails.reportMode / handoffMode，後端、調度中心與騎士端可直接辨識，不再只依賴 note 文字；保留 human-readable note 作舊版相容。 -->
-<!-- 2026-09-03｜Customer Task Content V1：重整送／取／買／排隊／全能跑腿任務細項與品項分類；新增忘帶急送、維修品取件、五金急買、現場代辦、退換歸還、臨時救援；Production Flow 加入依任務細項變化的提示文案與全能任務現場回報／交接結構化欄位；底層 serviceKey/serviceMode 與既有估價建單契約維持不變。 -->
-<!-- 2026-09-02｜Customer Home Layout V3.9：刪除舊版 flow-home-footer-brand CSS，修正舊 span 10px 規則覆蓋新版 60px 品牌字；UBee跑腿 改為真正單一樣式來源。 -->
-<!-- 2026-09-02｜Customer Home Layout V3.8：首頁底部浮水印維持原始三行品牌樣式，並進一步放大「UBee跑腿」品牌字，強化品牌感。 -->
-<!-- 2026-09-02｜Customer Home Layout V3.5：修正首頁底部 UBee 跑腿浮水印，改為接近原始品牌視覺的三行淡化樣式；其餘首頁結構與地圖互動維持 V3.4。 -->
-<!-- 2026-09-08｜Customer Global Match ETA V1：首頁媒合時間改以全區可媒合小U估算，不再依附近 3/5/10 公里數量呈現。 -->
-<!-- 2026-09-02｜Customer Home Platform V3：正式首頁加入即時服務地圖、匿名小U分布、低運力友善顯示、動態任務地址文案與需求情境入口；productionOrderFlow 為唯一正式首頁。 -->
-<!-- 2026-09-08｜Home Live Supply Global V1：首頁即時運力固定顯示全區可媒合小U，不再切換全區 / 全區 fallback。 -->
-<!-- 2026-09-08｜Home Live Supply Global V1.1：productionOrderFlow 首頁共用全區 service-status，不再讀取全區欄位。 -->
-<!-- 2026-09-08｜Home Live Supply Global V1.2 Compact：正式首頁即時運力保留中等尺寸，但展示口徑改為全區任務池。 -->
-<!-- 2026-09-01｜Order ↔ Backend Pricing Contract V1：統一估價/建單服務欄位，加入全能跑腿 taskMinutes，排隊明細去重，樓層費改由後端正式判定。 -->
-<!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
+<!-- =========================================================
+  UBee 跑腿｜客戶端最新正式版｜2026-10-01
+  Release: Customer Native Polish & Cleanup V1
+  PWA: 20261001-customer-native-polish-cleanup-v1
+
+  本次整理：
+  1. 原生 App 操作層：觸控回饋、捲動、Safe Area、鍵盤與底部導航維持單一正式規格。
+  2. 首頁多點配送文案收斂：送達點 2 保留選填與 +NT$50 規則，移除重複工程提示。
+  3. 清除 No-Map 後已無 DOM 的舊首頁地圖視覺／匿名小U Marker 顯示層與舊首頁地圖呼叫。
+  4. 保留 Google Places／Geocode／Routes、定位、估價、下單、ETA、通知與會員核心。
+  5. 舊 Step 1～4 只作資料／契約相容橋接，不再作為客戶可見 UI。
+
+  Canonical recent milestones:
+  - 2026-10-01 Customer Native Notification Center V1
+  - 2026-09-29 State Sync / Rating Lock / No-Map + Universal ETA / Drive Semantic
+  - 2026-09-24 Order Lifecycle / Segmented Live Progress / Final Delivery ETA
+  - 2026-09-23 Multi-stop / Cloud Draft
+  - 2026-09-16 Native Experience V2 / Growth Engine
+========================================================= -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-notification-center-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-native-polish-cleanup-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -121,10 +81,7 @@
       font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
     }
 
-    button,
-    input,
-    textarea,
-    select{
+    button,input,textarea,select{
       font-family:inherit;
       font-size:16px !important;
       -webkit-text-size-adjust:100%;
@@ -270,14 +227,12 @@
 
 /* 不再顯示「首頁 / 2/5 / 3/5」第二排 */
 
-    .step,
-    .app-section{
+    .step,.app-section{
       display:none;
       animation:fadeIn .18s ease;
     }
 
-    .step.active,
-    .app-section.active{
+    .step.active,.app-section.active{
       display:block;
     }
 
@@ -300,38 +255,13 @@
       background:#e8eaed;
     }
 
-    .map-placeholder{
-      position:absolute;
-      inset:0;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
-      z-index:2;
-      pointer-events:none;
-      background:linear-gradient(180deg,#eceff1,#e4e7ea);
-      color:#6b7280;
-      text-align:center;
-      padding:24px;
-      font-weight:900;
-    }
+    
 
-    .map-placeholder small{
-      font-size:12px;
-      font-weight:800;
-      color:#8b9096;
-      line-height:1.6;
-    }
+    
 
-    .map-placeholder.is-ready{
-      display:none;
-    }
+    
 
-    .map-current-btn svg{
-      width:21px;
-      height:21px;
-    }
+    
 
     .route-badge{
       position:absolute;
@@ -384,13 +314,7 @@
       margin-bottom:18px;
     }
 
-    .task-path-box,
-    .quick-guide,
-    .nearby-box,
-    .content-card,
-    .info-item,
-    .member-card,
-    .address-display{
+    .task-path-box,.quick-guide,.nearby-box,.content-card,.info-item,.member-card,.address-display{
       border:1px solid var(--line);
       background:var(--surface);
       border-radius:20px;
@@ -482,9 +406,7 @@
       font-weight:1000;
     }
 
-    input,
-    textarea,
-    select{
+    input,textarea,select{
       width:100%;
       border:none;
       outline:none;
@@ -494,8 +416,7 @@
       padding:4px 0;
     }
 
-    input::placeholder,
-    textarea::placeholder{
+    input::placeholder,textarea::placeholder{
       color:#a8adb3;
     }
 
@@ -529,9 +450,7 @@
       font-weight:1000;
     }
 
-    .nearby-sub,
-    .nearby-status,
-    .nearby-place-meta{
+    .nearby-sub,.nearby-status,.nearby-place-meta{
       color:var(--muted);
       font-size:12px;
       font-weight:800;
@@ -1019,13 +938,12 @@
       color:#111;
     }
 
-    @media(max-width:380px){
+    @media (max-width:380px){
       .app{
         padding-left:12px;
         padding-right:12px;
       }
 
-      .home-map-shell,
       .review-map-shell{
         margin-left:-12px;
         margin-right:-12px;
@@ -1050,54 +968,11 @@
 
 /* 地圖拉高，讓首頁更有即時跑腿平台的感覺 */
 
-.home-map-shell{
-  position:relative;
 
-  height:350px;
-
-  margin:
-    0
-    -14px;
-
-  overflow:hidden;
-
-  background:#e8eaed;
-
-  border-top:none;
-  border-bottom:none;
-}
 
 /* 定位按鈕改成圓形 */
 
-.map-current-btn{
-  position:absolute;
 
-  right:16px;
-  bottom:22px;
-
-  z-index:6;
-
-  width:46px;
-  height:46px;
-
-  display:flex;
-
-  align-items:center;
-  justify-content:center;
-
-  padding:0;
-
-  border:
-    1px solid
-    rgba(17,24,39,.08);
-
-  border-radius:50%;
-
-  background:#ffffff;
-
-  color:#111111;
-
-}
 
 /* 白色操作區改成接住地圖的底部面板 */
 
@@ -2152,9 +2027,7 @@
 
 /* 輸入文字 */
 
-#step2 input,
-#step2 textarea,
-#step2 select{
+#step2 input,#step2 textarea,#step2 select{
   color:#111111;
 
   font-size:
@@ -2165,8 +2038,7 @@
 
 /* placeholder */
 
-#step2 input::placeholder,
-#step2 textarea::placeholder{
+#step2 input::placeholder,#step2 textarea::placeholder{
   color:#b0b4b8;
 
   font-weight:750;
@@ -2347,8 +2219,7 @@
 
 /* 按下效果 */
 
-.step2-back-btn:active,
-.step2-next-btn:active{
+.step2-back-btn:active,.step2-next-btn:active{
   transform:
     scale(.985);
 }
@@ -2713,8 +2584,7 @@
 
 /* 按下效果 */
 
-.step3-back-btn:active,
-.step3-next-btn:active{
+.step3-back-btn:active,.step3-next-btn:active{
   transform:
     scale(.985);
 }
@@ -2788,36 +2658,11 @@
 
 /* 第四頁地圖載入提示 */
 
-#step4 .map-placeholder{
-  gap:6px;
 
-  background:
-    linear-gradient(
-      180deg,
-      #eceff1,
-      #e5e8eb
-    );
 
-  color:#62676d;
-}
 
-#step4 .map-placeholder strong{
-  font-size:14px;
 
-  font-weight:1000;
-}
 
-#step4 .map-placeholder small{
-  max-width:260px;
-
-  color:#8f9499;
-
-  font-size:11px;
-
-  font-weight:800;
-
-  line-height:1.6;
-}
 
 /* ==============================
    地圖下方距離與時間
@@ -3078,8 +2923,7 @@
    左側圖示
    ============================== */
 
-#step4 .review-summary-icon,
-#step4 .review-summary-marker{
+#step4 .review-summary-icon,#step4 .review-summary-marker{
   width:32px;
 
   height:32px;
@@ -3951,7 +3795,7 @@ input:checked
    小尺寸手機
    ============================== */
 
-@media(max-width:380px){
+@media (max-width:380px){
 
   #step4 .review-sticky-footer{
     grid-template-columns:
@@ -4067,15 +3911,8 @@ body{background:#eef0f2;}
 .ubee-v3-metric b{font-size:12px;}
 .ubee-v3-mascot{position:absolute;right:15px;bottom:19px;z-index:2;width:84px;height:84px;border-radius:25px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.78);border:1px solid rgba(244,185,0,.25);font-size:50px;}
 
-.home-map-shell{
-  height:390px;
-  border-radius:26px;
-  overflow:hidden;
-  border:1px solid rgba(15,23,42,.08);
 
-  background:#e9edf1;
-}
-.map-current-btn{width:50px;height:50px;right:16px;bottom:17px;border-radius:50%;background:rgba(255,255,255,.96);}
+
 .route-badge{bottom:18px;border-radius:18px;}
 
 .task-sheet{
@@ -4202,7 +4039,7 @@ body{background:#eef0f2;}
 .app-section .member-card,.menu-list,.info-item,.address-display{border-radius:23px;}
 .member-card{background:linear-gradient(135deg,#fff,#fff8d8);}
 
-@media(max-width:390px){
+@media (max-width:390px){
   .app{padding-left:12px;padding-right:12px;}
   .topbar{margin-left:-12px;margin-right:-12px;padding-left:14px;padding-right:14px;}
   .ubee-v3-hero{min-height:166px;padding:18px 15px;}
@@ -4210,7 +4047,7 @@ body{background:#eef0f2;}
   .ubee-v3-hero-title{font-size:22px;}
   .ubee-v3-hero-title strong{font-size:31px;}
   .ubee-v3-mascot{width:72px;height:72px;font-size:43px;right:11px;}
-  .home-map-shell{height:350px;}
+  
 
   .home-next-btn{font-size:17px!important;}
   .ubee-v3-progress{padding:14px 8px;}
@@ -4312,10 +4149,7 @@ body{background:#eef0f2;}
   line-height:1.65;
 }
 
-.home-map-shell{
-  height:270px !important;
-  margin:0 -14px !important;
-}
+
 
 .task-sheet{
   margin-top:-14px !important;
@@ -4439,8 +4273,8 @@ body{background:#eef0f2;}
 
 }
 
-@media(max-width:380px){
-  .home-map-shell{height:245px !important;}
+@media (max-width:380px){
+  
   .category-tab{min-width:96px !important;}
   .service-item{flex-basis:90px !important;}
 }
@@ -4452,21 +4286,8 @@ body{background:#eef0f2;}
 #step1{padding-top:0!important;}
 .ubee-v3-hero{display:none!important;}
 
-.home-map-shell{
-  position:relative!important;
-  height:330px!important;
-  margin:0 -14px!important;
-  border:none!important;
-  border-radius:0!important;
 
-  overflow:hidden!important;
-}
-.map-current-btn{
-  right:18px!important;
-  bottom:18px!important;
-  width:46px!important;
-  height:46px!important;
-}
+
 
 .task-sheet{
   position:relative!important;
@@ -4522,8 +4343,7 @@ body{background:#eef0f2;}
   line-height:1.2!important;
   letter-spacing:0!important;
 }
-.home-service-status-count span,
-.home-service-status-count strong{font-size:14px!important;font-weight:1000!important;}
+.home-service-status-count span,.home-service-status-count strong{font-size:14px!important;font-weight:1000!important;}
 .home-service-status-side{min-width:auto!important;text-align:right!important;}
 .home-service-status-label{display:none!important;}
 .home-service-status-time{margin-top:0!important;font-size:11px!important;color:#999da2!important;}
@@ -4581,9 +4401,7 @@ body{background:#eef0f2;}
   scrollbar-width:none!important;
 }
 .service-grid-new > *{flex:0 0 78px!important;min-width:78px!important;}
-.service-item,
-.service-card-new,
-.service-option{
+.service-item,.service-card-new,.service-option{
   position:relative!important;
   min-height:80px!important;
   padding:7px 4px 12px!important;
@@ -4596,20 +4414,13 @@ body{background:#eef0f2;}
 }
 .service-item-icon{width:35px!important;height:35px!important;margin:0 auto 5px!important;font-size:25px!important;}
 .service-item-title{font-size:12px!important;font-weight:1000!important;line-height:1.3!important;white-space:nowrap!important;}
-.service-item.active,
-.service-card-new.active,
-.service-option.active,
-.service-item.selected,
-.service-card-new.selected,
-.service-option.selected{
+.service-item.active,.service-card-new.active,.service-option.active,.service-item.selected,.service-card-new.selected,.service-option.selected{
   border:none!important;
   background:transparent!important;
   color:#111!important;
 
 }
-.service-item.active::after,
-.service-card-new.active::after,
-.service-option.active::after{
+.service-item.active::after,.service-card-new.active::after,.service-option.active::after{
   display:block!important;
   content:""!important;
   position:absolute!important;
@@ -4640,8 +4451,8 @@ body{background:#eef0f2;}
 #step1 .home-estimate-amount{font-size:24px!important;}
 #step1 .home-next-btn{height:56px!important;min-height:56px!important;border-radius:17px!important;font-size:17px!important;}
 
-@media(max-width:390px){
-  .home-map-shell{height:305px!important;}
+@media (max-width:390px){
+  
   .category-tab{min-width:76px!important;padding-left:9px!important;padding-right:9px!important;}
   .service-grid-new > *{flex-basis:74px!important;min-width:74px!important;}
 
@@ -4671,9 +4482,7 @@ body{background:#eef0f2;}
 /* =====================================================
    正式上線修復：任務分類點擊層與觸控可靠性
    ===================================================== */
-#step2 .task-category-step2,
-#step2 #serviceCategoryBox,
-#step2 #serviceCategoryGrid{
+#step2 .task-category-step2,#step2 #serviceCategoryBox,#step2 #serviceCategoryGrid{
   position:relative !important;
   z-index:300 !important;
   pointer-events:auto !important;
@@ -4697,13 +4506,12 @@ body{background:#eef0f2;}
   appearance:none;
 }
 
-#step2 #serviceCategoryGrid .category-choice-item::before,
-#step2 #serviceCategoryGrid .category-choice-item::after{
+#step2 #serviceCategoryGrid .category-choice-item::before,#step2 #serviceCategoryGrid .category-choice-item::after{
   pointer-events:none !important;
 }
 
 /* UBee 2026-07-16 正式營運整合功能 */
-.address-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}.compact-field{display:block;border:1px solid var(--line);border-radius:14px;background:#fff;padding:9px 11px;}.compact-field span{display:block;font-size:10px;font-weight:1000;color:var(--muted);margin-bottom:4px;}.compact-field input{font-size:13px!important;}.saved-address-quickbar{display:flex;gap:7px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}.quick-address-chip,.mini-action{border:1px solid #e4d174;background:#fffbed;color:#5f4c00;border-radius:999px;padding:8px 11px;font-size:12px!important;font-weight:1000;white-space:nowrap;}.match-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#fafafa;}.match-status-card strong,.match-status-card span{display:block;}.match-status-card strong{font-size:13px;}.match-status-card div span{font-size:11px;color:var(--muted);margin-top:3px;}.status-badge{border-radius:999px;padding:6px 9px;font-size:10px!important;font-weight:1000;}.status-badge.good{background:#e9f8ef;color:#16753a;}.status-badge.warn{background:#fff4d6;color:#8a6200;}.status-badge.neutral{background:#eef0f2;color:#62676d;}.home-estimate-eta{font-size:10px;color:#72767b;font-weight:900;margin-top:2px;}.form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}.shopping-list{display:flex;flex-direction:column;gap:9px;}.shopping-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px;}.shopping-item-grid{display:grid;grid-template-columns:1fr 92px;gap:8px;}.shopping-item input,.shopping-item select{border:1px solid var(--line);border-radius:11px;padding:10px!important;background:#fafafa;}.shopping-item-actions{display:flex;justify-content:flex-end;margin-top:8px;}.danger-link{border:none;background:transparent;color:var(--red);font-size:12px!important;font-weight:1000;}.field-help,.inline-status{font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;margin-top:8px;}.system-check-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:13px;margin-bottom:18px;}.system-check-row{display:flex;gap:9px;align-items:flex-start;padding:8px 0;font-size:12px;font-weight:850;}.system-check-row+.system-check-row{border-top:1px solid #f0f1f2;}.system-check-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 22px;}.system-check-row.ok .system-check-icon{background:#e9f8ef;color:#16753a;}.system-check-row.warn .system-check-icon{background:#fff4d6;color:#8a6200;}.system-check-row.error .system-check-icon{background:#feecec;color:#b42318;}.field-invalid{border-color:#dc2626!important;}.field-error-text{font-size:11px;color:#dc2626;font-weight:900;margin-top:6px;}.saved-address-list{display:flex;flex-direction:column;gap:9px;}.saved-address-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa;}.saved-address-card-head{display:flex;justify-content:space-between;gap:10px;}.saved-address-card-title{font-weight:1000;}.saved-address-card-text{font-size:12px;color:var(--muted);line-height:1.6;margin-top:5px;}.saved-address-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}.saved-address-actions button,.order-card-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px!important;font-weight:1000;}.order-history-card{border:1px solid var(--line);background:var(--surface2);border-radius:17px;padding:13px;margin-bottom:10px;}.order-card-actions{display:flex;gap:8px;margin-top:10px;}.draft-banner{position:fixed;left:50%;top:calc(74px + env(safe-area-inset-top));transform:translateX(-50%);z-index:120;width:calc(100% - 28px);max-width:492px;border:1px solid #e8d05c;border-radius:17px;background:#fffbed;padding:12px;}.draft-banner-actions{display:flex;gap:8px;margin-top:9px;}.draft-banner-actions button{flex:1;border:none;border-radius:12px;padding:10px;font-weight:1000;}.draft-continue{background:var(--accent);}.draft-discard{background:#fff;border:1px solid var(--line);}.empty-state{font-size:13px;color:var(--muted);font-weight:800;}@media(max-width:380px){.address-detail-grid,.shopping-item-grid{grid-template-columns:1fr;}}
+.address-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}.compact-field{display:block;border:1px solid var(--line);border-radius:14px;background:#fff;padding:9px 11px;}.compact-field span{display:block;font-size:10px;font-weight:1000;color:var(--muted);margin-bottom:4px;}.compact-field input{font-size:13px!important;}.saved-address-quickbar{display:flex;gap:7px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}.quick-address-chip,.mini-action{border:1px solid #e4d174;background:#fffbed;color:#5f4c00;border-radius:999px;padding:8px 11px;font-size:12px!important;font-weight:1000;white-space:nowrap;}.match-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#fafafa;}.match-status-card strong,.match-status-card span{display:block;}.match-status-card strong{font-size:13px;}.match-status-card div span{font-size:11px;color:var(--muted);margin-top:3px;}.status-badge{border-radius:999px;padding:6px 9px;font-size:10px!important;font-weight:1000;}.status-badge.good{background:#e9f8ef;color:#16753a;}.status-badge.warn{background:#fff4d6;color:#8a6200;}.status-badge.neutral{background:#eef0f2;color:#62676d;}.home-estimate-eta{font-size:10px;color:#72767b;font-weight:900;margin-top:2px;}.form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}.shopping-list{display:flex;flex-direction:column;gap:9px;}.shopping-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px;}.shopping-item-grid{display:grid;grid-template-columns:1fr 92px;gap:8px;}.shopping-item input,.shopping-item select{border:1px solid var(--line);border-radius:11px;padding:10px!important;background:#fafafa;}.shopping-item-actions{display:flex;justify-content:flex-end;margin-top:8px;}.danger-link{border:none;background:transparent;color:var(--red);font-size:12px!important;font-weight:1000;}.field-help,.inline-status{font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;margin-top:8px;}.system-check-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:13px;margin-bottom:18px;}.system-check-row{display:flex;gap:9px;align-items:flex-start;padding:8px 0;font-size:12px;font-weight:850;}.system-check-row+.system-check-row{border-top:1px solid #f0f1f2;}.system-check-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 22px;}.system-check-row.ok .system-check-icon{background:#e9f8ef;color:#16753a;}.system-check-row.warn .system-check-icon{background:#fff4d6;color:#8a6200;}.system-check-row.error .system-check-icon{background:#feecec;color:#b42318;}.field-invalid{border-color:#dc2626!important;}.field-error-text{font-size:11px;color:#dc2626;font-weight:900;margin-top:6px;}.saved-address-list{display:flex;flex-direction:column;gap:9px;}.saved-address-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa;}.saved-address-card-head{display:flex;justify-content:space-between;gap:10px;}.saved-address-card-title{font-weight:1000;}.saved-address-card-text{font-size:12px;color:var(--muted);line-height:1.6;margin-top:5px;}.saved-address-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}.saved-address-actions button,.order-card-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px!important;font-weight:1000;}.order-history-card{border:1px solid var(--line);background:var(--surface2);border-radius:17px;padding:13px;margin-bottom:10px;}.order-card-actions{display:flex;gap:8px;margin-top:10px;}.draft-banner{position:fixed;left:50%;top:calc(74px + env(safe-area-inset-top));transform:translateX(-50%);z-index:120;width:calc(100% - 28px);max-width:492px;border:1px solid #e8d05c;border-radius:17px;background:#fffbed;padding:12px;}.draft-banner-actions{display:flex;gap:8px;margin-top:9px;}.draft-banner-actions button{flex:1;border:none;border-radius:12px;padding:10px;font-weight:1000;}.draft-continue{background:var(--accent);}.draft-discard{background:#fff;border:1px solid var(--line);}.empty-state{font-size:13px;color:var(--muted);font-weight:800;}@media (max-width:380px){.address-detail-grid,.shopping-item-grid{grid-template-columns:1fr;}}
 
 /* =========================================================
    UBee 客人端｜第三、四步精簡正式營運版 2026-07-20
@@ -4779,8 +4587,7 @@ body{background:#eef0f2;}
   font-weight:1000;
 }
 #step4 .review-more-details > summary::-webkit-details-marker{display:none;}
-#step4 .review-more-details-hint,
-#step4 .review-price-details-hint{
+#step4 .review-more-details-hint,#step4 .review-price-details-hint{
   color:#969a9f;
   font-size:11px;
   font-weight:900;
@@ -4886,8 +4693,7 @@ body{background:#eef0f2;}
 }
 
 /* ===== UBee 第三階段：客戶即時追蹤穩定性與異常狀態 ===== */
-#step5 .customer-tracking-health-card,
-#step5 .customer-tracking-incident-card{
+#step5 .customer-tracking-health-card,#step5 .customer-tracking-incident-card{
   margin:12px 0;
   border-radius:18px;
   padding:13px 14px;
@@ -4900,8 +4706,7 @@ body{background:#eef0f2;}
 #step5 .customer-tracking-health-dot{width:11px;height:11px;border-radius:50%;background:#16a34a;flex:0 0 auto;}
 #step5 .customer-tracking-health-card.is-delayed .customer-tracking-health-dot{background:#9ca3af;}
 #step5 .customer-tracking-health-card.is-stale .customer-tracking-health-dot{background:#f59e0b;}
-#step5 .customer-tracking-health-card.is-offline .customer-tracking-health-dot,
-#step5 .customer-tracking-health-card.is-critical .customer-tracking-health-dot{background:#dc2626;}
+#step5 .customer-tracking-health-card.is-offline .customer-tracking-health-dot,#step5 .customer-tracking-health-card.is-critical .customer-tracking-health-dot{background:#dc2626;}
 #step5 .customer-tracking-health-title{font-size:13px;font-weight:1000;color:#111;}
 #step5 .customer-tracking-health-desc{font-size:11px;font-weight:800;color:var(--muted);margin-top:3px;line-height:1.5;}
 #step5 .customer-tracking-health-time{font-size:11px;font-weight:1000;color:#6b7280;white-space:nowrap;}
@@ -5001,8 +4806,7 @@ body{background:#eef0f2;}
 
 }
 
-#step1 #serviceCategoryGrid .category-choice-item::before,
-#step1 #serviceCategoryGrid .category-choice-item::after{
+#step1 #serviceCategoryGrid .category-choice-item::before,#step1 #serviceCategoryGrid .category-choice-item::after{
   pointer-events:none !important;
 }
 
@@ -5091,7 +4895,7 @@ body{background:#eef0f2;}
   color:#111;
 
 }
-@media(max-width:370px){
+@media (max-width:370px){
   .service-city-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 
@@ -5101,26 +4905,26 @@ body{background:#eef0f2;}
        - 首頁不顯示 Google Map
        - 地圖保留到後續路線確認步驟
        ===================================================== */
-    #step1 {
+    #step1{
       padding-top: 0 !important;
       background: #f5f6f7;
     }
 
-    .ubee-v4-home-intro {
+    .ubee-v4-home-intro{
       margin: 0 -14px;
       padding: 26px 20px 24px;
       background: linear-gradient(145deg, #fff8c8 0%, #ffffff 72%);
       border-bottom: 1px solid #eee4a3;
     }
 
-    .ubee-v4-home-eyebrow {
+    .ubee-v4-home-eyebrow{
       color: #8a6800;
       font-size: 12px;
       font-weight: 1000;
       letter-spacing: .8px;
     }
 
-    .ubee-v4-home-intro h1 {
+    .ubee-v4-home-intro h1{
       margin: 7px 0 6px;
       font-size: 30px;
       line-height: 1.2;
@@ -5128,7 +4932,7 @@ body{background:#eef0f2;}
       letter-spacing: -.8px;
     }
 
-    .ubee-v4-home-intro p {
+    .ubee-v4-home-intro p{
       margin: 0;
       color: #6f7378;
       font-size: 14px;
@@ -5136,7 +4940,7 @@ body{background:#eef0f2;}
       font-weight: 800;
     }
 
-    .ubee-v4-home-map-hidden {
+    .ubee-v4-home-map-hidden{
       display: none !important;
       height: 0 !important;
       min-height: 0 !important;
@@ -5144,7 +4948,7 @@ body{background:#eef0f2;}
       margin: 0 !important;
     }
 
-    .ubee-v4-task-sheet {
+    .ubee-v4-task-sheet{
       margin: 0 -14px !important;
       padding: 18px 14px 28px !important;
       border-radius: 0 !important;
@@ -5152,18 +4956,18 @@ body{background:#eef0f2;}
       background: #f5f6f7 !important;
     }
 
-    .ubee-v4-task-sheet .task-sheet-handle {
+    .ubee-v4-task-sheet .task-sheet-handle{
       display: none !important;
     }
 
-    .ubee-v4-service-title {
+    .ubee-v4-service-title{
       margin: 0 2px 12px;
       color: #111;
       font-size: 19px;
       font-weight: 1000;
     }
 
-    #step1 .ubee-v4-service-tabs {
+    #step1 .ubee-v4-service-tabs{
       display: grid !important;
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       gap: 11px !important;
@@ -5173,7 +4977,7 @@ body{background:#eef0f2;}
       overflow: visible !important;
     }
 
-    #step1 .ubee-v4-service-tabs .category-tab {
+    #step1 .ubee-v4-service-tabs .category-tab{
       min-width: 0 !important;
       min-height: 116px !important;
       display: flex !important;
@@ -5193,29 +4997,29 @@ body{background:#eef0f2;}
       white-space: normal !important;
     }
 
-    #step1 .ubee-v4-service-tabs .category-tab:last-child {
+    #step1 .ubee-v4-service-tabs .category-tab:last-child{
       grid-column: 1 / -1;
       min-height: 96px !important;
     }
 
-    #step1 .ubee-v4-service-tabs .category-tab.active {
+    #step1 .ubee-v4-service-tabs .category-tab.active{
       border-color: #e5bd00 !important;
       background: linear-gradient(145deg, #fff9d8, #ffffff) !important;
 
     }
 
-    #step1 .ubee-v4-service-tabs .category-tab::after {
+    #step1 .ubee-v4-service-tabs .category-tab::after{
       display: none !important;
     }
 
-    .ubee-v4-service-icon {
+    .ubee-v4-service-icon{
       display: block;
       margin-bottom: 3px;
       font-size: 27px;
       line-height: 1;
     }
 
-    #step1 .ubee-v4-service-tabs .category-tab small {
+    #step1 .ubee-v4-service-tabs .category-tab small{
       display: block;
       color: #7b8086;
       font-size: 11px;
@@ -5223,17 +5027,17 @@ body{background:#eef0f2;}
       font-weight: 800;
     }
 
-    #step1 .home-service-status {
+    #step1 .home-service-status{
       margin: 0 0 17px !important;
       border-radius: 18px !important;
       background: #fff !important;
     }
 
-    @media (max-width: 370px) {
-      #step1 .ubee-v4-service-tabs {
+    @media (max-width: 370px){
+      #step1 .ubee-v4-service-tabs{
         gap: 8px !important;
       }
-      #step1 .ubee-v4-service-tabs .category-tab {
+      #step1 .ubee-v4-service-tabs .category-tab{
         min-height: 108px !important;
         padding: 13px !important;
         font-size: 17px !important;
@@ -9082,8 +8886,6 @@ let homeLastSuccessfulServiceScope = 'global';
 let homeLastMatchEstimate = null;
 let homeServiceLocationAttempted = false;
 let homeServiceLocationError = '';
-let homeNearbyRiderMarkers = [];
-let homeNearbyRiderInfoWindow = null;
 
 let isStepTransitioning = false;
 let stepTransitionUnlockTimer = null;
@@ -9512,12 +9314,6 @@ async function requestCurrentLocationForMap(){
       setTimeout(() => refreshHomeServiceStatus(), 0);
     }
 
-    if(customerMap){
-      renderCurrentLocationMarker();
-      customerMap.setCenter({ lat, lng });
-      customerMap.setZoom(16);
-    }
-
     return position;
   }catch(err){
     console.warn('目前位置取得失敗:', err);
@@ -9533,26 +9329,6 @@ async function requestCurrentLocationForMap(){
     return null;
   }
 }
-
-async function focusCurrentLocation(){
-  try{
-    // 先取得座標，再建立／移動地圖；避免先跳到城市預設中心。
-    if(!hasValidLatLng(currentLocationLat, currentLocationLng)){
-      await requestCurrentLocationForMap();
-    }
-
-    await ensureCustomerMapReady();
-
-    if(hasValidLatLng(currentLocationLat, currentLocationLng) && customerMap){
-      customerMap.panTo({ lat:Number(currentLocationLat), lng:Number(currentLocationLng) });
-      customerMap.setZoom(16);
-      renderCurrentLocationMarker();
-    }
-  }catch(err){
-    console.warn('回到目前位置失敗:', err);
-  }
-}
-
 
 // 依客戶裝置定位，自動判斷目前所在縣市。
 // 定位或反向地理編碼失敗時，保留使用者原本選擇，不阻斷下單。
@@ -12611,8 +12387,6 @@ async function searchNearbyPlaces(force){
 
     currentLocationLat = lat;
     currentLocationLng = lng;
-    renderCurrentLocationMarker();
-
     const key = `${keyword}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
 
     if(!force && key === lastNearbySearchKey && nearbyPlaces.length){
@@ -13160,54 +12934,7 @@ function showOnlyStep(step){
   window.scrollTo(0,0);
 
 
-  /* ==============================
-     Step 1：首頁地圖
-     ============================== */
-
-  if(step === 1 && qs('flowHomeMap')){
-
-    setTimeout(() => {
-
-      ensureCustomerMapReady()
-
-        .then(() => {
-
-          if(
-            window.google?.maps?.event &&
-            customerMap
-          ){
-
-            google.maps.event.trigger(
-              customerMap,
-              'resize'
-            );
-
-          }
-
-
-          if(lastRouteData){
-
-            renderRouteOnCustomerMap(
-              lastRouteData
-            );
-
-          }
-
-        })
-
-        .catch(err => {
-
-          console.warn(
-            '首頁地圖顯示失敗:',
-            err
-          );
-
-        });
-
-    }, 80);
-
-  }
-
+  /* Step 1 可視地圖已於 No-Map 架構移除；首頁只保留定位、地址與即時運力資料。 */
 
   /* ==============================
      Step 4：確認頁地圖
@@ -17540,118 +17267,6 @@ function clearSavedAddress(){
 
 
 
-function clearHomeNearbyRiderMarkers(){
-  homeNearbyRiderMarkers.forEach(marker => {
-    clearMapObject(marker);
-  });
-  homeNearbyRiderMarkers = [];
-
-  try{
-    homeNearbyRiderInfoWindow?.close?.();
-  }catch(_err){}
-}
-
-function createNearbyRiderMarkerContent(){
-  const el = document.createElement('div');
-  el.className = 'ubee-nearby-rider-pin';
-  el.setAttribute('aria-label', '附近有小U');
-  return el;
-}
-
-async function renderHomeNearbyRiders(nearbyRiders = []){
-  clearHomeNearbyRiderMarkers();
-
-  const safeRiders = Array.isArray(nearbyRiders)
-    ? nearbyRiders.filter(item =>
-        hasValidLatLng(item?.lat, item?.lng)
-      )
-    : [];
-
-  if(!safeRiders.length){
-    return;
-  }
-
-  try{
-    const map = await ensureCustomerMapReady();
-    if(!map) return;
-
-    if(!homeNearbyRiderInfoWindow && window.google?.maps?.InfoWindow){
-      homeNearbyRiderInfoWindow = new google.maps.InfoWindow();
-    }
-
-    safeRiders.forEach(item => {
-      const position = {
-        lat:Number(item.lat),
-        lng:Number(item.lng)
-      };
-
-      let marker = null;
-
-      if(
-        googleMapsMapId &&
-        googleMapsLibraries?.marker?.AdvancedMarkerElement
-      ){
-        marker = new googleMapsLibraries.marker.AdvancedMarkerElement({
-          map,
-          position,
-          title:'附近有小U',
-          content:createNearbyRiderMarkerContent()
-        });
-
-        marker.addListener?.('click', () => {
-          if(!homeNearbyRiderInfoWindow) return;
-          homeNearbyRiderInfoWindow.setContent(
-            '<div style="padding:2px 4px;font-weight:900;color:#111">附近有小U</div>' +
-            '<div style="margin-top:4px;font-size:12px;color:#6f7378">位置已做約略偏移，僅供服務範圍參考</div>'
-          );
-          homeNearbyRiderInfoWindow.open({
-            map,
-            anchor:marker
-          });
-        });
-      }else if(window.google?.maps?.Marker){
-        marker = new google.maps.Marker({
-          map,
-          position,
-          title:'附近有小U',
-          icon:{
-            path:google.maps.SymbolPath.CIRCLE,
-            scale:17,
-            fillColor:'#facc15',
-            fillOpacity:1,
-            strokeColor:'#ffffff',
-            strokeWeight:3
-          },
-          label:{
-            text:'U',
-            color:'#111111',
-            fontWeight:'900',
-            fontSize:'14px'
-          }
-        });
-
-        marker.addListener('click', () => {
-          if(!homeNearbyRiderInfoWindow) return;
-          homeNearbyRiderInfoWindow.setContent(
-            '<div style="padding:2px 4px;font-weight:900;color:#111">附近有小U</div>' +
-            '<div style="margin-top:4px;font-size:12px;color:#6f7378">位置已做約略偏移，僅供服務範圍參考</div>'
-          );
-          homeNearbyRiderInfoWindow.open({
-            map,
-            anchor:marker
-          });
-        });
-      }
-
-      if(marker){
-        homeNearbyRiderMarkers.push(marker);
-      }
-    });
-  }catch(err){
-    console.warn('首頁匿名小U標記顯示失敗：', err);
-  }
-}
-
 function formatHomeServiceUpdatedAt(value){
   const date = value ? new Date(value) : new Date();
   if(Number.isNaN(date.getTime())) return '--:--';
@@ -17895,8 +17510,6 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
   }else{
     noteEl.innerText = '目前正在更新全區可媒合小U，系統會持續確認服務狀態。';
   }
-
-  renderHomeNearbyRiders(data?.nearbyRiders || []);
 
   timeEl.innerText = formatHomeServiceUpdatedAt(data?.updatedAt);
   mirrorHomeServiceStatusToProductionFlow();
@@ -19461,83 +19074,25 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   overflow:visible!important;
 }
 
-#productionOrderFlow .flow-home-map-shell{
-  position:relative;
-  width:100%;
-  height:205px;
-  margin:0 0 14px;
-  overflow:hidden;
-  border:1px solid #e5e7e9;
-  border-radius:19px;
-  background:#e8eaed;
-}
 
-#productionOrderFlow .flow-home-map-canvas{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  background:#e8eaed;
-}
 
-#productionOrderFlow .flow-home-map-placeholder{
-  z-index:2;
-  padding:76px 52px 46px;
-  background:linear-gradient(180deg,#eef1f3 0%,#e6e9ec 100%);
-}
 
-#productionOrderFlow .flow-home-map-placeholder strong{
-  display:block;
-  color:#555b61;
-  font-size:13px;
-  font-weight:1000;
-}
 
-#productionOrderFlow .flow-home-map-placeholder small{
-  display:block;
-  max-width:230px;
-  margin-top:5px;
-  color:#888e95;
-  font-size:10px;
-  font-weight:800;
-  line-height:1.5;
-}
 
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-status{
-  position:absolute!important;
-  z-index:5!important;
-  top:10px!important;
-  left:10px!important;
-  right:10px!important;
-  width:auto!important;
-  margin:0!important;
-  padding:9px 11px!important;
-  border:1px solid rgba(219,197,90,.78)!important;
-  border-radius:15px!important;
-  background:rgba(255,253,238,.95)!important;
-  box-shadow:0 7px 20px rgba(17,24,39,.09)!important;
-  -webkit-backdrop-filter:blur(12px);
-  backdrop-filter:blur(12px);
-}
 
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-status.is-fallback,
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-status.is-empty{
-  border-color:rgba(222,225,228,.92)!important;
-  background:rgba(255,255,255,.95)!important;
-}
 
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-head{
-  min-height:45px!important;
-}
 
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-count{
-  margin-top:4px!important;
-  font-size:14px!important;
-}
 
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-count span{
-  font-size:20px!important;
-}
+
+
+
+
+
+
+
+
+
+
 
 #productionOrderFlow .flow-live-supply-eta{
   display:inline-flex;
@@ -19562,8 +19117,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   background:#111;
 }
 
-#productionOrderFlow .flow-live-supply-eta[data-supply-level="limited"],
-#productionOrderFlow .flow-live-supply-eta[data-supply-level="expanded"]{
+#productionOrderFlow .flow-live-supply-eta[data-supply-level="limited"],#productionOrderFlow .flow-live-supply-eta[data-supply-level="expanded"]{
   background:#6a5712;
 }
 
@@ -19572,58 +19126,17 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   color:#7e8389;
 }
 
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-head{
-  min-height:62px!important;
-  align-items:flex-start!important;
-}
 
-#productionOrderFlow .flow-home-map-shell .flow-live-supply-side{
-  padding-top:2px;
-}
 
-#productionOrderFlow .flow-home-map-current{
-  position:absolute;
-  z-index:6;
-  right:11px;
-  bottom:11px;
-  width:42px;
-  height:42px;
-  display:grid;
-  place-items:center;
-  padding:0;
-  border:1px solid rgba(17,24,39,.09);
-  border-radius:14px;
-  background:rgba(255,255,255,.96);
-  color:#111;
-  box-shadow:0 5px 15px rgba(17,24,39,.10);
-}
 
-#productionOrderFlow .flow-home-map-current svg{
-  width:21px;
-  height:21px;
-  display:block;
-}
 
-#productionOrderFlow .flow-home-map-privacy{
-  position:absolute;
-  z-index:5;
-  left:11px;
-  bottom:11px;
-  max-width:calc(100% - 68px);
-  padding:7px 10px;
-  border:1px solid rgba(17,24,39,.07);
-  border-radius:999px;
-  background:rgba(255,255,255,.92);
-  color:#6f747a;
-  font-size:9px;
-  font-weight:850;
-  line-height:1.2;
-  white-space:nowrap;
-  box-shadow:0 4px 12px rgba(17,24,39,.06);
-}
 
-#productionOrderFlow .flow-home-discovery,
-#productionOrderFlow .flow-home-trust{
+
+
+
+
+
+#productionOrderFlow .flow-home-discovery,#productionOrderFlow .flow-home-trust{
   margin-top:14px;
   padding:16px;
   border:1px solid #e5e7e9;
@@ -19746,11 +19259,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   line-height:1.35;
 }
 
-@media(max-width:390px){
-  #productionOrderFlow .flow-home-map-shell{height:185px;}
-  #productionOrderFlow .flow-home-map-shell .flow-live-supply-status{top:8px!important;left:8px!important;right:8px!important;}
-  #productionOrderFlow .flow-home-map-privacy{left:9px;bottom:9px;font-size:8.5px;}
-  #productionOrderFlow .flow-home-map-current{right:9px;bottom:9px;width:40px;height:40px;}
+@media (max-width:390px){
+  
+  
+  
+  
   #productionOrderFlow .flow-home-discovery{padding:14px;}
   #productionOrderFlow .flow-home-scenario{min-height:106px;padding:12px;}
   #productionOrderFlow .flow-home-trust{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:10px;}
@@ -19885,11 +19398,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </button>
 <button class="flow-address-button" id="flowDropoff2Button" type="button">
 <span class="flow-address-dot drop"></span>
-<span class="flow-address-text"><small id="flowDropoff2Label">送達點 2（選填）</small><strong id="flowDropoff2Text">可不填，直接下一步</strong><em id="flowDropoff2Meta">有填才加入多點路線並加收 NT$50</em></span>
+<span class="flow-address-text"><small id="flowDropoff2Label">送達點 2（選填）</small><strong id="flowDropoff2Text">新增第二個送達地點</strong><em id="flowDropoff2Meta">多點配送 +NT$50</em></span>
 <span class="flow-address-arrow">›</span>
 </button>
 </div>
-<div id="flowMultiStopHint" style="margin:8px 2px 0;color:#737780;font-size:12px;font-weight:800;line-height:1.55">送達點 2 為選填；留空不影響估價、下一步或正式送單。有填寫時固定加收多點配送費 NT$50。</div>
 <button class="flow-text-link" id="flowClearDropoff2" type="button" hidden style="margin-top:8px">移除送達點 2</button>
 <div class="flow-task-preview" id="flowTaskPreview"><div class="flow-task-preview-text" id="flowTaskPreviewText"></div><button class="flow-text-link" id="flowEditTaskButton" type="button">修改</button></div>
 <div class="flow-status" id="flowHomeStatus"></div>
@@ -20983,11 +20495,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const multiStopAvailable=!['queue','drive'].includes(state.service)&&!(state.service==='helper'&&state.singlePointTask===true);
     const dropoff2Button=$('flowDropoff2Button');
     if(dropoff2Button)dropoff2Button.hidden=!multiStopAvailable;
-    if($('flowMultiStopHint'))$('flowMultiStopHint').hidden=!multiStopAvailable;
     if($('flowDropoff2Text'))$('flowDropoff2Text').textContent=d2?.address||'可不填，直接下一步';
     if($('flowDropoff2Meta'))$('flowDropoff2Meta').textContent=d2
-      ? `${d2.contactName||''} ${d2.phone||''}`.trim()||'已加入第二送達點・多點 +NT$50'
-      : '有填才加入多點路線並加收 NT$50';
+      ? '已加入第二送達點・+NT$50'
+      : '多點配送 +NT$50';
     if($('flowClearDropoff2'))$('flowClearDropoff2').hidden=!multiStopAvailable||!d2;
 
     if($('flowHomeNext')) $('flowHomeNext').textContent=copy.next;
@@ -22422,7 +21933,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-notification-center-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-polish-cleanup-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23497,6 +23008,57 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     font-weight:800;
     line-height:1.55;
   }
+
+/* 2026-10-01｜Canonical Native Interaction Polish：直接併入正式 App 操作層，不另建競爭覆蓋層。 */
+html,body{
+  min-height:100%;
+  overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+#productionOrderFlow .flow-scroll,
+#productionOrderFlow .flow-home-scroll,
+#productionOrderFlow .ubee-my-scroll,
+#productionOrderFlow .ubee-my-panel{
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+  scroll-behavior:auto!important;
+  scrollbar-width:none;
+}
+#productionOrderFlow .flow-scroll::-webkit-scrollbar,
+#productionOrderFlow .flow-home-scroll::-webkit-scrollbar,
+#productionOrderFlow .ubee-my-scroll::-webkit-scrollbar,
+#productionOrderFlow .ubee-my-panel::-webkit-scrollbar{display:none;width:0;height:0}
+#productionOrderFlow .flow-address-button,
+#productionOrderFlow .flow-service-button,
+#productionOrderFlow .flow-home-next,
+#productionOrderFlow .flow-icon-btn,
+#productionOrderFlow .flow-back-btn,
+#productionOrderFlow .ubee-my-menu-item,
+#productionOrderFlow .ubee-settings-row,
+#productionOrderFlow .ubee-customer-notification-item{
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+#productionOrderFlow .flow-address-button:active,
+#productionOrderFlow .flow-service-button:active,
+#productionOrderFlow .flow-home-next:active,
+#productionOrderFlow .flow-icon-btn:active,
+#productionOrderFlow .flow-back-btn:active,
+#productionOrderFlow .ubee-my-menu-item:active,
+#productionOrderFlow .ubee-settings-row:active,
+#productionOrderFlow .ubee-customer-notification-item:active{
+  transform:scale(.985);
+}
+@media(prefers-reduced-motion:reduce){
+  #productionOrderFlow .flow-page.active{animation:none!important}
+  #productionOrderFlow *,#productionOrderFlow *::before,#productionOrderFlow *::after{
+    scroll-behavior:auto!important;
+    transition-duration:.01ms!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+  }
+}
 </style>
 <style id="ubee-customer-growth-v1-style">
 /* UBee Growth Engine V1.3｜Customer Native Growth UI
@@ -28201,49 +27763,22 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
 /* ---------- 地圖 ---------- */
 
-#productionOrderFlow #flowPageHome .flow-home-map-shell{
-  height:310px!important;
-  margin:0 0 8px!important;
-  border:1px solid #dfe3e6!important;
-  border-radius:22px!important;
-  background:#e7eaed!important;
-  box-shadow:0 5px 18px rgba(17,24,39,.055)!important;
-  overflow:hidden!important;
-}
 
-#productionOrderFlow #flowPageHome .flow-home-map-placeholder{
-  padding:100px 48px 70px!important;
-}
 
-#productionOrderFlow #flowPageHome .flow-home-map-placeholder strong{
-  font-size:12px!important;
-}
 
-#productionOrderFlow #flowPageHome .flow-home-map-placeholder small{
-  font-size:9.5px!important;
-}
 
-#productionOrderFlow #flowPageHome .flow-home-map-current{
-  right:11px!important;
-  bottom:11px!important;
-  width:40px!important;
-  height:40px!important;
-  border-radius:13px!important;
-}
 
-#productionOrderFlow #flowPageHome .flow-home-map-current svg{
-  width:20px!important;
-  height:20px!important;
-}
 
-#productionOrderFlow #flowPageHome .flow-home-map-privacy{
-  display:none!important;
-}
+
+
+
+
+
+
+
 
 /* 地圖內不允許再出現即時運力文字卡 */
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-status{
-  display:none!important;
-}
+
 
 /* ---------- 地圖下方：即時運力 + Match ETA ---------- */
 
@@ -28641,8 +28176,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   color:#e6d486!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-footer-logo .bee,
-#productionOrderFlow #flowPageHome .flow-home-footer-logo .rt{
+#productionOrderFlow #flowPageHome .flow-home-footer-logo .bee,#productionOrderFlow #flowPageHome .flow-home-footer-logo .rt{
   color:#a9adb2!important;
 }
 
@@ -28668,10 +28202,8 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   line-height:1.5!important;
 }
 
-@media(max-width:390px){
-  #productionOrderFlow #flowPageHome .flow-home-map-shell{
-    height:275px!important;
-  }
+@media (max-width:390px){
+  
 
   #productionOrderFlow #flowPageHome .flow-service-label{
     font-size:10px!important;
