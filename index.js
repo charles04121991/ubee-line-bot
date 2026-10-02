@@ -1845,7 +1845,7 @@ const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
-const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
+const LINE_ADMIN_GROUP_ID = String(process.env.LINE_ADMIN_GROUP_ID || '').trim();
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 // =====================================================
 // UBee 小U營運管理系統 V4：固定營運設定
@@ -4080,7 +4080,7 @@ const PARTNER_FORM_URL =
   RIDER_WEB_URL;
 
 if (!LINE_ADMIN_GROUP_ID) {
-  console.warn('⚠️ 未設定 LINE_ADMIN_GROUP_ID 或 LINE_FINISH_GROUP_ID，審核與管理通知可能無法推送。');
+  console.error('❌ 未設定 LINE_ADMIN_GROUP_ID：小U申請審核通知不允許 fallback 到其他群組。');
 }
 
 if (!GOOGLE_MAPS_API_KEY) {
@@ -20455,7 +20455,10 @@ app.get('/api/rider/profile-photo/view', riderAuthMiddleware, async (req, res) =
 
 
 // ============================================================
-// UBee 小U註冊 API V2
+// UBee 小U註冊 API V2｜2026-10-02 Review Flow Hardening V4.7
+// - 新申請固定 UNDER_REVIEW，不建立 ridersV2。
+// - LINE 審核群：送出時即時重試 + Firestore 租約背景補送，避免通知漏單。
+// - 審核通過後才建立 ridersV2(TRAINING)，完成數位入職後才 ACTIVE。
 // 正式分層規則：
 // 1. 申請送出時，只建立 riderApplicationsV2/{手機號碼}
 // 2. 不提前建立 ridersV2
@@ -20944,6 +20947,7 @@ app.post('/api/rider/register', async (req, res) => {
         duplicatePayload = {
           riderId,
           status: oldStatus,
+          application: oldData,
           message:
             oldStatus === 'rejected'
               ? '此手機號碼的新版申請曾被拒絕，請聯繫 UBee 辦公室協助處理。'
@@ -20971,6 +20975,30 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
     if (duplicatePayload) {
+      // 同一申請若先前審核群通知失敗，允許再次送出時補送通知；
+      // 但不重寫申請內容，也不會建立正式 ridersV2。
+      let duplicateNotifySent = duplicatePayload.application?.adminNotifySent === true;
+      let duplicateNotifyStatus = String(duplicatePayload.application?.adminNotifyStatus || '');
+      if (duplicatePayload.application && !duplicateNotifySent && !['approved', 'training', 'active', 'rejected'].includes(String(duplicatePayload.status || '').toLowerCase())) {
+        const retryResult = await pushRiderReviewToAdminGroupWithRetry(duplicatePayload.application);
+        duplicateNotifySent = retryResult.ok;
+        duplicateNotifyStatus = retryResult.ok ? 'sent' : 'retry_pending';
+        await applicationRef.set({
+          adminNotifySent: retryResult.ok,
+          adminNotifyStatus: duplicateNotifyStatus,
+          adminNotifyError: retryResult.ok ? admin.firestore.FieldValue.delete() : retryResult.error,
+          adminNotifyAttempts: admin.firestore.FieldValue.increment(retryResult.attempts),
+          adminNotifyNextRetryAtMs: retryResult.ok
+            ? admin.firestore.FieldValue.delete()
+            : getRiderReviewNotifyNextRetryAtMs(
+                Number(duplicatePayload.application?.adminNotifyAttempts || 0) + retryResult.attempts
+              ),
+          adminNotifyUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          adminNotifyUpdatedAtMs: Date.now(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: Date.now(),
+        }, { merge: true });
+      }
       return res.json({
         success: true,
         duplicate: true,
@@ -20979,6 +21007,8 @@ app.post('/api/rider/register', async (req, res) => {
         status: duplicatePayload.status,
         collection: RIDER_V2_COLLECTIONS.applications,
         applicationCollection: RIDER_V2_COLLECTIONS.applications,
+        adminNotifySent: duplicateNotifySent,
+        adminNotifyStatus: duplicateNotifyStatus || (duplicateNotifySent ? 'sent' : 'retry_pending'),
         message: duplicatePayload.message,
       });
     }
@@ -20992,39 +21022,24 @@ app.post('/api/rider/register', async (req, res) => {
       documentsComplete: true,
     });
 
-    let notifyOk = false;
-    let notifyErrorMessage = '';
-
-    try {
-      if (!LINE_ADMIN_GROUP_ID) {
-        throw new Error('LINE_ADMIN_GROUP_ID 未設定');
-      }
-
-      await pushToGroup(
-        LINE_ADMIN_GROUP_ID,
-        createRiderReviewFlex({
-          ...application,
-          createdAt: submittedAtText,
-          submittedAtText,
-        })
-      );
-
-      notifyOk = true;
-    } catch (notifyErr) {
-      notifyOk = false;
-      notifyErrorMessage = notifyErr?.message || String(notifyErr);
-      console.error(
-        '⚠️ 新版小U審核通知失敗，但申請資料已成功寫入：',
-        notifyErrorMessage
-      );
-    }
+    const notifyResult = await pushRiderReviewToAdminGroupWithRetry({
+      ...application,
+      createdAt: submittedAtText,
+      submittedAtText,
+    });
+    const notifyOk = notifyResult.ok;
+    const notifyErrorMessage = notifyResult.error || '';
 
     const notifyUpdate = {
       adminNotifySent: notifyOk,
-      adminNotifyStatus: notifyOk ? 'sent' : 'failed',
+      adminNotifyStatus: notifyOk ? 'sent' : 'retry_pending',
+      adminNotifyNextRetryAtMs: notifyOk
+        ? admin.firestore.FieldValue.delete()
+        : getRiderReviewNotifyNextRetryAtMs(notifyResult.attempts),
       adminNotifyUpdatedAt:
         admin.firestore.FieldValue.serverTimestamp(),
       adminNotifyUpdatedAtMs: Date.now(),
+      adminNotifyAttempts: notifyResult.attempts,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAtMs: Date.now(),
     };
@@ -21048,6 +21063,7 @@ app.post('/api/rider/register', async (req, res) => {
       applicationCollection: RIDER_V2_COLLECTIONS.applications,
       officialRiderCreated: false,
       adminNotifySent: notifyOk,
+      adminNotifyStatus: notifyOk ? 'sent' : 'retry_pending',
       message: '已送出新版小U申請，等待 UBee 審核。',
     });
   } catch (err) {
@@ -28785,6 +28801,7 @@ function buildApprovedRiderV2(application, approvedBy) {
 
     name: cleanText(application.name || '', 20),
     phone,
+    birthDate: String(application.birthDate || '').trim(),
     lineId: cleanText(application.lineId || '', 60),
     userId: String(
       application.lineUserId || application.userId || ''
@@ -28805,10 +28822,15 @@ function buildApprovedRiderV2(application, approvedBy) {
     ),
 
     vehicle: cleanText(application.vehicle || '', 40),
+    vehicleMode: cleanText(
+      application.vehicleMode || normalizeRiderVehicleMode(application.vehicle),
+      20
+    ),
     plateNumber: cleanText(application.plateNumber || '', 20),
     vehicleOwnerType: String(
       application.vehicleOwnerType || 'self'
     ).trim(),
+    vehicleOwnerConsent: application.vehicleOwnerConsent === true,
     compulsoryInsuranceExpiryDate: String(
       application.compulsoryInsuranceExpiryDate || ''
     ).trim(),
@@ -30135,6 +30157,150 @@ async function pushToGroup(groupId, messages) {
   if (!groupId) return;
   const list = Array.isArray(messages) ? messages : [messages];
   await client.pushMessage(groupId, list);
+}
+
+async function pushRiderReviewToAdminGroupWithRetry(application, maxAttempts = 3) {
+  if (!LINE_ADMIN_GROUP_ID) {
+    return { ok: false, attempts: 0, error: 'LINE_ADMIN_GROUP_ID 未設定' };
+  }
+  let lastError = '';
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await pushToGroup(LINE_ADMIN_GROUP_ID, createRiderReviewFlex(application));
+      return { ok: true, attempts: attempt, error: '' };
+    } catch (err) {
+      lastError = err?.message || String(err);
+      console.error(`⚠️ 小U審核群通知第 ${attempt}/${maxAttempts} 次失敗：`, lastError);
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 750));
+      }
+    }
+  }
+  return { ok: false, attempts: maxAttempts, error: lastError || 'LINE 審核群通知失敗' };
+}
+
+// ============================================================
+// Rider Review Notification Durable Retry V1
+// - 申請資料先安全寫入 Firestore，再推送 LINE 審核群。
+// - 即時 3 次都失敗時標記 retry_pending。
+// - 背景 worker 使用 Firestore lease 防止多實例重複補送。
+// - 只補送尚未通過／拒絕的申請；人工審核資格絕不受通知結果影響。
+// ============================================================
+const RIDER_REVIEW_NOTIFY_RETRY_INTERVAL_MS = Math.max(
+  60000,
+  Number(process.env.RIDER_REVIEW_NOTIFY_RETRY_INTERVAL_MS || 60000)
+);
+const RIDER_REVIEW_NOTIFY_LEASE_MS = 45000;
+let riderReviewNotifyRetryWorkerTimer = null;
+let riderReviewNotifyRetryWorkerRunning = false;
+
+function isRiderApplicationStillAwaitingReviewNotification(application = {}) {
+  if (application.adminNotifySent === true) return false;
+  if (application.approved === true) return false;
+  const status = String(application.status || '').trim().toLowerCase();
+  const reviewStatus = String(application.reviewStatus || '').trim().toLowerCase();
+  const lifecycle = String(application.lifecycleStatus || '').trim().toUpperCase();
+  if (['approved', 'training', 'active', 'rejected'].includes(status)) return false;
+  if (['approved', 'rejected'].includes(reviewStatus)) return false;
+  if ([RIDER_V4_LIFECYCLE.TRAINING, RIDER_V4_LIFECYCLE.ACTIVE, RIDER_V4_LIFECYCLE.REJECTED].includes(lifecycle)) return false;
+  return true;
+}
+
+function getRiderReviewNotifyNextRetryAtMs(totalAttempts = 0) {
+  const attempt = Math.max(0, Number(totalAttempts || 0));
+  const delayMs = Math.min(15 * 60 * 1000, 60000 * Math.pow(2, Math.min(4, Math.floor(attempt / 3))));
+  return Date.now() + delayMs;
+}
+
+async function retryPendingRiderReviewNotifications() {
+  if (riderReviewNotifyRetryWorkerRunning || !LINE_ADMIN_GROUP_ID) return;
+  riderReviewNotifyRetryWorkerRunning = true;
+  try {
+    const nowMs = Date.now();
+    const snap = await db
+      .collection(RIDER_V2_COLLECTIONS.applications)
+      .where('adminNotifySent', '==', false)
+      .limit(30)
+      .get();
+
+    for (const doc of snap.docs) {
+      const ref = doc.ref;
+      let claimedApplication = null;
+
+      await db.runTransaction(async tx => {
+        const freshDoc = await tx.get(ref);
+        if (!freshDoc.exists) return;
+        const application = freshDoc.data() || {};
+        if (!isRiderApplicationStillAwaitingReviewNotification(application)) return;
+
+        const nextRetryAtMs = Number(application.adminNotifyNextRetryAtMs || 0);
+        const leaseUntilMs = Number(application.adminNotifyLeaseUntilMs || 0);
+        if (nextRetryAtMs > nowMs || leaseUntilMs > nowMs) return;
+
+        claimedApplication = {
+          ...application,
+          riderId: application.riderId || freshDoc.id,
+          id: application.id || freshDoc.id,
+        };
+
+        tx.set(ref, {
+          adminNotifyStatus: 'retrying',
+          adminNotifyLeaseUntilMs: nowMs + RIDER_REVIEW_NOTIFY_LEASE_MS,
+          adminNotifyWorkerClaimedAtMs: nowMs,
+          adminNotifyUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          adminNotifyUpdatedAtMs: nowMs,
+        }, { merge: true });
+      });
+
+      if (!claimedApplication) continue;
+
+      const result = await pushRiderReviewToAdminGroupWithRetry(claimedApplication, 1);
+      const previousAttempts = Math.max(0, Number(claimedApplication.adminNotifyAttempts || 0));
+      const totalAttempts = previousAttempts + Math.max(1, Number(result.attempts || 0));
+
+      if (result.ok) {
+        await ref.set({
+          adminNotifySent: true,
+          adminNotifyStatus: 'sent',
+          adminNotifyAttempts: totalAttempts,
+          adminNotifyError: admin.firestore.FieldValue.delete(),
+          adminNotifyNextRetryAtMs: admin.firestore.FieldValue.delete(),
+          adminNotifyLeaseUntilMs: admin.firestore.FieldValue.delete(),
+          adminNotifySentAt: admin.firestore.FieldValue.serverTimestamp(),
+          adminNotifySentAtMs: Date.now(),
+          adminNotifyUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          adminNotifyUpdatedAtMs: Date.now(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: Date.now(),
+        }, { merge: true });
+      } else {
+        await ref.set({
+          adminNotifySent: false,
+          adminNotifyStatus: 'retry_pending',
+          adminNotifyAttempts: totalAttempts,
+          adminNotifyError: result.error || 'LINE 審核群通知失敗',
+          adminNotifyNextRetryAtMs: getRiderReviewNotifyNextRetryAtMs(totalAttempts),
+          adminNotifyLeaseUntilMs: admin.firestore.FieldValue.delete(),
+          adminNotifyUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          adminNotifyUpdatedAtMs: Date.now(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: Date.now(),
+        }, { merge: true });
+      }
+    }
+  } catch (error) {
+    console.error('❌ 小U審核群背景補送 worker 失敗：', error?.message || error);
+  } finally {
+    riderReviewNotifyRetryWorkerRunning = false;
+  }
+}
+
+function startRiderReviewNotificationRetryWorker() {
+  if (riderReviewNotifyRetryWorkerTimer) return;
+  const run = () => retryPendingRiderReviewNotifications().catch(() => {});
+  setTimeout(run, 5000);
+  riderReviewNotifyRetryWorkerTimer = setInterval(run, RIDER_REVIEW_NOTIFY_RETRY_INTERVAL_MS);
+  riderReviewNotifyRetryWorkerTimer.unref?.();
 }
 
 function safeText(value, fallback = '無') {
@@ -31635,6 +31801,24 @@ function createMainMenuFlex() {
 }
 
 function createRiderReviewFlex(rider) {
+  const rawStatus = String(rider?.status || rider?.reviewStatus || '').trim().toLowerCase();
+  const statusLabel = ['submitted', 'pending', 'under_review'].includes(rawStatus)
+    ? '待人工審核'
+    : rawStatus === 'needs_supplement'
+      ? '等待補件'
+      : rawStatus || '待人工審核';
+  const rawSubmittedAt = rider?.submittedAtText || rider?.createdAt || rider?.submittedAt || '';
+  let submittedAtText = '-';
+  try {
+    if (typeof rawSubmittedAt === 'string' && rawSubmittedAt.trim()) {
+      submittedAtText = rawSubmittedAt.trim();
+    } else if (rawSubmittedAt?.toDate) {
+      submittedAtText = rawSubmittedAt.toDate().toLocaleString('zh-TW', { timeZone:'Asia/Taipei', hour12:false });
+    } else if (Number(rawSubmittedAt) > 0) {
+      submittedAtText = new Date(Number(rawSubmittedAt)).toLocaleString('zh-TW', { timeZone:'Asia/Taipei', hour12:false });
+    }
+  } catch (_) {}
+
   return createFlexMessage('新騎士申請審核', createBubble(
     '🟡 新騎士申請審核',
     [
@@ -31657,8 +31841,8 @@ function createRiderReviewFlex(rider) {
         '強制險到期',
         rider.compulsoryInsuranceExpiryDate || '-'
       ),
-      createInfoRow('狀態', rider.status === 'pending' ? '待審核' : rider.status),
-      createInfoRow('申請時間', rider.createdAt),
+      createInfoRow('狀態', statusLabel),
+      createInfoRow('申請時間', submittedAtText),
       {
         type: 'text',
         text: '請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再做最終決定。',
@@ -49445,4 +49629,10 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`UBee OMS is running on port ${PORT}`);
+  if (LINE_ADMIN_GROUP_ID) {
+    startRiderReviewNotificationRetryWorker();
+    console.log('✅ 小U審核群背景補送 worker 已啟動');
+  } else {
+    console.error('❌ 小U審核群背景補送 worker 未啟動：LINE_ADMIN_GROUP_ID 尚未設定');
+  }
 });
