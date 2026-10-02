@@ -29,10 +29,6 @@ button{cursor:pointer}
 .btn.red{background:#fee2e2;color:#b91c1c;box-shadow:none}
 .btn.ghost{background:transparent}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.login-card{max-width:480px;margin:10vh auto 0;background:var(--card);border:1px solid var(--line);border-radius:28px;padding:24px;box-shadow:var(--shadow)}
-.login-icon{width:58px;height:58px;border-radius:19px;background:#fff7cc;display:grid;place-items:center;font-size:30px;margin-bottom:18px}
-.login-card h2{font-size:25px;margin:0 0 8px}
-.login-card p{color:var(--muted);line-height:1.6;margin:0 0 20px}
 .field{display:grid;gap:7px;margin-bottom:14px}
 .field label{font-size:13px;font-weight:800;color:#374151}
 .input,.select,.textarea{width:100%;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:14px;padding:13px 14px;outline:none;min-height:48px}
@@ -94,26 +90,12 @@ button{cursor:pointer}
 </head>
 <body>
 <div class="shell">
-  <div id="loginView" class="login-card">
-    <div class="login-icon">🐝</div>
-    <h2>小U福利管理</h2>
-    <p>登入後可自行新增、編輯、預覽、排序、上架與下架合作福利。管理授權只保留在這個瀏覽器分頁工作階段。</p>
-    <div class="field">
-      <label for="adminKey">管理授權碼</label>
-      <input id="adminKey" class="input" type="password" autocomplete="current-password" placeholder="輸入福利管理授權碼">
-      <div class="hint">後端讀取 UBEE_RIDER_BENEFITS_ADMIN_KEY；若未另外設定，會沿用 UBEE_RIDER_V4_ADMIN_KEY。</div>
-    </div>
-    <button id="loginBtn" class="btn primary" type="button" style="width:100%">登入福利管理</button>
-    <div id="loginMessage"></div>
-  </div>
-
-  <div id="appView" class="hidden">
+  <div id="appView">
     <div class="topbar">
       <div class="brand">
         <div class="brand-mark">🐝</div>
-        <div><h1>UBee 小U福利管理</h1><p>Rider Benefits Management V1</p></div>
+        <div><h1>UBee 小U福利管理</h1><p>Rider Benefits Management V1.1</p></div>
       </div>
-      <button class="btn" type="button" onclick="logout()">登出</button>
     </div>
 
     <div class="toolbar">
@@ -207,7 +189,6 @@ button{cursor:pointer}
 const API_BASE = location.origin.includes('onrender.com')
   ? location.origin
   : 'https://ubee-line-bot-2-zezw.onrender.com';
-const KEY_STORAGE = 'ubee_rider_benefits_admin_key_session';
 const DEFAULT_STEPS = [
   '前往合作店家',
   '告知店家為 UBee 小U',
@@ -215,7 +196,6 @@ const DEFAULT_STEPS = [
   '出示目前騎士端的小U身分證明',
   '店家確認後即可享有優惠'
 ];
-let adminKey = sessionStorage.getItem(KEY_STORAGE) || '';
 let benefits = [];
 let categories = ['騎士裝備','保健','餐飲','車輛','生活服務'];
 let currentBenefit = null;
@@ -233,14 +213,10 @@ function setMessage(target,message,type='error'){
   const el=$(target);
   el.innerHTML=message?`<div class="${type==='success'?'success':'error'}">${escapeHtml(message)}</div>`:'';
 }
-function authHeaders(extra={}){
-  return {'X-UBee-Admin-Key':adminKey,...extra};
-}
 async function api(path,options={}){
   const response=await fetch(`${API_BASE}${path}`,{
     cache:'no-store',
-    ...options,
-    headers:authHeaders(options.headers||{})
+    ...options
   });
   const data=await response.json().catch(()=>({}));
   if(!response.ok || data.success===false){
@@ -261,40 +237,6 @@ function updateEditorStatus(){
 function populateCategories(){
   $('category').innerHTML=categories.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
 }
-async function login(){
-  const key=$('adminKey').value.trim();
-  if(!key){setMessage('loginMessage','請輸入管理授權碼。');return;}
-  adminKey=key;
-  $('loginBtn').disabled=true;
-  setMessage('loginMessage','');
-  try{
-    const data=await api('/api/admin/rider-benefits');
-    sessionStorage.setItem(KEY_STORAGE,adminKey);
-    benefits=data.benefits||[];
-    categories=data.categories||categories;
-    populateCategories();
-    $('loginView').classList.add('hidden');
-    $('appView').classList.remove('hidden');
-    renderList();
-    newBenefit();
-  }catch(error){
-    adminKey='';
-    sessionStorage.removeItem(KEY_STORAGE);
-    setMessage('loginMessage',error.message||'登入失敗。');
-  }finally{
-    $('loginBtn').disabled=false;
-  }
-}
-function logout(){
-  adminKey='';
-  sessionStorage.removeItem(KEY_STORAGE);
-  benefits=[];
-  currentBenefit=null;
-  $('appView').classList.add('hidden');
-  $('loginView').classList.remove('hidden');
-  $('adminKey').value='';
-  setMessage('loginMessage','');
-}
 async function loadBenefits(showNotice=false){
   try{
     const data=await api('/api/admin/rider-benefits');
@@ -304,7 +246,6 @@ async function loadBenefits(showNotice=false){
     renderList();
     if(showNotice) showToast('福利清單已更新');
   }catch(error){
-    if(error.status===401){logout();setMessage('loginMessage','登入已失效，請重新輸入管理授權碼。');return;}
     showToast(error.message||'讀取失敗');
   }
 }
@@ -439,7 +380,6 @@ async function uploadSelectedImage(benefitId=''){
   if(benefitId)form.append('benefitId',benefitId);
   const response=await fetch(`${API_BASE}/api/admin/rider-benefits/image`,{
     method:'POST',
-    headers:{'X-UBee-Admin-Key':adminKey},
     body:form
   });
   const data=await response.json().catch(()=>({}));
@@ -472,7 +412,6 @@ async function saveBenefit(){
     if(savedId)editBenefit(savedId);
     showToast(data.message||'福利已儲存');
   }catch(error){
-    if(error.status===401){logout();setMessage('loginMessage','登入已失效，請重新登入。');return;}
     setMessage('editorMessage',error.message||'儲存失敗。');
   }finally{
     $('saveBtn').disabled=false;
@@ -503,8 +442,6 @@ async function deleteCurrentBenefit(){
   }catch(error){setMessage('editorMessage',error.message||'刪除失敗。');}
 }
 
-$('loginBtn').addEventListener('click',login);
-$('adminKey').addEventListener('keydown',event=>{if(event.key==='Enter')login();});
 $('status').addEventListener('change',()=>{updateEditorStatus();renderPreview();});
 ['name','category','offer','city','district','address','originalPrice','discountAmount','memberPrice'].forEach(id=>{
   $(id).addEventListener('input',renderPreview);
@@ -514,23 +451,8 @@ $('imageFile').addEventListener('change',renderPreview);
 
 (async function boot(){
   populateCategories();
-  if(adminKey){
-    $('adminKey').value=adminKey;
-    try{
-      const data=await api('/api/admin/rider-benefits');
-      benefits=data.benefits||[];
-      categories=data.categories||categories;
-      populateCategories();
-      $('loginView').classList.add('hidden');
-      $('appView').classList.remove('hidden');
-      renderList();
-      newBenefit();
-      return;
-    }catch(_){
-      adminKey='';
-      sessionStorage.removeItem(KEY_STORAGE);
-    }
-  }
+  await loadBenefits(false);
+  newBenefit();
 })();
 </script>
 </body>
