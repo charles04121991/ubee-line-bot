@@ -1,8 +1,9 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-01
-// Release: 2026_1001_UCOIN_V1｜Customer U Coin / Notification Tab V4 / Rider Approval Login Lock
+// UBee Backend｜Latest Release 2026-10-02
+// Release: 2026_1002_RIDER_BENEFITS_ADMIN_V1｜Rider Benefits Management / Dynamic Partner Benefits / V4.8 contracts preserved
 //
 // 本次整理：
+// - 新增小U福利管理 API、Firestore 唯一資料來源、圖片上傳與 V4.8 既有福利一次性遷移。
 // - 新增 U幣整數帳本、七日簽到、完單／首單／評價／推薦獎勵。
 // - 新增訂單 U幣保留、完單扣除、取消退回與冪等交易事件。
 // - 折抵受服務費 20% 與平台收入雙重上限保護，不影響小U收入與代墊款。
@@ -1819,7 +1820,7 @@ app.use((req, res, next) => {
   }
 
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-UBee-Support-Case-Id, X-UBee-Support-Access-Token, X-UBee-Support-Admin-Key, X-UBee-Support-Operator, X-UBee-Support-File-Name, X-UBee-Support-Evidence-Type, X-UBee-Rider-Phone, X-UBee-Rider-Line-User-Id, X-UBee-Rider-Document-Type, X-UBee-Rider-File-Name, X-UBee-Admin-Key');
 
   if (req.method === 'OPTIONS') {
@@ -9423,6 +9424,520 @@ app.post('/api/admin/rider-notifications/announcement', async (req, res) => {
     return res.status(500).json({ success:false, message:'建立系統公告失敗。' });
   }
 });
+
+
+// ============================================================
+// 2026-10-02｜Rider Benefits Management V1
+// 唯一正式資料來源：Firestore riderPartnerBenefits。
+// - 騎士端只讀 active 福利，不再內建合作店家清單。
+// - 管理端可新增／編輯／預覽／排序／草稿／上架／下架／刪除。
+// - 圖片上傳至 Firebase Storage；管理 API 以獨立福利管理金鑰保護。
+// - 第一次啟用時只做一次 V4.8 既有兩筆福利資料遷移。
+// ============================================================
+const RIDER_BENEFITS_COLLECTION = 'riderPartnerBenefits';
+const RIDER_BENEFITS_MIGRATION_COLLECTION = 'systemMigrations';
+const RIDER_BENEFITS_MIGRATION_ID = 'riderPartnerBenefits_v1_20261002';
+const RIDER_BENEFITS_CATEGORIES = Object.freeze([
+  '騎士裝備','保健','餐飲','車輛','生活服務'
+]);
+const RIDER_BENEFITS_ADMIN_KEY = String(
+  process.env.UBEE_RIDER_BENEFITS_ADMIN_KEY ||
+  process.env.UBEE_RIDER_V4_ADMIN_KEY ||
+  ''
+).trim();
+const RIDER_BENEFITS_STORAGE_BUCKET = String(
+  process.env.RIDER_BENEFITS_STORAGE_BUCKET ||
+  process.env.FIREBASE_STORAGE_BUCKET ||
+  RIDER_DOCUMENT_STORAGE_BUCKET ||
+  `${process.env.FIREBASE_PROJECT_ID || ''}.appspot.com`
+).trim();
+const RIDER_BENEFITS_IMAGE_MAX_BYTES = 6 * 1024 * 1024;
+
+const riderBenefitImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { files:1, fileSize:RIDER_BENEFITS_IMAGE_MAX_BYTES },
+  fileFilter: (req, file, callback) => {
+    const mime = String(file?.mimetype || '').toLowerCase();
+    if (!['image/jpeg','image/png','image/webp'].includes(mime)) {
+      return callback(new Error('RIDER_BENEFIT_IMAGE_UNSUPPORTED_TYPE'));
+    }
+    return callback(null, true);
+  },
+});
+
+function riderBenefitSafeId(value='') {
+  return String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+}
+
+function riderBenefitNumber(value, { min=0, max=99999999, integer=true }={}) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  const bounded = Math.max(min, Math.min(max, n));
+  return integer ? Math.round(bounded) : bounded;
+}
+
+function riderBenefitStatus(value='draft') {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ['draft','active','inactive'].includes(normalized) ? normalized : 'draft';
+}
+
+function riderBenefitCategory(value='') {
+  const category = cleanText(value, 40);
+  return RIDER_BENEFITS_CATEGORIES.includes(category) ? category : '生活服務';
+}
+
+function riderBenefitUsageSteps(value) {
+  const raw = Array.isArray(value)
+    ? value
+    : String(value || '').split(/\r?\n/);
+  return raw
+    .map(item => cleanText(item, 120))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeRiderBenefitInput(payload={}, existing={}) {
+  const name = cleanText(payload.name ?? existing.name ?? '', 120);
+  const category = riderBenefitCategory(payload.category ?? existing.category ?? '');
+  const status = riderBenefitStatus(payload.status ?? existing.status ?? 'draft');
+  const originalPrice = riderBenefitNumber(payload.originalPrice ?? existing.originalPrice ?? 0);
+  const memberPrice = riderBenefitNumber(payload.memberPrice ?? existing.memberPrice ?? 0);
+  const discountAmountInput = riderBenefitNumber(payload.discountAmount ?? existing.discountAmount ?? 0);
+  const discountAmount =
+    discountAmountInput > 0
+      ? discountAmountInput
+      : (originalPrice > 0 && memberPrice > 0 ? Math.max(0, originalPrice - memberPrice) : 0);
+
+  return {
+    name,
+    category,
+    badge: cleanText(payload.badge ?? existing.badge ?? '正式小U專屬', 80) || '正式小U專屬',
+    offer: cleanText(payload.offer ?? existing.offer ?? '', 160),
+    description: cleanLongText(payload.description ?? existing.description ?? '', 600),
+    city: cleanText(payload.city ?? existing.city ?? '', 40),
+    district: cleanText(payload.district ?? existing.district ?? '', 40),
+    address: cleanText(payload.address ?? existing.address ?? '', 220),
+    mapQuery: cleanText(payload.mapQuery ?? existing.mapQuery ?? '', 260),
+    validity: cleanText(payload.validity ?? existing.validity ?? '長期合作', 120) || '長期合作',
+    notice: cleanLongText(payload.notice ?? existing.notice ?? '', 1000),
+    usageSteps: riderBenefitUsageSteps(payload.usageSteps ?? existing.usageSteps ?? [
+      '前往合作店家',
+      '告知店家為 UBee 小U',
+      '開啟 UBee 騎士端',
+      '出示目前騎士端的小U身分證明',
+      '店家確認後即可享有優惠',
+    ]),
+    originalPrice,
+    discountAmount,
+    memberPrice,
+    imageUrl: cleanText(payload.imageUrl ?? existing.imageUrl ?? '', 1500),
+    imageStoragePath: cleanText(payload.imageStoragePath ?? existing.imageStoragePath ?? '', 700),
+    imageStorageBucket: cleanText(payload.imageStorageBucket ?? existing.imageStorageBucket ?? '', 300),
+    sortOrder: riderBenefitNumber(payload.sortOrder ?? existing.sortOrder ?? 100, {min:0,max:99999}),
+    status,
+  };
+}
+
+function riderBenefitPublicPayload(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    id: riderBenefitSafeId(data.benefitId || doc?.id || ''),
+    name: cleanText(data.name || '', 120),
+    category: riderBenefitCategory(data.category || ''),
+    badge: cleanText(data.badge || '正式小U專屬', 80) || '正式小U專屬',
+    offer: cleanText(data.offer || '', 160),
+    description: cleanLongText(data.description || '', 600),
+    city: cleanText(data.city || '', 40),
+    district: cleanText(data.district || '', 40),
+    address: cleanText(data.address || '', 220),
+    mapQuery: cleanText(data.mapQuery || '', 260),
+    validity: cleanText(data.validity || '長期合作', 120) || '長期合作',
+    notice: cleanLongText(data.notice || '', 1000),
+    usageSteps: riderBenefitUsageSteps(data.usageSteps || []),
+    originalPrice: riderBenefitNumber(data.originalPrice || 0),
+    discountAmount: riderBenefitNumber(data.discountAmount || 0),
+    memberPrice: riderBenefitNumber(data.memberPrice || 0),
+    imageUrl: cleanText(data.imageUrl || '', 1500),
+    sortOrder: riderBenefitNumber(data.sortOrder || 100, {min:0,max:99999}),
+    status: riderBenefitStatus(data.status || 'draft'),
+    updatedAtMs: Math.max(0, Number(data.updatedAtMs || 0)),
+  };
+}
+
+function riderBenefitAdminPayload(doc) {
+  const publicData = riderBenefitPublicPayload(doc);
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    ...publicData,
+    imageStoragePath: cleanText(data.imageStoragePath || '', 700),
+    imageStorageBucket: cleanText(data.imageStorageBucket || '', 300),
+    createdAtMs: Math.max(0, Number(data.createdAtMs || 0)),
+  };
+}
+
+function riderBenefitAdminKeyFromRequest(req) {
+  return String(
+    req.headers['x-ubee-admin-key'] ||
+    req.body?.adminKey ||
+    req.query?.adminKey ||
+    ''
+  ).trim();
+}
+
+function requireRiderBenefitsAdmin(req, res, next) {
+  if (!RIDER_BENEFITS_ADMIN_KEY) {
+    return res.status(503).json({
+      success:false,
+      code:'RIDER_BENEFITS_ADMIN_KEY_NOT_CONFIGURED',
+      message:'尚未設定小U福利管理授權。請在 Render 設定 UBEE_RIDER_BENEFITS_ADMIN_KEY，或沿用 UBEE_RIDER_V4_ADMIN_KEY。',
+    });
+  }
+
+  const supplied = riderBenefitAdminKeyFromRequest(req);
+  const expectedBuffer = Buffer.from(RIDER_BENEFITS_ADMIN_KEY);
+  const suppliedBuffer = Buffer.from(supplied);
+  const valid =
+    expectedBuffer.length > 0 &&
+    expectedBuffer.length === suppliedBuffer.length &&
+    crypto.timingSafeEqual(expectedBuffer, suppliedBuffer);
+
+  if (!valid) {
+    return res.status(401).json({
+      success:false,
+      code:'RIDER_BENEFITS_ADMIN_UNAUTHORIZED',
+      message:'小U福利管理授權不正確。',
+    });
+  }
+
+  return next();
+}
+
+function riderBenefitImageExtension(mimeType='', originalName='') {
+  const ext = String(originalName || '').toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1] || '';
+  if (['jpg','jpeg','png','webp'].includes(ext)) return ext === 'jpeg' ? 'jpg' : ext;
+  const map = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp' };
+  return map[String(mimeType || '').toLowerCase()] || 'jpg';
+}
+
+async function deleteRiderBenefitStorageObject(storageBucket='', storagePath='') {
+  const safePath = String(storagePath || '').trim();
+  const safeBucket = String(storageBucket || RIDER_BENEFITS_STORAGE_BUCKET || '').trim();
+  if (!safeBucket || !safePath || !safePath.startsWith('rider-benefits/')) return false;
+  try {
+    await admin.storage().bucket(safeBucket).file(safePath).delete({ ignoreNotFound:true });
+    return true;
+  } catch (error) {
+    console.warn('⚠️ 刪除舊小U福利圖片失敗：', safePath, error?.message || error);
+    return false;
+  }
+}
+
+async function ensureRiderBenefitsSeeded() {
+  const migrationRef = db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFITS_MIGRATION_ID);
+  const manmanqiRef = db.collection(RIDER_BENEFITS_COLLECTION).doc('manmanqi');
+  const xinhongRef = db.collection(RIDER_BENEFITS_COLLECTION).doc('xinhong');
+
+  await db.runTransaction(async tx => {
+    const migrationDoc = await tx.get(migrationRef);
+    if (migrationDoc.exists) return;
+    const manmanqiDoc = await tx.get(manmanqiRef);
+    const xinhongDoc = await tx.get(xinhongRef);
+
+    const nowMs = Date.now();
+    if (!manmanqiDoc.exists) {
+      tx.set(manmanqiRef, {
+        benefitId:'manmanqi',
+        name:'慢慢騎',
+        category:'騎士裝備',
+        badge:'正式小U專屬',
+        offer:'小U專屬優惠',
+        description:'UBee 正式小U合作福利。',
+        city:'台中市',
+        district:'南屯區',
+        address:'台中市南屯區向心里文心南二路439巷6號',
+        mapQuery:'台中市南屯區向心里文心南二路439巷6號',
+        validity:'長期合作',
+        notice:'正式小U出示騎士端身分證明，即享小U專屬優惠，優惠內容依店家現場公告為準，部分商品除外。',
+        usageSteps:['前往合作店家','告知店家為 UBee 小U','開啟 UBee 騎士端','出示目前騎士端的小U身分證明','店家確認後即可享有優惠'],
+        originalPrice:0,
+        discountAmount:0,
+        memberPrice:0,
+        imageUrl:'',
+        imageStoragePath:'',
+        imageStorageBucket:'',
+        sortOrder:10,
+        status:'active',
+        createdAtMs:nowMs,
+        createdAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    if (!xinhongDoc.exists) {
+      tx.set(xinhongRef, {
+        benefitId:'xinhong',
+        name:'昕紘整復推拿',
+        category:'保健',
+        badge:'正式小U專屬',
+        offer:'小U專屬價 NT$800',
+        description:'長時間騎乘、搬運、久坐久站的小U專屬合作福利。',
+        city:'台中市',
+        district:'豐原區',
+        address:'台中市豐原區豐原大道三段5號',
+        mapQuery:'台中市豐原區豐原大道三段5號',
+        validity:'長期合作',
+        notice:'原價 NT$900，正式小U現折 NT$100，專屬價 NT$800。服務項目與可預約時段以合作店家現場為準。',
+        usageSteps:['前往合作店家','告知店家為 UBee 小U','開啟 UBee 騎士端','出示目前騎士端的小U身分證明','店家確認後即可享有優惠'],
+        originalPrice:900,
+        discountAmount:100,
+        memberPrice:800,
+        imageUrl:'',
+        imageStoragePath:'',
+        imageStorageBucket:'',
+        sortOrder:20,
+        status:'active',
+        createdAtMs:nowMs,
+        createdAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    tx.set(migrationRef, {
+      migrationId:RIDER_BENEFITS_MIGRATION_ID,
+      source:'rider-v48-hardcoded-benefits',
+      completed:true,
+      completedAtMs:nowMs,
+      completedAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+async function listRiderBenefitsForAdmin() {
+  await ensureRiderBenefitsSeeded();
+  const snapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(300).get();
+  return snapshot.docs
+    .map(riderBenefitAdminPayload)
+    .sort((a,b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'zh-Hant'));
+}
+
+// 騎士端：只回傳正式上架福利。
+app.get('/api/rider/benefits', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await ensureRiderBenefitsSeeded();
+    const snapshot = await db.collection(RIDER_BENEFITS_COLLECTION)
+      .where('status', '==', 'active')
+      .limit(200)
+      .get();
+    const benefits = snapshot.docs
+      .map(riderBenefitPublicPayload)
+      .filter(item => item.id && item.name && item.offer)
+      .sort((a,b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'zh-Hant'));
+    const categories = [
+      '全部',
+      ...RIDER_BENEFITS_CATEGORIES.filter(category => benefits.some(item => item.category === category)),
+    ];
+    return res.json({
+      success:true,
+      version:'rider-benefits-v1',
+      benefits,
+      categories,
+      count:benefits.length,
+    });
+  } catch (error) {
+    console.error('❌ 讀取小U福利失敗：', error);
+    return res.status(500).json({ success:false, message:'小U福利暫時無法讀取，請稍後再試。' });
+  }
+});
+
+// 管理端：登入驗證＋完整清單。
+app.get('/api/admin/rider-benefits', requireRiderBenefitsAdmin, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const benefits = await listRiderBenefitsForAdmin();
+    return res.json({
+      success:true,
+      version:'rider-benefits-admin-v1',
+      categories:RIDER_BENEFITS_CATEGORIES,
+      benefits,
+      count:benefits.length,
+    });
+  } catch (error) {
+    console.error('❌ 讀取小U福利管理清單失敗：', error);
+    return res.status(500).json({ success:false, message:'讀取小U福利管理資料失敗。' });
+  }
+});
+
+// 管理端：上傳合作店家圖片。
+app.post('/api/admin/rider-benefits/image', requireRiderBenefitsAdmin, (req, res) => {
+  riderBenefitImageUpload.single('file')(req, res, async error => {
+    if (error) {
+      const tooLarge = error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE';
+      const unsupported = String(error?.message || '') === 'RIDER_BENEFIT_IMAGE_UNSUPPORTED_TYPE';
+      return res.status(tooLarge ? 413 : 415).json({
+        success:false,
+        message:tooLarge
+          ? '合作店家圖片不可超過 6 MB。'
+          : unsupported
+            ? '合作店家圖片只支援 JPG、PNG 或 WEBP。'
+            : '合作店家圖片格式不正確。',
+      });
+    }
+
+    try {
+      if (!req.file) return res.status(400).json({ success:false, message:'請先選擇合作店家圖片。' });
+      if (!RIDER_BENEFITS_STORAGE_BUCKET) {
+        return res.status(503).json({ success:false, message:'小U福利圖片儲存空間尚未設定。' });
+      }
+
+      const benefitId = riderBenefitSafeId(req.body?.benefitId || '') || crypto.randomUUID().replace(/-/g, '').slice(0, 20);
+      const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      const extension = riderBenefitImageExtension(req.file.mimetype, req.file.originalname);
+      const storagePath = `rider-benefits/${benefitId}/${Date.now()}-${sha256.slice(0,16)}.${extension}`;
+      const downloadToken = crypto.randomUUID();
+      const bucket = admin.storage().bucket(RIDER_BENEFITS_STORAGE_BUCKET);
+      const file = bucket.file(storagePath);
+
+      await file.save(req.file.buffer, {
+        resumable:false,
+        validation:'md5',
+        metadata:{
+          contentType:req.file.mimetype,
+          cacheControl:'public, max-age=3600',
+          metadata:{
+            firebaseStorageDownloadTokens:downloadToken,
+            purpose:'rider_partner_benefit',
+            benefitId,
+            sha256,
+          },
+        },
+      });
+
+      const imageUrl =
+        `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/` +
+        `${encodeURIComponent(storagePath)}?alt=media&token=${encodeURIComponent(downloadToken)}`;
+
+      return res.json({
+        success:true,
+        benefitId,
+        imageUrl,
+        imageStoragePath:storagePath,
+        imageStorageBucket:bucket.name,
+      });
+    } catch (uploadError) {
+      console.error('❌ 上傳小U福利圖片失敗：', uploadError);
+      return res.status(500).json({ success:false, message:'合作店家圖片上傳失敗，請稍後再試。' });
+    }
+  });
+});
+
+// 管理端：新增／編輯福利。草稿不會出現在騎士端。
+app.post('/api/admin/rider-benefits', requireRiderBenefitsAdmin, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await ensureRiderBenefitsSeeded();
+
+    let benefitId = riderBenefitSafeId(req.body?.benefitId || '');
+    const collection = db.collection(RIDER_BENEFITS_COLLECTION);
+    const ref = benefitId ? collection.doc(benefitId) : collection.doc();
+    benefitId = riderBenefitSafeId(ref.id);
+
+    const existingDoc = await ref.get();
+    const existing = existingDoc.exists ? (existingDoc.data() || {}) : {};
+    const normalized = normalizeRiderBenefitInput(req.body || {}, existing);
+
+    if (!normalized.name) {
+      return res.status(400).json({ success:false, message:'請輸入合作店家名稱。' });
+    }
+    if (!normalized.offer) {
+      return res.status(400).json({ success:false, message:'請輸入小U優惠內容。' });
+    }
+    if (!normalized.address) {
+      return res.status(400).json({ success:false, message:'請輸入合作店家地址。' });
+    }
+
+    const nowMs = Date.now();
+    const data = {
+      ...normalized,
+      benefitId,
+      createdAtMs: existingDoc.exists ? Math.max(1, Number(existing.createdAtMs || nowMs)) : nowMs,
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (!existingDoc.exists) data.createdAt = admin.firestore.FieldValue.serverTimestamp();
+
+    await ref.set(data, { merge:true });
+
+    const oldStoragePath = String(existing.imageStoragePath || '').trim();
+    const newStoragePath = String(normalized.imageStoragePath || '').trim();
+    if (oldStoragePath && oldStoragePath !== newStoragePath) {
+      await deleteRiderBenefitStorageObject(existing.imageStorageBucket, oldStoragePath);
+    }
+
+    const fresh = await ref.get();
+    return res.json({
+      success:true,
+      benefit:riderBenefitAdminPayload(fresh),
+      message:normalized.status === 'active'
+        ? '福利已正式上架，小U重新開啟福利中心即可看到。'
+        : normalized.status === 'inactive'
+          ? '福利已下架並保留資料。'
+          : '福利已儲存為草稿。',
+    });
+  } catch (error) {
+    console.error('❌ 儲存小U福利失敗：', error);
+    return res.status(500).json({ success:false, message:'儲存小U福利失敗，請稍後再試。' });
+  }
+});
+
+// 管理端：快速切換草稿／上架／下架。
+app.post('/api/admin/rider-benefits/:benefitId/status', requireRiderBenefitsAdmin, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const benefitId = riderBenefitSafeId(req.params.benefitId || '');
+    const rawStatus = String(req.body?.status || '').trim().toLowerCase();
+    if (!benefitId) return res.status(400).json({ success:false, message:'福利編號不正確。' });
+    if (!['draft','active','inactive'].includes(rawStatus)) {
+      return res.status(400).json({ success:false, message:'福利狀態不正確。' });
+    }
+    const status = rawStatus;
+    const ref = db.collection(RIDER_BENEFITS_COLLECTION).doc(benefitId);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這筆福利。' });
+    await ref.set({
+      status,
+      updatedAtMs:Date.now(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    const fresh = await ref.get();
+    return res.json({ success:true, benefit:riderBenefitAdminPayload(fresh) });
+  } catch (error) {
+    console.error('❌ 更新小U福利狀態失敗：', error);
+    return res.status(500).json({ success:false, message:'更新福利狀態失敗。' });
+  }
+});
+
+// 管理端：永久刪除福利與該筆目前使用的圖片。
+app.delete('/api/admin/rider-benefits/:benefitId', requireRiderBenefitsAdmin, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const benefitId = riderBenefitSafeId(req.params.benefitId || '');
+    if (!benefitId) return res.status(400).json({ success:false, message:'福利編號不正確。' });
+    const ref = db.collection(RIDER_BENEFITS_COLLECTION).doc(benefitId);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這筆福利。' });
+    const data = doc.data() || {};
+    await ref.delete();
+    await deleteRiderBenefitStorageObject(data.imageStorageBucket, data.imageStoragePath);
+    return res.json({ success:true, benefitId, message:'福利已永久刪除。' });
+  } catch (error) {
+    console.error('❌ 刪除小U福利失敗：', error);
+    return res.status(500).json({ success:false, message:'刪除福利失敗。' });
+  }
+});
+
 
 app.get('/api/rider/notifications', riderAuthMiddleware, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
