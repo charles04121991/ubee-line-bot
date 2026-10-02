@@ -3,8 +3,8 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-02
-  Release: Customer Balanced Typography V9
-  PWA: 20261002-customer-balanced-type-v9
+  Release: Customer Compact Home V10
+  PWA: 20261002-customer-compact-home-v10
 
   本次整理：
   1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
@@ -12,6 +12,7 @@
   3. 折抵上限為跑腿服務費 20% 且不超過平台收入，不影響小U收入；代墊費不折抵。
   4. 延續 Native Notification Tab V4、訂單、ETA、店家、會員與既有後端 API 契約。
   5. 以通知設定全開關版 V8 為基底，將 14～33px 固定字級縮小 1px，保留 13px 閱讀下限與六個通知開關。
+  6. 首頁移除情境教育卡與大型品牌頁尾，正式結束於即時小U運力卡。
 
   Canonical recent milestones:
   - 2026-10-01 Customer Native Notification Tab V4 / Native Controls V2 / Notification Center
@@ -22,7 +23,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261002-customer-balanced-type-v9" rel="manifest"/>
+<link href="/manifest-order.json?v=20261002-customer-compact-home-v10" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19066,7 +19067,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <style id="ubee-customer-home-platform-v3-style">
 /* =========================================================
    2026-09-02｜Customer Home Platform V3
-   正式首頁：即時地圖 + 運力 + 任務入口 + 情境教育
+   正式首頁：運力 + 任務入口；情境教育與品牌頁尾已於 V10 移除
    ========================================================= */
 #productionOrderFlow #flowPageHome .flow-card{
   overflow:visible!important;
@@ -19430,85 +19431,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     <div class="flow-live-supply-note" id="flowLiveSupplyNote">目前顯示全區可媒合小U；建立任務後會進入全區待接任務池。</div>
   </div>
 </section>
-</div>
-<section aria-labelledby="flowHomeDiscoveryTitle" class="flow-home-discovery">
-<div class="flow-home-section-head">
-<div>
-<strong id="flowHomeDiscoveryTitle">原來這些也能交給小U</strong>
-<span>UBee 不只幫你送東西，生活裡需要有人跑一趟的事，都可以先看看能不能交給小U。</span>
-</div>
-</div>
-
-<div class="flow-home-education-grid" aria-label="UBee 跑腿服務情境說明">
-
-<div class="flow-home-education-card">
-  <div class="flow-home-education-top">
-    <span class="flow-home-education-icon" aria-hidden="true">取</span>
-    <span class="flow-home-education-tag">幫我取</span>
-  </div>
-  <strong>東西忘在公司、家裡或飯店？</strong>
-  <p>把取件地點和送達地點告訴我們，小U可以幫你取回再送到指定位置。</p>
-</div>
-
-<div class="flow-home-education-card">
-  <div class="flow-home-education-top">
-    <span class="flow-home-education-icon" aria-hidden="true">買</span>
-    <span class="flow-home-education-tag">幫我買</span>
-  </div>
-  <strong>臨時缺東西，但現在沒空去買？</strong>
-  <p>日用品、餐點或臨時用品都可以填寫需求，讓小U代買後送到你手上。</p>
-</div>
-
-<div class="flow-home-education-card">
-  <div class="flow-home-education-top">
-    <span class="flow-home-education-icon" aria-hidden="true">排</span>
-    <span class="flow-home-education-tag">幫排隊</span>
-  </div>
-  <strong>不想把時間花在排隊或候位？</strong>
-  <p>餐廳、活動、門市或其他需要現場等待的情境，可以請小U先到場協助。</p>
-</div>
-
-<div class="flow-home-education-card">
-  <div class="flow-home-education-top">
-    <span class="flow-home-education-icon" aria-hidden="true">送</span>
-    <span class="flow-home-education-tag">幫我送</span>
-  </div>
-  <strong>文件、鑰匙、蛋糕或物品急著送？</strong>
-  <p>建立取件與送達地點，附近小U就能依任務位置進行媒合。</p>
-</div>
-
-<div class="flow-home-education-card">
-  <div class="flow-home-education-top">
-    <span class="flow-home-education-icon" aria-hidden="true">辦</span>
-    <span class="flow-home-education-tag">代辦協助</span>
-  </div>
-  <strong>取貨、領件或臨時跑一趟的事情？</strong>
-  <p>只要能清楚說明地點、時間與交付方式，都可以先把需求交給 UBee 評估。</p>
-</div>
-
-<div class="flow-home-education-card flow-home-education-card-helper">
-  <div class="flow-home-education-top">
-    <span class="flow-home-education-icon" aria-hidden="true">U</span>
-    <span class="flow-home-education-tag">全能跑腿</span>
-  </div>
-  <strong>不知道自己的需求算哪一種？</strong>
-  <p>不用硬分類。進入「全能跑腿」後，可選全能協助、現場代辦、商務支援、送禮、退換歸還或臨時救援。</p>
-</div>
-
-</div>
-
-<div class="flow-home-education-foot">
-<strong>UBee 的重點不是只有「送」。</strong>
-<span>送、取、買、排、辦，以及臨時救援，都是把生活裡需要有人跑一趟的事情標準化。</span>
-</div>
-</section>
-
-<div aria-hidden="true" class="flow-home-footer-brand">
-  <div class="flow-home-footer-logo">
-    <span class="u">U</span><span class="bee">Bee</span><span class="rt">跑腿</span>
-  </div>
-  <div class="flow-home-footer-slogan">生活大小事，一叫就出發</div>
-  <div class="flow-home-footer-meta">代買・代送・取件・排隊・全能跑腿・代駕</div>
 </div>
 </div>
 </section>
@@ -27907,8 +27829,8 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
    2026-09-02｜Customer Home Layout V3.3
    - 維持首頁地圖 greedy 單指互動與放大高度
    - 即時運力 / Match ETA 維持地圖下方
-   - 教育區維持六種常見情境
-   - 底部 UBee 跑腿浮水印調整為更接近品牌原稿的三行淡化樣式
+   - V10 首頁已移除六種情境教育區
+   - V10 首頁已移除底部 UBee 跑腿品牌頁尾
    ========================================================= */
 
 #productionOrderFlow #flowPageHome{
@@ -28197,7 +28119,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   box-shadow:0 4px 12px rgba(169,132,0,.10)!important;
 }
 
-/* ---------- 教育區 ---------- */
+/* ---------- 舊教育區相容樣式（V10 首頁已無對應 DOM） ---------- */
 
 #productionOrderFlow #flowPageHome .flow-home-discovery{
   margin:22px 0 0!important;
@@ -28327,7 +28249,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   display:none!important;
 }
 
-/* ---------- UBee 底部品牌浮水印 ---------- */
+/* ---------- 舊品牌頁尾相容樣式（V10 首頁已無對應 DOM） ---------- */
 
 #productionOrderFlow #flowPageHome .flow-home-footer-brand{
   min-height:228px!important;
