@@ -1,13 +1,12 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-02
-// Release: emma2156-202610｜Customer Notification Tab V4 / Rider Manual Review + Approval Login Lock
+// UBee Backend｜Latest Release 2026-10-01
+// Release: 2026_1001_UCOIN_V1｜Customer U Coin / Notification Tab V4 / Rider Approval Login Lock
 //
 // 本次整理：
-// - 修正 Rider Clean Launch 對申請／進度 Native Gate 的前端阻斷（前端檔同步）。
-// - Rider Login / Session / Rider API 採 fail-closed 審核鎖：只有正式 ridersV2 且審核通過才可使用騎士端。
-// - 2026-10-02 Rider Review Delivery + Manual Approval Lock V1：新申請固定 under_review，不建立 ridersV2；LINE 審核群通知加入失敗重試與重複申請補送。
-// - 申請中／未審核／未通過只存在 riderApplicationsV2，不建立登入權限；登入 API 回傳明確申請狀態訊息。
-// - Customer Native Notification Tab V4、下單／派單／計價／財務／通知契約維持不變。
+// - 新增 U幣整數帳本、七日簽到、完單／首單／評價／推薦獎勵。
+// - 新增訂單 U幣保留、完單扣除、取消退回與冪等交易事件。
+// - 折抵受服務費 20% 與平台收入雙重上限保護，不影響小U收入與代墊款。
+// - Customer Notification Tab V4、下單／派單／計價／財務／通知契約維持不變。
 //
 // Canonical recent milestones:
 // 2026-10-01 Customer Native Notification Tab V4 / Customer Notification Center / Finance Dispatch Hold V1
@@ -655,8 +654,10 @@ async function processUBeeGrowthCompletedOrder(order = {}) {
   if (!orderId) return;
   const customerId = String(order.userId || order.customerId || '').trim();
   if (customerId) {
-    await recordGrowthCompletedOrderForOwner('customer', customerId, orderId).catch(err => console.warn('Growth customer counter:', err.message));
+    const customerGrowthResult = await recordGrowthCompletedOrderForOwner('customer', customerId, orderId).catch(err => ({ recorded:false, error:err }));
+    await processUCoinCompletedOrder(order, customerGrowthResult).catch(err => console.warn('U coin completed-order reward:', err.message));
     await qualifyGrowthReferral('customer', customerId, { type:'first_valid_order', orderId }).catch(err => console.warn('Growth customer referral reconcile:', err.message));
+    await processUCoinCustomerReferralReward(customerId, orderId).catch(err => console.warn('U coin referral reward:', err.message));
   }
   const riderOwnerId = await resolveGrowthRiderOwnerIdFromOrder(order).catch(()=>String(order.riderId || '').trim());
   if (riderOwnerId) {
@@ -668,6 +669,279 @@ async function processUBeeGrowthCompletedOrder(order = {}) {
       }
     }
   }
+}
+
+// =====================================================
+// UBee 客戶 U幣 V1
+// - 所有金額以 0.1 U 為最小單位（units），避免浮點誤差。
+// - 1 U = NT$1；折抵只接受整數 U。
+// - 發放／扣抵皆以 deterministic event id 保證冪等。
+// =====================================================
+const UBEE_UCOIN = Object.freeze({
+  version:'ucoin-v1-20261001',
+  unitsPerCoin:10,
+  expiryDays:180,
+  orderCompletedUnits:5,
+  firstOrderBonusUnits:10,
+  ratingUnits:5,
+  referralUnits:20,
+  redemptionRateTwd:1,
+  redemptionServicePercent:0.20,
+});
+
+const UBEE_UCOIN_COLLECTIONS = Object.freeze({
+  wallets:'uCoinWallets',
+  transactions:'uCoinTransactions',
+  checkins:'uCoinCheckins',
+});
+
+function uCoinSafeUnits(value) {
+  return Math.max(0, Math.floor(Number(value || 0)));
+}
+
+function uCoinEventId(customerId, eventKey) {
+  return crypto.createHash('sha256')
+    .update(`${String(customerId || '').trim()}:${String(eventKey || '').trim()}`)
+    .digest('hex');
+}
+
+function serializeUCoinWallet(wallet = {}) {
+  const availableUnits = uCoinSafeUnits(wallet.availableUnits);
+  const reservedUnits = uCoinSafeUnits(wallet.reservedUnits);
+  return {
+    version:UBEE_UCOIN.version,
+    availableUnits,
+    reservedUnits,
+    balance:availableUnits / UBEE_UCOIN.unitsPerCoin,
+    reserved:reservedUnits / UBEE_UCOIN.unitsPerCoin,
+    redemptionWholeCoins:Math.floor(availableUnits / UBEE_UCOIN.unitsPerCoin),
+    lifetimeEarnedUnits:uCoinSafeUnits(wallet.lifetimeEarnedUnits),
+    lifetimeUsedUnits:uCoinSafeUnits(wallet.lifetimeUsedUnits),
+  };
+}
+
+async function grantUCoin(customerId, units, type, eventKey, title, metadata = {}) {
+  const safeCustomerId = String(customerId || '').trim();
+  const safeUnits = uCoinSafeUnits(units);
+  if (!safeCustomerId || safeUnits <= 0 || !eventKey) return { granted:false };
+  const eventId = uCoinEventId(safeCustomerId, eventKey);
+  const walletRef = db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(safeCustomerId);
+  const eventRef = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).doc(eventId);
+  const nowMs = Date.now();
+  let balanceUnits = 0;
+  let granted = false;
+  await db.runTransaction(async tx => {
+    const [eventDoc, walletDoc] = await Promise.all([tx.get(eventRef), tx.get(walletRef)]);
+    const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
+    balanceUnits = uCoinSafeUnits(wallet.availableUnits);
+    if (eventDoc.exists) return;
+    balanceUnits += safeUnits;
+    granted = true;
+    tx.set(eventRef, {
+      customerId:safeCustomerId,
+      type:String(type || 'reward'),
+      eventKey:String(eventKey),
+      title:String(title || '獲得 U幣'),
+      deltaUnits:safeUnits,
+      remainingUnits:safeUnits,
+      balanceUnitsAfter:balanceUnits,
+      orderId:String(metadata.orderId || ''),
+      expiresAtMs:nowMs + UBEE_UCOIN.expiryDays * 86400000,
+      metadata,
+      createdAtMs:nowMs,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.set(walletRef, {
+      customerId:safeCustomerId,
+      availableUnits:balanceUnits,
+      reservedUnits:uCoinSafeUnits(wallet.reservedUnits),
+      lifetimeEarnedUnits:uCoinSafeUnits(wallet.lifetimeEarnedUnits) + safeUnits,
+      lifetimeUsedUnits:uCoinSafeUnits(wallet.lifetimeUsedUnits),
+      updatedAtMs:nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+  });
+  return { granted, units:safeUnits, balanceUnits };
+}
+
+async function processUCoinCompletedOrder(order = {}, growthResult = {}) {
+  const customerId = String(order.customerId || order.userId || '').trim();
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  if (!customerId || !orderId || !isGrowthValidCompletedOrder(order)) return { rewarded:false };
+  const completed = await grantUCoin(customerId, UBEE_UCOIN.orderCompletedUnits, 'order_completed', `order_completed:${orderId}`, '完成一趟跑腿', { orderId });
+  let firstOrder = { granted:false };
+  if (growthResult?.recorded) {
+    const { data:profile } = await loadGrowthProfile('customer', customerId).catch(() => ({ data:{} }));
+    if (Number(profile?.completedOrders || 0) === 1) {
+      firstOrder = await grantUCoin(customerId, UBEE_UCOIN.firstOrderBonusUnits, 'first_order_bonus', `first_order:${customerId}`, '首次跑腿加贈', { orderId });
+    }
+  }
+  await finalizeUCoinReservation(order).catch(error => console.warn('U coin reservation finalize:', error.message));
+  return { rewarded:completed.granted || firstOrder.granted, completed, firstOrder };
+}
+
+async function reconcileExpiredUCoin(customerId) {
+  const safeCustomerId = String(customerId || '').trim();
+  if (!safeCustomerId) return { expiredUnits:0 };
+  const walletRef = db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(safeCustomerId);
+  const creditsQuery = db.collection(UBEE_UCOIN_COLLECTIONS.transactions)
+    .where('customerId', '==', safeCustomerId)
+    .limit(500);
+  const nowMs = Date.now();
+  let expiredUnits = 0;
+  await db.runTransaction(async tx => {
+    const [walletDoc, creditsSnap] = await Promise.all([tx.get(walletRef), tx.get(creditsQuery)]);
+    const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
+    // 有訂單保留額時暫緩到期結算，避免把已鎖定給訂單的點數誤當成可用點數扣除。
+    if (uCoinSafeUnits(wallet.reservedUnits) > 0) return;
+    let availableToExpire = uCoinSafeUnits(wallet.availableUnits);
+    const expiredCredits = creditsSnap.docs
+      .map(doc => ({ ref:doc.ref, id:doc.id, ...(doc.data() || {}) }))
+      .filter(item => Number(item.deltaUnits || 0) > 0 && uCoinSafeUnits(item.remainingUnits) > 0 && Number(item.expiresAtMs || 0) > 0 && Number(item.expiresAtMs) <= nowMs)
+      .sort((a, b) => Number(a.expiresAtMs || 0) - Number(b.expiresAtMs || 0));
+    for (const credit of expiredCredits) {
+      if (availableToExpire <= 0) break;
+      const amount = Math.min(availableToExpire, uCoinSafeUnits(credit.remainingUnits));
+      if (amount <= 0) continue;
+      availableToExpire -= amount;
+      expiredUnits += amount;
+      tx.set(credit.ref, { remainingUnits:uCoinSafeUnits(credit.remainingUnits) - amount, expiredUnits:uCoinSafeUnits(credit.expiredUnits) + amount, expiredProcessedAtMs:nowMs }, { merge:true });
+      const expiryRef = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).doc(uCoinEventId(safeCustomerId, `expiry:${credit.id}`));
+      tx.set(expiryRef, {
+        customerId:safeCustomerId, type:'expiry', eventKey:`expiry:${credit.id}`, title:'U幣到期',
+        deltaUnits:-amount, sourceCreditId:credit.id, createdAtMs:nowMs,
+        createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:false });
+    }
+    if (expiredUnits > 0) {
+      tx.set(walletRef, {
+        availableUnits:Math.max(0, uCoinSafeUnits(wallet.availableUnits) - expiredUnits),
+        updatedAtMs:nowMs, updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+    }
+  });
+  return { expiredUnits };
+}
+
+async function processUCoinCustomerReferralReward(inviteeId, orderId) {
+  const safeInviteeId = String(inviteeId || '').trim();
+  if (!safeInviteeId) return { rewarded:false };
+  const referralDoc = await db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`customer_${safeInviteeId}`).get();
+  if (!referralDoc.exists) return { rewarded:false };
+  const referral = referralDoc.data() || {};
+  const inviterId = String(referral.referrerId || '').trim();
+  if (String(referral.status || '') !== 'qualified' || String(referral.referrerType || '') !== 'customer' || !inviterId) return { rewarded:false };
+  const key = `customer_referral:${safeInviteeId}`;
+  const [inviter, invitee] = await Promise.all([
+    grantUCoin(inviterId, UBEE_UCOIN.referralUnits, 'referral', `${key}:inviter`, '推薦好友完成首趟', { orderId, inviteeId:safeInviteeId }),
+    grantUCoin(safeInviteeId, UBEE_UCOIN.referralUnits, 'referral', `${key}:invitee`, '好友推薦首趟獎勵', { orderId, inviterId }),
+  ]);
+  return { rewarded:inviter.granted || invitee.granted, inviter, invitee };
+}
+
+function applyUCoinDiscountFields(target = {}, source = {}) {
+  const discount = Math.max(0, Math.floor(Number(source.uCoinDiscountTwd || 0)));
+  if (!discount) return target;
+  const baseService = Math.max(0, Math.round(Number(target.serviceSubtotal ?? source.uCoinBaseServiceSubtotal ?? source.serviceSubtotal ?? 0)));
+  const advance = Math.max(0, Math.round(Number(target.advancePayment ?? source.advancePayment ?? 0)));
+  const payable = Math.max(0, baseService + advance - discount);
+  target.uCoinDiscountTwd = discount;
+  target.uCoinRedeemedWhole = discount;
+  target.uCoinRedeemedUnits = discount * UBEE_UCOIN.unitsPerCoin;
+  target.uCoinReservationStatus = String(source.uCoinReservationStatus || 'reserved');
+  target.uCoinBaseServiceSubtotal = Math.max(0, Number(source.uCoinBaseServiceSubtotal || baseService));
+  const grossPlatformIncome = Math.max(0, Math.round(Number(
+    target.platformIncome ?? target.platformFee ??
+    source.uCoinPlatformIncomeBeforeDiscount ?? source.platformIncome ?? source.platformFee ?? 0
+  )));
+  const netPlatformIncome = Math.max(0, grossPlatformIncome - discount);
+  target.uCoinPlatformIncomeBeforeDiscount = grossPlatformIncome;
+  target.platformIncome = netPlatformIncome;
+  target.platformFee = netPlatformIncome;
+  if ('cashDueToPlatform' in target || 'cashDueToPlatform' in source) target.cashDueToPlatform = netPlatformIncome;
+  if ('riderDueToPlatform' in target || 'riderDueToPlatform' in source) target.riderDueToPlatform = netPlatformIncome;
+  if ('platformReceivable' in target || 'platformReceivable' in source) target.platformReceivable = netPlatformIncome;
+  target.customerPayableTotal = payable;
+  target.payableTotal = payable;
+  target.riderDisplayTotal = payable;
+  target.total = payable;
+  target.finalTotal = payable;
+  target.customerTotalWithAdvance = payable;
+  return target;
+}
+
+async function finalizeUCoinReservation(order = {}) {
+  const customerId = String(order.customerId || order.userId || '').trim();
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  const units = uCoinSafeUnits(order.uCoinRedeemedUnits);
+  if (!customerId || !orderId || units <= 0) return { finalized:false };
+  const walletRef = db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId);
+  const orderRef = db.collection('orders').doc(orderId);
+  const eventRef = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).doc(uCoinEventId(customerId, `redemption:${orderId}`));
+  const creditsQuery = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).where('customerId', '==', customerId).limit(500);
+  let finalized = false;
+  await db.runTransaction(async tx => {
+    const [walletDoc, orderDoc, eventDoc, creditsSnap] = await Promise.all([tx.get(walletRef), tx.get(orderRef), tx.get(eventRef), tx.get(creditsQuery)]);
+    if (eventDoc.exists || !orderDoc.exists) return;
+    const latestOrder = orderDoc.data() || {};
+    if (!['completed','done'].includes(String(latestOrder.status || '').toLowerCase())) return;
+    const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
+    let unitsToConsume = units;
+    const activeCredits = creditsSnap.docs
+      .map(doc => ({ ref:doc.ref, ...(doc.data() || {}) }))
+      .filter(item => Number(item.deltaUnits || 0) > 0 && uCoinSafeUnits(item.remainingUnits) > 0)
+      .sort((a, b) => Number(a.expiresAtMs || Number.MAX_SAFE_INTEGER) - Number(b.expiresAtMs || Number.MAX_SAFE_INTEGER));
+    for (const credit of activeCredits) {
+      if (unitsToConsume <= 0) break;
+      const amount = Math.min(unitsToConsume, uCoinSafeUnits(credit.remainingUnits));
+      unitsToConsume -= amount;
+      tx.set(credit.ref, { remainingUnits:uCoinSafeUnits(credit.remainingUnits) - amount, usedUnits:uCoinSafeUnits(credit.usedUnits) + amount }, { merge:true });
+    }
+    tx.set(walletRef, {
+      reservedUnits:Math.max(0, uCoinSafeUnits(wallet.reservedUnits) - units),
+      lifetimeUsedUnits:uCoinSafeUnits(wallet.lifetimeUsedUnits) + units,
+      updatedAtMs:Date.now(), updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    tx.set(eventRef, {
+      customerId, type:'redemption', eventKey:`redemption:${orderId}`, title:'訂單折抵',
+      deltaUnits:-units, orderId, createdAtMs:Date.now(),
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.set(orderRef, { uCoinReservationStatus:'consumed', uCoinConsumedAtMs:Date.now(), updatedAt:admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
+    finalized = true;
+  });
+  return { finalized };
+}
+
+async function releaseUCoinReservation(order = {}, reason = 'order_cancelled') {
+  const customerId = String(order.customerId || order.userId || '').trim();
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  const units = uCoinSafeUnits(order.uCoinRedeemedUnits);
+  if (!customerId || !orderId || units <= 0) return { released:false };
+  const walletRef = db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId);
+  const orderRef = db.collection('orders').doc(orderId);
+  const eventRef = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).doc(uCoinEventId(customerId, `release:${orderId}`));
+  let released = false;
+  await db.runTransaction(async tx => {
+    const [walletDoc, orderDoc, eventDoc] = await Promise.all([tx.get(walletRef), tx.get(orderRef), tx.get(eventRef)]);
+    if (eventDoc.exists || !orderDoc.exists) return;
+    const latestOrder = orderDoc.data() || {};
+    if (String(latestOrder.uCoinReservationStatus || '') !== 'reserved') return;
+    const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
+    tx.set(walletRef, {
+      availableUnits:uCoinSafeUnits(wallet.availableUnits) + units,
+      reservedUnits:Math.max(0, uCoinSafeUnits(wallet.reservedUnits) - units),
+      updatedAtMs:Date.now(), updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    tx.set(eventRef, {
+      customerId, type:'release', eventKey:`release:${orderId}`, title:'取消訂單退回',
+      deltaUnits:units, orderId, reason:String(reason || ''), createdAtMs:Date.now(),
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.set(orderRef, { uCoinReservationStatus:'released', uCoinReleasedAtMs:Date.now(), updatedAt:admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
+    released = true;
+  });
+  return { released };
 }
 
 function buildGrowthRiderQueryPairs(identity = {}) {
@@ -1573,9 +1847,6 @@ const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
-const RIDER_REVIEW_NOTIFY_RETRY_MS = 60 * 1000;
-const RIDER_REVIEW_NOTIFY_CLAIM_MS = 2 * 60 * 1000;
-const RIDER_REVIEW_NOTIFY_BATCH_SIZE = 12;
 // =====================================================
 // UBee 小U營運管理系統 V4：固定營運設定
 // - 街口支付：平台款項回繳入口
@@ -6131,6 +6402,144 @@ app.get('/api/rider/growth/referrals', riderAuthMiddleware, async (req, res) => 
   } catch (error) {
     console.error('❌ Rider Growth referral progress failed:', error);
     return res.status(500).json({ success:false, message:'邀請進度讀取失敗。' });
+  }
+});
+
+function uCoinTaipeiDateKey(nowMs = Date.now()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit',
+  }).formatToParts(new Date(nowMs));
+  const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function uCoinPreviousDateKey(dateKey) {
+  const [year, month, day] = String(dateKey || '').split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
+}
+
+function uCoinRulesPayload() {
+  return {
+    version:UBEE_UCOIN.version,
+    unitsPerCoin:UBEE_UCOIN.unitsPerCoin,
+    redemptionRateTwd:UBEE_UCOIN.redemptionRateTwd,
+    expiryDays:UBEE_UCOIN.expiryDays,
+    redemptionServicePercent:UBEE_UCOIN.redemptionServicePercent,
+    redemptionText:'1 U幣折抵 NT$1；每筆最多折抵跑腿服務費 20%，且不得超過 UBee 平台收入。代墊費、停車費、過路費與小費不適用。',
+    earn:[
+      { key:'checkin', title:'每日簽到', amountText:'0.1～0.2 U幣' },
+      { key:'order', title:'完成一趟跑腿', amountText:'0.5 U幣' },
+      { key:'first_order', title:'完成首次跑腿', amountText:'加贈 1 U幣' },
+      { key:'rating', title:'完成訂單評價', amountText:'0.5 U幣' },
+      { key:'referral', title:'推薦朋友完成首趟', amountText:'雙方各 2 U幣' },
+    ],
+    checkinSchedule:[1,1,1,1,2,2,2],
+  };
+}
+
+app.get('/api/customer/u-coins', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    await reconcileExpiredUCoin(customerId);
+    const [walletDoc, historySnap] = await Promise.all([
+      db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId).get(),
+      db.collection(UBEE_UCOIN_COLLECTIONS.transactions).where('customerId', '==', customerId).limit(100).get(),
+    ]);
+    const walletData = walletDoc.exists ? walletDoc.data() || {} : {};
+    const today = uCoinTaipeiDateKey();
+    const history = historySnap.docs.map(doc => ({ id:doc.id, ...(doc.data() || {}) }))
+      .sort((a, b) => Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0))
+      .filter(item => String(item.type || '') !== 'reservation')
+      .slice(0, 50)
+      .map(item => ({
+        id:item.id, type:String(item.type || ''), title:String(item.title || 'U幣異動'),
+        deltaUnits:Number(item.deltaUnits || 0), orderId:String(item.orderId || ''),
+        createdAtMs:Number(item.createdAtMs || 0), expiresAtMs:Number(item.expiresAtMs || 0),
+      }));
+    return res.json({
+      success:true,
+      wallet:serializeUCoinWallet(walletData),
+      checkin:{
+        checkedInToday:String(walletData.lastCheckinDate || '') === today,
+        lastCheckinDate:String(walletData.lastCheckinDate || ''),
+        streak:uCoinSafeUnits(walletData.checkinStreak),
+        cycleDay:uCoinSafeUnits(walletData.checkinCycleDay),
+      },
+      history,
+      rules:uCoinRulesPayload(),
+    });
+  } catch (error) {
+    console.error('❌ 讀取 U幣失敗：', error);
+    return res.status(500).json({ success:false, error:'U幣資料暫時無法讀取，請稍後再試。' });
+  }
+});
+
+app.post('/api/customer/u-coins/check-in', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    await reconcileExpiredUCoin(customerId);
+    const dateKey = uCoinTaipeiDateKey();
+    const walletRef = db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId);
+    const checkinRef = db.collection(UBEE_UCOIN_COLLECTIONS.checkins).doc(`${customerId}_${dateKey}`);
+    const eventRef = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).doc(uCoinEventId(customerId, `checkin:${dateKey}`));
+    let result = null;
+    await db.runTransaction(async tx => {
+      const [walletDoc, checkinDoc, eventDoc] = await Promise.all([tx.get(walletRef), tx.get(checkinRef), tx.get(eventRef)]);
+      const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
+      if (checkinDoc.exists || eventDoc.exists || String(wallet.lastCheckinDate || '') === dateKey) {
+        result = { duplicate:true, wallet:serializeUCoinWallet(wallet), cycleDay:uCoinSafeUnits(wallet.checkinCycleDay) };
+        return;
+      }
+      const consecutive = String(wallet.lastCheckinDate || '') === uCoinPreviousDateKey(dateKey);
+      const previousCycleDay = uCoinSafeUnits(wallet.checkinCycleDay);
+      const cycleDay = consecutive ? (previousCycleDay >= 7 ? 1 : Math.max(1, previousCycleDay + 1)) : 1;
+      const streak = consecutive ? uCoinSafeUnits(wallet.checkinStreak) + 1 : 1;
+      const units = cycleDay <= 4 ? 1 : 2;
+      const availableUnits = uCoinSafeUnits(wallet.availableUnits) + units;
+      const nowMs = Date.now();
+      tx.set(checkinRef, { customerId, dateKey, cycleDay, units, createdAtMs:nowMs, createdAt:admin.firestore.FieldValue.serverTimestamp() });
+      tx.set(eventRef, {
+        customerId, type:'checkin', eventKey:`checkin:${dateKey}`, title:`每日簽到・第 ${cycleDay} 天`,
+        deltaUnits:units, balanceUnitsAfter:availableUnits,
+        remainingUnits:units,
+        expiresAtMs:nowMs + UBEE_UCOIN.expiryDays * 86400000,
+        createdAtMs:nowMs, createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      });
+      const nextWallet = {
+        customerId, availableUnits, reservedUnits:uCoinSafeUnits(wallet.reservedUnits),
+        lifetimeEarnedUnits:uCoinSafeUnits(wallet.lifetimeEarnedUnits) + units,
+        lifetimeUsedUnits:uCoinSafeUnits(wallet.lifetimeUsedUnits),
+        lastCheckinDate:dateKey, checkinCycleDay:cycleDay, checkinStreak:streak,
+        updatedAtMs:nowMs, updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      };
+      tx.set(walletRef, nextWallet, { merge:true });
+      result = { duplicate:false, units, cycleDay, streak, wallet:serializeUCoinWallet(nextWallet) };
+    });
+    return res.json({ success:true, message:result?.duplicate ? '今天已完成簽到。' : `簽到成功，獲得 ${(result.units / 10).toFixed(1)} U幣。`, ...result });
+  } catch (error) {
+    console.error('❌ U幣簽到失敗：', error);
+    return res.status(500).json({ success:false, error:'簽到失敗，請稍後再試。' });
+  }
+});
+
+app.post('/api/customer/u-coins/redemption-preview', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    await reconcileExpiredUCoin(customerId);
+    const walletDoc = await db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId).get();
+    const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
+    const serviceSubtotal = Math.max(0, Math.round(Number(req.body?.serviceSubtotal || 0)));
+    const platformIncome = Math.max(0, Math.floor(Number(req.body?.platformIncome || 0)));
+    const balanceWhole = Math.floor(uCoinSafeUnits(wallet.availableUnits) / UBEE_UCOIN.unitsPerCoin);
+    const maxWhole = Math.max(0, Math.min(balanceWhole, Math.floor(serviceSubtotal * UBEE_UCOIN.redemptionServicePercent), platformIncome));
+    return res.json({ success:true, wallet:serializeUCoinWallet(wallet), serviceSubtotal, platformIncome, maxWhole, discountTwd:maxWhole });
+  } catch (error) {
+    console.error('❌ U幣折抵預覽失敗：', error);
+    return res.status(500).json({ success:false, error:'目前無法計算 U幣折抵。' });
   }
 });
 
@@ -20562,20 +20971,6 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
     if (duplicatePayload) {
-      let duplicateNotify = null;
-      const duplicateStatus = String(duplicatePayload.status || '').toLowerCase();
-      if (!['approved','training','active','rejected'].includes(duplicateStatus)) {
-        const existingApplicationDoc = await applicationRef.get();
-        if (existingApplicationDoc.exists) {
-          const existingApplication = existingApplicationDoc.data() || {};
-          if (existingApplication.adminNotifySent !== true) {
-            duplicateNotify = await deliverRiderReviewNotification(
-              { ...existingApplication, riderId:existingApplication.riderId || riderId },
-              { force:true }
-            );
-          }
-        }
-      }
       return res.json({
         success: true,
         duplicate: true,
@@ -20584,9 +20979,6 @@ app.post('/api/rider/register', async (req, res) => {
         status: duplicatePayload.status,
         collection: RIDER_V2_COLLECTIONS.applications,
         applicationCollection: RIDER_V2_COLLECTIONS.applications,
-        approved: ['approved','training','active'].includes(duplicateStatus),
-        canLogin: ['approved','training','active'].includes(duplicateStatus),
-        adminNotifySent: duplicateNotify ? duplicateNotify.ok === true : undefined,
         message: duplicatePayload.message,
       });
     }
@@ -20600,10 +20992,48 @@ app.post('/api/rider/register', async (req, res) => {
       documentsComplete: true,
     });
 
-    // 人工審核是唯一開通路徑：送出後只排入審核群，不建立 ridersV2。
-    // LINE 暫時失敗時保留 under_review 並由背景工作自動重送，絕不因通知失敗而自動通過。
-    const reviewNotifyResult = await deliverRiderReviewNotification(application, { force:true });
-    const notifyOk = reviewNotifyResult.ok === true;
+    let notifyOk = false;
+    let notifyErrorMessage = '';
+
+    try {
+      if (!LINE_ADMIN_GROUP_ID) {
+        throw new Error('LINE_ADMIN_GROUP_ID 未設定');
+      }
+
+      await pushToGroup(
+        LINE_ADMIN_GROUP_ID,
+        createRiderReviewFlex({
+          ...application,
+          createdAt: submittedAtText,
+          submittedAtText,
+        })
+      );
+
+      notifyOk = true;
+    } catch (notifyErr) {
+      notifyOk = false;
+      notifyErrorMessage = notifyErr?.message || String(notifyErr);
+      console.error(
+        '⚠️ 新版小U審核通知失敗，但申請資料已成功寫入：',
+        notifyErrorMessage
+      );
+    }
+
+    const notifyUpdate = {
+      adminNotifySent: notifyOk,
+      adminNotifyStatus: notifyOk ? 'sent' : 'failed',
+      adminNotifyUpdatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+      adminNotifyUpdatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: Date.now(),
+    };
+
+    if (!notifyOk) {
+      notifyUpdate.adminNotifyError = notifyErrorMessage;
+    }
+
+    await applicationRef.set(notifyUpdate, { merge: true });
 
     const submittedApplicationDoc = await applicationRef.get();
     await notifyRiderApplicationReviewUpdate(
@@ -20617,15 +21047,8 @@ app.post('/api/rider/register', async (req, res) => {
       collection: RIDER_V2_COLLECTIONS.applications,
       applicationCollection: RIDER_V2_COLLECTIONS.applications,
       officialRiderCreated: false,
-      approved: false,
-      reviewStatus: 'under_review',
-      lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
-      canLogin: false,
       adminNotifySent: notifyOk,
-      adminNotifyStatus: notifyOk ? 'sent' : 'retry_pending',
-      message: notifyOk
-        ? '申請已送達 UBee 審核群，等待人工審核；審核通過前不會開通騎士帳號。'
-        : '申請資料已安全保存，審核群通知正在自動重送；審核通過前不會開通騎士帳號。',
+      message: '已送出新版小U申請，等待 UBee 審核。',
     });
   } catch (err) {
     console.error('❌ 新版小U註冊失敗：', err);
@@ -28060,13 +28483,53 @@ async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
       throw error;
     }
 
-    transaction.set(orderRef, { ...order, id: orderId }, { merge: true });
+    const customerId = String(order.customerId || order.userId || '').trim();
+    const requestedWhole = Math.max(0, Math.floor(Number(order.uCoinRequestedWhole || 0)));
+    let savedOrder = { ...order, id:orderId };
+    if (customerId && requestedWhole > 0) {
+      const walletRef = db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId);
+      const reservationRef = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).doc(uCoinEventId(customerId, `reservation:${orderId}`));
+      const [walletDoc, reservationDoc] = await Promise.all([
+        transaction.get(walletRef),
+        transaction.get(reservationRef),
+      ]);
+      const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
+      const balanceWhole = Math.floor(uCoinSafeUnits(wallet.availableUnits) / UBEE_UCOIN.unitsPerCoin);
+      const baseServiceSubtotal = Math.max(0, Math.round(Number(order.serviceSubtotal || order.serviceTotal || 0)));
+      const platformIncome = Math.max(0, Math.floor(Number(order.platformIncome ?? order.platformFee ?? order.serviceFee ?? 0)));
+      const percentCap = Math.floor(baseServiceSubtotal * UBEE_UCOIN.redemptionServicePercent);
+      const redeemedWhole = Math.max(0, Math.min(requestedWhole, balanceWhole, percentCap, platformIncome));
+      const redeemedUnits = redeemedWhole * UBEE_UCOIN.unitsPerCoin;
+      if (redeemedUnits > 0 && !reservationDoc.exists) {
+        savedOrder = applyUCoinDiscountFields({ ...savedOrder }, {
+          ...savedOrder,
+          uCoinDiscountTwd:redeemedWhole,
+          uCoinBaseServiceSubtotal:baseServiceSubtotal,
+          uCoinReservationStatus:'reserved',
+        });
+        transaction.set(walletRef, {
+          customerId,
+          availableUnits:uCoinSafeUnits(wallet.availableUnits) - redeemedUnits,
+          reservedUnits:uCoinSafeUnits(wallet.reservedUnits) + redeemedUnits,
+          updatedAtMs:nowMs,
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge:true });
+        transaction.set(reservationRef, {
+          customerId, type:'reservation', eventKey:`reservation:${orderId}`, title:'訂單折抵保留',
+          deltaUnits:0, reservedUnits:redeemedUnits, orderId, createdAtMs:nowMs,
+          createdAt:admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    transaction.set(orderRef, savedOrder, { merge: true });
     transaction.set(quoteRef, {
       status: 'used',
       usedAtMs: nowMs,
       usedAt: admin.firestore.FieldValue.serverTimestamp(),
       orderId,
     }, { merge: true });
+    Object.assign(order, savedOrder);
   });
 
   order.id = orderId;
@@ -31194,11 +31657,11 @@ function createRiderReviewFlex(rider) {
         '強制險到期',
         rider.compulsoryInsuranceExpiryDate || '-'
       ),
-      createInfoRow('狀態', ['submitted','pending','under_review'].includes(String(rider.status || '').toLowerCase()) ? '待人工審核' : rider.status),
+      createInfoRow('狀態', rider.status === 'pending' ? '待審核' : rider.status),
       createInfoRow('申請時間', rider.createdAt),
       {
         type: 'text',
-        text: '此申請不會自動開通。請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再由管理人員做最終決定。',
+        text: '請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再做最終決定。',
         size: 'sm',
         color: '#666666',
         wrap: true,
@@ -31214,127 +31677,6 @@ function createRiderReviewFlex(rider) {
     ]
   ));
 }
-
-
-// ============================================================
-// Rider Review Delivery V1
-// - 申請資料先安全寫入 riderApplicationsV2，再送 LINE 審核群。
-// - 群組通知失敗不會把申請者誤開通；後端會保留 failed 狀態並自動重試。
-// - 重複送出尚在審核中的申請，也會補送尚未成功的審核通知。
-// ============================================================
-async function deliverRiderReviewNotification(application, options = {}) {
-  const riderId = normalizePhone(
-    application?.riderId || application?.phone || application?.applicationId || ''
-  );
-  if (!/^09\d{8}$/.test(riderId)) {
-    return { ok:false, code:'RIDER_REVIEW_NOTIFY_INVALID_ID', message:'申請編號不正確' };
-  }
-
-  const ref = db.collection(RIDER_V2_COLLECTIONS.applications).doc(riderId);
-  const nowMs = Date.now();
-  let claimedApplication = null;
-
-  try {
-    await db.runTransaction(async tx => {
-      const snap = await tx.get(ref);
-      if (!snap.exists) throw new Error('RIDER_REVIEW_APPLICATION_NOT_FOUND');
-      const data = snap.data() || {};
-      const status = String(data.status || '').toLowerCase();
-      const reviewStatus = String(data.reviewStatus || '').toLowerCase();
-      const alreadyApproved = data.approved === true || ['approved','training','active'].includes(status) || reviewStatus === 'approved';
-      if (alreadyApproved) throw new Error('RIDER_REVIEW_ALREADY_APPROVED');
-      if (status === 'rejected' || reviewStatus === 'rejected') throw new Error('RIDER_REVIEW_ALREADY_REJECTED');
-      if (data.adminNotifySent === true && options.force !== true) throw new Error('RIDER_REVIEW_NOTIFY_ALREADY_SENT');
-
-      const claimUntil = Number(data.adminNotifyClaimUntilMs || 0);
-      if (claimUntil > nowMs && options.force !== true) throw new Error('RIDER_REVIEW_NOTIFY_BUSY');
-
-      claimedApplication = { ...data, riderId: data.riderId || riderId, phone: data.phone || riderId };
-      tx.set(ref, {
-        adminNotifyStatus:'sending',
-        adminNotifyClaimedAtMs:nowMs,
-        adminNotifyClaimUntilMs:nowMs + RIDER_REVIEW_NOTIFY_CLAIM_MS,
-        adminNotifyUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
-        adminNotifyUpdatedAtMs:nowMs,
-      }, { merge:true });
-    });
-  } catch (claimError) {
-    const code = String(claimError?.message || claimError || '');
-    if (['RIDER_REVIEW_NOTIFY_ALREADY_SENT','RIDER_REVIEW_NOTIFY_BUSY','RIDER_REVIEW_ALREADY_APPROVED','RIDER_REVIEW_ALREADY_REJECTED'].includes(code)) {
-      return { ok: code === 'RIDER_REVIEW_NOTIFY_ALREADY_SENT', code };
-    }
-    throw claimError;
-  }
-
-  try {
-    if (!LINE_ADMIN_GROUP_ID) throw new Error('LINE_ADMIN_GROUP_ID 未設定');
-    await pushToGroup(
-      LINE_ADMIN_GROUP_ID,
-      createRiderReviewFlex({
-        ...claimedApplication,
-        createdAt: claimedApplication.submittedAtText || claimedApplication.createdAt || '',
-        submittedAtText: claimedApplication.submittedAtText || '',
-      })
-    );
-
-    await ref.set({
-      adminNotifySent:true,
-      adminNotifyStatus:'sent',
-      adminNotifyError:admin.firestore.FieldValue.delete(),
-      adminNotifySentAt:admin.firestore.FieldValue.serverTimestamp(),
-      adminNotifySentAtMs:Date.now(),
-      adminNotifyClaimUntilMs:0,
-      adminNotifyUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      adminNotifyUpdatedAtMs:Date.now(),
-      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      updatedAtMs:Date.now(),
-    }, { merge:true });
-    return { ok:true, code:'RIDER_REVIEW_NOTIFY_SENT' };
-  } catch (error) {
-    const message = error?.message || String(error);
-    await ref.set({
-      adminNotifySent:false,
-      adminNotifyStatus:'failed',
-      adminNotifyError:message,
-      adminNotifyClaimUntilMs:0,
-      adminNotifyUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      adminNotifyUpdatedAtMs:Date.now(),
-      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      updatedAtMs:Date.now(),
-    }, { merge:true }).catch(()=>{});
-    console.error('⚠️ 小U審核群通知失敗，已排入自動重試：', riderId, message);
-    return { ok:false, code:'RIDER_REVIEW_NOTIFY_FAILED', message };
-  }
-}
-
-let riderReviewNotifyRetryRunning = false;
-async function retryPendingRiderReviewNotifications() {
-  if (riderReviewNotifyRetryRunning) return;
-  riderReviewNotifyRetryRunning = true;
-  try {
-    if (!LINE_ADMIN_GROUP_ID) return;
-    const snapshot = await db.collection(RIDER_V2_COLLECTIONS.applications)
-      .where('adminNotifySent', '==', false)
-      .limit(RIDER_REVIEW_NOTIFY_BATCH_SIZE)
-      .get();
-
-    for (const doc of snapshot.docs) {
-      const data = doc.data() || {};
-      const status = String(data.status || '').toLowerCase();
-      const reviewStatus = String(data.reviewStatus || '').toLowerCase();
-      const waitingReview = ['submitted','pending','under_review'].includes(status) || ['under_review','pending'].includes(reviewStatus);
-      if (!waitingReview || data.approved === true) continue;
-      await deliverRiderReviewNotification({ ...data, riderId:data.riderId || doc.id });
-    }
-  } catch (error) {
-    console.warn('⚠️ 小U審核群通知重試工作失敗：', error?.message || error);
-  } finally {
-    riderReviewNotifyRetryRunning = false;
-  }
-}
-
-setTimeout(() => retryPendingRiderReviewNotifications().catch(()=>{}), 12000);
-setInterval(() => retryPendingRiderReviewNotifications().catch(()=>{}), RIDER_REVIEW_NOTIFY_RETRY_MS);
 
 function createBusinessReviewFlex(business) {
   const safe = (v, fallback = '未填寫') => {
@@ -38162,6 +38504,11 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   quoteExpiresAtMs:
     Number(lockedQuote.expiresAtMs || 0),
 
+  // U幣只接受整數 U；實際可折抵額仍由 saveCustomerOrderWithQuoteLock
+  // 依錢包餘額、服務費 20% 與平台收入三者重新取最小值。
+  uCoinRequestedWhole:
+    Math.max(0, Math.floor(Number(req.body.uCoinRedeemWhole || 0))),
+
   serviceSubtotal,
 
   customerPayableTotal,
@@ -38310,6 +38657,9 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
     // Level 4：由後端統一產生可信任的區域與時間特徵，不依賴前端判斷。
     Object.assign(order, buildDispatchOrderMetadata(order, Date.now()));
+
+    // 建單前先結清已到期的可用 U幣，避免以過期餘額建立折抵保留。
+    await reconcileExpiredUCoin(req.customerAuth.customerId);
 
     // 訂單與 Quote 在同一 transaction 內提交：成功就兩者一起成功，失敗就兩者都不寫入。
     await saveCustomerOrderWithQuoteLock(order, quoteValidation.ref);
@@ -41108,6 +41458,10 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           updateData,
           financialOrder
         );
+
+        // 動態等候費重算後重新套用既有 U幣折抵；折抵只減少平台收入，
+        // 不改動 riderIncome / estimatedRiderIncome。
+        applyUCoinDiscountFields(updateData, order);
       }
 
       if (status === 'arrived_dropoff') {
@@ -41144,6 +41498,8 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           updateData,
           financialOrder
         );
+
+        applyUCoinDiscountFields(updateData, order);
       }
 
       if (status === 'completed') {
@@ -42426,6 +42782,14 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
         }
       }
     });
+
+    // 取消成功後退回下單時保留的 U幣；事件鍵以訂單編號去重。
+    if (cancelledOrder?.uCoinReservationStatus === 'reserved') {
+      await releaseUCoinReservation(cancelledOrder, 'customer_cancelled').catch(error =>
+        console.warn('⚠️ 取消訂單後退回 U幣失敗：', error?.message || error)
+      );
+      cancelledOrder.uCoinReservationStatus = 'released';
+    }
 
     if(typeof orders==='object' && orders){
       orders[safeOrderId]=cancelledOrder;
@@ -48577,10 +48941,20 @@ app.post('/api/customer/orders/:orderId/rider-rating', requireCustomerAuth, asyn
       }, { merge:true });
     });
 
+    const uCoinReward = await grantUCoin(
+      customerId,
+      UBEE_UCOIN.ratingUnits,
+      'rating',
+      `rating:${orderId}`,
+      '完成訂單評價',
+      { orderId }
+    ).catch(error => ({ granted:false, error:String(error?.message || error) }));
+
     return res.json({
       success:true,
       message:'評價已送出，謝謝你的回饋。',
       rating:savedRating,
+      uCoinReward,
       riderRatingSummary:{
         count:Number(riderAggregate?.count || 0),
         average:Number(riderAggregate?.average || 0),
