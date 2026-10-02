@@ -1,8 +1,10 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-02
-// Release: 2026_1002_RIDER_CITY_ISOLATED_DISPATCH_V4_12｜City-isolated rider dispatch / V4.11 contracts preserved
+// Release: 2026_1002_RIDER_SELF_ORDER_HARD_LOCK_V4_13｜Self-order hard lock / V4.12 city-isolated dispatch preserved
 //
 // 本次整理：
+// - Self-Order Hard Lock V4.13：正式小U可正常使用客戶端下單，但本人不得看見、收到 Push、承接、預約、疊單或被調度指定自己的訂單。
+// - 客戶下單時由後端建立不可逆身分指紋；偵測到小U身分下單後，自動寫入客戶通知中心與小U通知中心。
 // - City-isolated Dispatch V4.12：台中／彰化／台南等縣市任務依「取件縣市」分池；小U只接收目前服務縣市的任務。
 // - 小U申請固定單一服務縣市；同一縣市內行政區可複選。接單設定變更縣市時同步更新正式 ridersV2 服務區域。
 // - 任務池、Web Push、預約承接、一般接單、Smart Stack 全部加入後端縣市 Hard Lock，避免前端或舊快取跨縣市誤接。
@@ -3180,6 +3182,17 @@ async function sendNewOrderPushToRiders(
           const riderCityMatched =
             riderMatchesOrderServiceCity(rider, order);
 
+          const riderIdentityForSelfOrderGuard = buildRiderApiIdentity(
+            riderDoc,
+            rider,
+            { riderId:rider.riderId || riderDoc.id, phone:rider.phone || riderDoc.id, lineUserId:rider.lineUserId || '' }
+          );
+          const riderIsOrderOwner = isSelfOrderForRiderSync(
+            order,
+            rider,
+            riderIdentityForSelfOrderGuard
+          );
+
           const riderPresence =
             getRiderPresenceV2(rider);
 
@@ -3239,6 +3252,7 @@ async function sendNewOrderPushToRiders(
             !riderApproved ||
             !riderDispatchEligible ||
             !riderCityMatched ||
+            riderIsOrderOwner ||
             (!riderOnline && !allowOffline) ||
             !webPushEnabled ||
             !subscription ||
@@ -12367,6 +12381,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       })
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => riderMatchesOrderServiceCity(rider, order))
+      .filter(order => !isSelfOrderForRiderSync(order, rider, identity))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => {
         const status = String(order.status || '').trim();
@@ -12419,7 +12434,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       radiusLimited: false,
       dispatchRadiusKm: null,
       taskPoolLabel: `${getRiderDispatchServiceCity(rider) || '目前縣市'}待接任務`,
-      apiVersion: 'rider-city-isolated-task-pool-v1',
+      apiVersion: 'rider-city-isolated-task-pool-v1-self-order-guard-v1',
       supportedWaitingStatuses: [
         ...UBEE_RIDER_PENDING_DISPATCH_STATUSES,
         'pending_schedule',
@@ -12506,6 +12521,7 @@ app.get('/api/rider/stack-candidates', riderAuthMiddleware, async (req, res) => 
       .map(doc => ({ id:doc.id, ...doc.data() }))
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => riderMatchesOrderServiceCity(rider, order))
+      .filter(order => !isSelfOrderForRiderSync(order, rider, identity))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => isSmartStackStandardDelivery(order))
       .map(order => {
@@ -13443,6 +13459,24 @@ app.post(
       const orderRef =
         db.collection('orders').doc(safeOrderId);
 
+      const reservePrecheckDoc = await orderRef.get();
+      if (reservePrecheckDoc.exists) {
+        const reservePrecheckOrder = { id:reservePrecheckDoc.id, ...reservePrecheckDoc.data() };
+        if (await isSelfOrderForRider(reservePrecheckOrder, riderResult.rider || {}, identity)) {
+          await recordSelfOrderBlockedAttempt(
+            reservePrecheckOrder,
+            riderResult.rider || {},
+            identity,
+            'reserve_order'
+          );
+          return res.status(403).json({
+            success:false,
+            code:'RIDER_SELF_ORDER_BLOCKED',
+            message:'無法承接自己的訂單。此任務由你的 UBee 客戶帳號建立，系統已自動排除本人承接。',
+          });
+        }
+      }
+
       let reservedOrder = null;
 
       await db.runTransaction(
@@ -13510,6 +13544,10 @@ app.post(
 
           if (!riderMatchesOrderServiceCity(latestRider, order)) {
             throw new Error('RIDER_SERVICE_CITY_MISMATCH');
+          }
+
+          if (isSelfOrderForRiderSync(order, latestRider, identity)) {
+            throw new Error('RIDER_SELF_ORDER_BLOCKED');
           }
 
           if (
@@ -13648,6 +13686,8 @@ app.post(
           [403, '你的資格目前不符合這筆任務。'],
         RIDER_SERVICE_CITY_MISMATCH:
           [403, '這筆預約不屬於你目前的服務縣市。'],
+        RIDER_SELF_ORDER_BLOCKED:
+          [403, '無法承接自己的訂單。此任務由你的 UBee 客戶帳號建立，系統已自動排除本人承接。'],
         RIDER_SCHEDULE_NOT_MATCHED:
           [409, '這筆預約時間不在你設定的可接時段內。'],
         ORDER_SCHEDULE_EXPIRED:
@@ -13976,6 +14016,20 @@ app.post(
         id: orderDoc.id,
         ...orderDoc.data(),
       };
+
+      if (await isSelfOrderForRider(order, riderResult.rider || {}, identity)) {
+        await recordSelfOrderBlockedAttempt(
+          order,
+          riderResult.rider || {},
+          identity,
+          'confirm_scheduled_order'
+        );
+        return res.status(403).json({
+          success:false,
+          code:'RIDER_SELF_ORDER_BLOCKED',
+          message:'無法確認自己的客戶訂單。系統已阻擋本人承接，請等待其他小U處理。',
+        });
+      }
 
       if (
         String(
@@ -18525,6 +18579,229 @@ function riderMatchesOrderServiceCity(rider = {}, order = {}) {
   const riderCity = getRiderDispatchServiceCity(rider);
   const orderCity = getOrderDispatchServiceCity(order);
   return Boolean(riderCity && orderCity && riderCity === orderCity);
+}
+
+// =====================================================
+// Rider Self-Order Hard Lock V4.13｜禁止本人下單本人承接
+// - 小U仍可使用客戶端正常下單；限制只作用於「承接本人建立的任務」。
+// - 訂單保存 HMAC 身分指紋，不把客戶會員手機／LINE 身分額外暴露給待接任務預覽。
+// - 派單池、Web Push、預約、一般接單、Smart Stack、人工調度全部使用同一規則。
+// - 新訂單可同步排除；舊訂單在真正承接前會再讀 customerAccounts 做後端 Hard Lock。
+// =====================================================
+const UBEE_SELF_ORDER_GUARD_V1 = Object.freeze({
+  version:'self-order-hard-lock-v1',
+  eventType:'RIDER_SELF_ORDER_BLOCKED',
+  customerNoticeRevision:'1',
+});
+
+function getSelfOrderGuardSecret() {
+  return String(
+    process.env.SELF_ORDER_GUARD_SECRET ||
+    process.env.CHANNEL_SECRET ||
+    process.env.FIREBASE_PROJECT_ID ||
+    'ubee-self-order-guard'
+  );
+}
+
+function buildSelfOrderIdentityKey(kind, value) {
+  const safeKind = String(kind || '').trim().toLowerCase();
+  let safeValue = String(value || '').trim();
+
+  if (safeKind === 'phone') {
+    safeValue = normalizePhone(safeValue);
+    if (!/^09\d{8}$/.test(safeValue)) return '';
+  } else if (safeKind === 'line') {
+    if (!/^U[0-9a-f]{32}$/i.test(safeValue)) return '';
+    safeValue = safeValue.toLowerCase();
+  } else if (safeKind === 'customer') {
+    if (!safeValue) return '';
+  } else {
+    return '';
+  }
+
+  return crypto
+    .createHmac('sha256', getSelfOrderGuardSecret())
+    .update(`${safeKind}:${safeValue}`)
+    .digest('hex');
+}
+
+function buildCustomerSelfOrderIdentityKeys(account = {}, customerId = '') {
+  return Array.from(new Set([
+    buildSelfOrderIdentityKey('phone', account.phone || account.mobile || ''),
+    buildSelfOrderIdentityKey('line', account.recoveryLineUserId || account.lineUserId || ''),
+    buildSelfOrderIdentityKey('customer', customerId || account.customerId || ''),
+  ].filter(Boolean)));
+}
+
+function buildRiderSelfOrderIdentityKeys(rider = {}, identity = {}) {
+  return Array.from(new Set([
+    buildSelfOrderIdentityKey('phone', identity.phone || rider.phone || rider.mobile || identity.riderDocId || ''),
+    buildSelfOrderIdentityKey('line', identity.lineUserId || rider.lineUserId || ''),
+    buildSelfOrderIdentityKey('customer', rider.customerId || rider.customerAccountId || ''),
+  ].filter(Boolean)));
+}
+
+function getOrderSelfOrderIdentityKeys(order = {}) {
+  const nested = order.selfOrderGuard && typeof order.selfOrderGuard === 'object'
+    ? order.selfOrderGuard
+    : {};
+  const source = Array.isArray(nested.ownerIdentityKeys)
+    ? nested.ownerIdentityKeys
+    : Array.isArray(order.customerOwnerIdentityKeys)
+      ? order.customerOwnerIdentityKeys
+      : [];
+  return Array.from(new Set(source.map(value => String(value || '').trim()).filter(Boolean)));
+}
+
+function isSelfOrderForRiderSync(order = {}, rider = {}, identity = {}) {
+  const orderKeys = getOrderSelfOrderIdentityKeys(order);
+  const riderKeys = buildRiderSelfOrderIdentityKeys(rider, identity);
+  if (orderKeys.length && riderKeys.length) {
+    const riderKeySet = new Set(riderKeys);
+    if (orderKeys.some(key => riderKeySet.has(key))) return true;
+  }
+
+  // 舊資料相容：只有後端已存在可信任客戶手機欄位時才使用，不採姓名判斷。
+  const legacyCustomerPhone = normalizePhone(
+    order.customerAccountPhone ||
+    order.customerPhone ||
+    order.memberPhone ||
+    ''
+  );
+  const riderPhone = normalizePhone(
+    identity.phone || rider.phone || rider.mobile || identity.riderDocId || ''
+  );
+  if (legacyCustomerPhone && riderPhone && legacyCustomerPhone === riderPhone) return true;
+
+  const legacyCustomerLine = String(
+    order.customerLineUserId ||
+    order.customerAccountLineUserId ||
+    ''
+  ).trim();
+  const riderLine = String(identity.lineUserId || rider.lineUserId || '').trim();
+  if (legacyCustomerLine && riderLine && legacyCustomerLine === riderLine) return true;
+
+  return false;
+}
+
+async function isSelfOrderForRider(order = {}, rider = {}, identity = {}) {
+  if (isSelfOrderForRiderSync(order, rider, identity)) return true;
+
+  // Legacy fallback：V4.13 之前建立、尚未帶 ownerIdentityKeys 的訂單，
+  // 在真正承接前由後端讀取 customerAccounts 再做一次可信任比對。
+  const customerId = String(order.customerId || order.userId || '').trim();
+  if (!customerId || !customerId.startsWith('customer_')) return false;
+
+  try {
+    const accountDoc = await db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .doc(customerId)
+      .get();
+    if (!accountDoc.exists) return false;
+
+    const accountKeys = buildCustomerSelfOrderIdentityKeys(
+      accountDoc.data() || {},
+      customerId
+    );
+    const riderKeys = new Set(buildRiderSelfOrderIdentityKeys(rider, identity));
+    return accountKeys.some(key => riderKeys.has(key));
+  } catch (error) {
+    console.warn('⚠️ Self-Order legacy identity check failed:', error?.message || error);
+    // 身分查核失敗不能誤判別人的訂單為本人；真正接單仍會走既有資格與交易鎖。
+    return false;
+  }
+}
+
+async function findRiderForCustomerSelfOrderGuard(account = {}) {
+  const phone = normalizePhone(account.phone || account.mobile || '');
+  if (!/^09\d{8}$/.test(phone)) return null;
+  try {
+    const found = await findRiderDocumentV2First({ phone });
+    if (!found?.riderDoc?.exists) return null;
+    const rider = found.riderDoc.data() || {};
+    if (!isApprovedRiderData(rider)) return null;
+    return { riderDoc:found.riderDoc, rider };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function notifySelfOrderGuardCustomerOrder(order = {}, account = {}) {
+  const customerId = String(order.customerId || order.userId || '').trim();
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  if (!customerId || !orderId) return { matched:false };
+
+  const riderMatch = await findRiderForCustomerSelfOrderGuard(account);
+  if (!riderMatch) return { matched:false };
+
+  const riderDocId = String(riderMatch.riderDoc.id || '').trim();
+  const message = `你可以正常使用 UBee 客戶端下單，但依平台規則不能承接自己建立的訂單。任務 ${orderId} 已自動從你的待接任務與派單通知中排除，請等待同縣市其他小U承接。`;
+
+  await Promise.allSettled([
+    createCustomerInboxNotification(customerId, {
+      eventKey:`self_order_guard:${orderId}`,
+      revision:UBEE_SELF_ORDER_GUARD_V1.customerNoticeRevision,
+      type:'system',
+      category:'任務通知',
+      title:'本人訂單已自動排除自接',
+      message,
+      orderId,
+      actionType:'order',
+      actionTarget:orderId,
+      metadata:{ orderId, guardVersion:UBEE_SELF_ORDER_GUARD_V1.version },
+      webPush:true,
+    }),
+    createRiderInboxNotification(riderDocId, {
+      eventKey:`self_order_guard:${orderId}`,
+      revision:'1',
+      type:'self_order_guard',
+      category:'系統',
+      title:'本人訂單不可自行承接',
+      message,
+      actionType:'notifications',
+      actionTarget:'',
+      metadata:{ orderId, guardVersion:UBEE_SELF_ORDER_GUARD_V1.version },
+      webPush:false,
+    }),
+    logDispatchEvent({
+      type:'RIDER_SELF_ORDER_DETECTED',
+      orderId,
+      riderId:String(riderMatch.rider.riderId || riderDocId || '').trim(),
+      riderDocId,
+      reason:'customer_account_matches_registered_rider',
+      createdAtMs:Date.now(),
+    }),
+  ]);
+
+  return { matched:true, riderDocId };
+}
+
+async function recordSelfOrderBlockedAttempt(order = {}, rider = {}, identity = {}, source = '') {
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  const riderDocId = String(identity.riderDocId || '').trim();
+  if (!orderId || !riderDocId) return;
+  await Promise.allSettled([
+    logDispatchEvent({
+      type:UBEE_SELF_ORDER_GUARD_V1.eventType,
+      orderId,
+      riderId:String(identity.riderId || rider.riderId || riderDocId).trim(),
+      riderDocId,
+      reason:String(source || 'self_order_guard'),
+      createdAtMs:Date.now(),
+    }),
+    createRiderInboxNotification(riderDocId, {
+      eventKey:`self_order_blocked:${orderId}:${String(source || 'accept')}`,
+      revision:'1',
+      type:'self_order_guard',
+      category:'系統',
+      title:'無法承接自己的訂單',
+      message:`任務 ${orderId} 是由你的 UBee 客戶帳號建立，系統已自動阻擋本人承接。請等待其他小U接單。`,
+      actionType:'notifications',
+      actionTarget:'',
+      metadata:{ orderId, source:String(source || ''), guardVersion:UBEE_SELF_ORDER_GUARD_V1.version },
+      webPush:false,
+    }),
+  ]);
 }
 
 function dispatchHaversineKm(lat1, lng1, lat2, lng2) {
@@ -39016,6 +39293,10 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     req.body.customerMemberNumber = String(req.customerAuth.account.memberNumber || '');
     req.body.customerName = String(req.customerAuth.account.name || '');
     req.body.customerPhone = String(req.customerAuth.account.phone || '');
+    const trustedSelfOrderIdentityKeys = buildCustomerSelfOrderIdentityKeys(
+      req.customerAuth.account || {},
+      req.customerAuth.customerId
+    );
     const data = createOrderFromApi(req.body);
 
     // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
@@ -39384,6 +39665,15 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   customerId:
     data.customerId,
+
+  // Self-Order Hard Lock V4.13：只保存不可逆身分指紋，供派單排除本人使用。
+  selfOrderGuard: {
+    version: UBEE_SELF_ORDER_GUARD_V1.version,
+    ownerIdentityKeys: trustedSelfOrderIdentityKeys,
+    blockOwnerDispatch: true,
+    createdAtMs: Date.now(),
+  },
+  customerOwnerIdentityKeys: trustedSelfOrderIdentityKeys,
 
   riderId: '',
 
@@ -39840,6 +40130,11 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
     // 訂單與 Quote 在同一 transaction 內提交：成功就兩者一起成功，失敗就兩者都不寫入。
     await saveCustomerOrderWithQuoteLock(order, quoteValidation.ref);
+
+    // 已註冊正式小U使用客戶端下單時，自動通知「可下單、不可自接」。
+    // 通知失敗不回滾已成功建立的客戶訂單。
+    notifySelfOrderGuardCustomerOrder(order, req.customerAuth.account || {})
+      .catch(error => console.warn('⚠️ Self-Order 自動通知失敗：', error?.message || error));
 
     await markGrowthReferralProgress('customer', req.customerAuth.customerId, 'order_created', {
       firstOrderCreatedId:String(order.id || id || ''),
@@ -40721,6 +41016,14 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
 
     const preCurrent = {id:preCurrentDoc.id,...preCurrentDoc.data()};
     const preCandidate = {id:preCandidateDoc.id,...preCandidateDoc.data()};
+    if (await isSelfOrderForRider(preCandidate, rider, identity)) {
+      await recordSelfOrderBlockedAttempt(preCandidate, rider, identity, 'accept_stack_order');
+      return res.status(403).json({
+        success:false,
+        code:'RIDER_SELF_ORDER_BLOCKED',
+        message:'無法承接自己的訂單。此任務由你的 UBee 客戶帳號建立，系統已自動排除本人承接。',
+      });
+    }
     if (!riderMatchesOrderServiceCity(rider, preCandidate)) {
       return res.status(403).json({
         success:false,
@@ -40806,6 +41109,9 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       }
       if (!riderMatchesOrderServiceCity(latestRider, candidate)) {
         throw new Error('RIDER_SERVICE_CITY_MISMATCH');
+      }
+      if (isSelfOrderForRiderSync(candidate, latestRider, identity)) {
+        throw new Error('RIDER_SELF_ORDER_BLOCKED');
       }
       if (isOrderSkippedForRider(candidate, identity)) throw new Error('RIDER_ALREADY_SKIPPED_ORDER');
       if (String(candidate.status || '').trim() !== 'pending_dispatch') {
@@ -41055,6 +41361,7 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       NOT_THIS_RIDER:[403,'目前任務不屬於此小U。'],
       RIDER_V4_QUALIFICATION_REQUIRED:[403,'目前資格不符合此任務需求。'],
       RIDER_SERVICE_CITY_MISMATCH:[403,'這張任務不屬於你目前的服務縣市。'],
+      RIDER_SELF_ORDER_BLOCKED:[403,'無法承接自己的訂單。此任務由你的 UBee 客戶帳號建立，系統已自動排除本人承接。'],
       RIDER_ALREADY_SKIPPED_ORDER:[409,'你已略過這張任務。'],
       ORDER_NOT_FOUND:[404,'找不到此任務。'],
     };
@@ -41115,6 +41422,21 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
     const orderRef = db.collection('orders').doc(safeOrderId);
     const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
 
+    // Self-Order Hard Lock V4.13：Transaction 前先做可通知的完整檢查；
+    // Transaction 內仍會再次檢查，避免 TOCTOU 或舊快取繞過。
+    const acceptPrecheckDoc = await orderRef.get();
+    if (acceptPrecheckDoc.exists) {
+      const acceptPrecheckOrder = { id:acceptPrecheckDoc.id, ...acceptPrecheckDoc.data() };
+      if (await isSelfOrderForRider(acceptPrecheckOrder, rider, identity)) {
+        await recordSelfOrderBlockedAttempt(acceptPrecheckOrder, rider, identity, 'accept_order');
+        return res.status(403).json({
+          success:false,
+          code:'RIDER_SELF_ORDER_BLOCKED',
+          message:'無法承接自己的訂單。此任務由你的 UBee 客戶帳號建立，系統已自動阻擋本人接單。',
+        });
+      }
+    }
+
     // UBee 任務即時追蹤：接單即建立 tracking session。
     // 這個 session 與一般 online / heartbeat 分離，直到完成或轉派才結束。
     const trackingStartedAtMs = Date.now();
@@ -41166,6 +41488,10 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
 
       if (!riderMatchesOrderServiceCity(latestRider, order)) {
         throw new Error('RIDER_SERVICE_CITY_MISMATCH');
+      }
+
+      if (isSelfOrderForRiderSync(order, latestRider, identity)) {
+        throw new Error('RIDER_SELF_ORDER_BLOCKED');
       }
 
       if (
@@ -41444,6 +41770,14 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         success: false,
         code: 'RIDER_SERVICE_CITY_MISMATCH',
         message: '這張任務不屬於你目前的服務縣市；如需跨縣市接單，請先到接單設定變更服務縣市。',
+      });
+    }
+
+    if (error.message === 'RIDER_SELF_ORDER_BLOCKED') {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_SELF_ORDER_BLOCKED',
+        message: '無法承接自己的訂單。此任務由你的 UBee 客戶帳號建立，系統已自動阻擋本人接單。',
       });
     }
 
@@ -44747,6 +45081,7 @@ function getDispatchApiErrorResponse(error) {
     RIDER_OFFLINE: [409, '這位小U目前已離線，請重新選擇其他小U。'],
     RIDER_ALREADY_BUSY: [409, '這位小U目前已有進行中的任務，請重新選擇。'],
     RIDER_ALREADY_ASSIGNED: [409, '此訂單已經被其他小U接走。'],
+    RIDER_SELF_ORDER_BLOCKED: [403, '這位小U就是此訂單的下單會員，系統禁止本人下單本人承接。請改派其他小U。'],
     ORDER_UNASSIGN_NOT_ALLOWED: [409, '此任務目前不符合取消派單條件；只有小U接單後、抵達取件點前可以由調度中心解除派單。'],
     ORDER_NO_RIDER_ASSIGNED: [409, '此訂單目前沒有可解除的承接小U。'],
     ORDER_ASSIGNMENT_CHANGED: [409, '此訂單的承接小U已發生變更，請重新整理調度中心後再操作。'],
@@ -44841,6 +45176,22 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
       .collection(RIDER_V2_COLLECTIONS.riders)
       .doc(riderDoc.id);
 
+    // 人工調度也不能繞過本人自接規則；舊訂單會透過 customerAccounts 補做可信任比對。
+    const dispatchSelfOrderPrecheckDoc = await orderRef.get();
+    if (dispatchSelfOrderPrecheckDoc.exists) {
+      const dispatchSelfOrderPrecheck = {
+        id:dispatchSelfOrderPrecheckDoc.id,
+        ...dispatchSelfOrderPrecheckDoc.data(),
+      };
+      if (await isSelfOrderForRider(dispatchSelfOrderPrecheck, rider, identity)) {
+        return res.status(403).json({
+          success:false,
+          code:'RIDER_SELF_ORDER_BLOCKED',
+          message:'這位小U就是此訂單的下單會員，系統禁止本人下單本人承接。請改派其他小U。',
+        });
+      }
+    }
+
     const nowMs = Date.now();
     const trackingSessionId =
       typeof crypto.randomUUID === 'function'
@@ -44885,6 +45236,10 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
         throw new Error(
           'ORDER_PAYMENT_NOT_CONFIRMED'
         );
+      }
+
+      if (isSelfOrderForRiderSync(order, latestRider, identity)) {
+        throw new Error('RIDER_SELF_ORDER_BLOCKED');
       }
 
       // 人工指定仍要求小U在線。
