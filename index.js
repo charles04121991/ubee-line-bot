@@ -1,9 +1,9 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-02
-// Release: 2026_1002_RIDER_BENEFITS_ADMIN_V1｜Rider Benefits Management / Dynamic Partner Benefits / V4.8 contracts preserved
+// Release: 2026_1002_RIDER_BENEFITS_ADMIN_V1_1_NO_AUTH｜Rider Benefits Management / No Authorization Code / V4.8 contracts preserved
 //
 // 本次整理：
-// - 新增小U福利管理 API、Firestore 唯一資料來源、圖片上傳與 V4.8 既有福利一次性遷移。
+// - 小U福利管理 API 改為免管理授權碼；Firestore 唯一資料來源、圖片上傳與 V4.8 既有福利一次性遷移維持。
 // - 新增 U幣整數帳本、七日簽到、完單／首單／評價／推薦獎勵。
 // - 新增訂單 U幣保留、完單扣除、取消退回與冪等交易事件。
 // - 折抵受服務費 20% 與平台收入雙重上限保護，不影響小U收入與代墊款。
@@ -9431,7 +9431,7 @@ app.post('/api/admin/rider-notifications/announcement', async (req, res) => {
 // 唯一正式資料來源：Firestore riderPartnerBenefits。
 // - 騎士端只讀 active 福利，不再內建合作店家清單。
 // - 管理端可新增／編輯／預覽／排序／草稿／上架／下架／刪除。
-// - 圖片上傳至 Firebase Storage；管理 API 以獨立福利管理金鑰保護。
+// - 圖片上傳至 Firebase Storage；依營運需求，福利管理 API 不使用管理授權碼。
 // - 第一次啟用時只做一次 V4.8 既有兩筆福利資料遷移。
 // ============================================================
 const RIDER_BENEFITS_COLLECTION = 'riderPartnerBenefits';
@@ -9440,11 +9440,6 @@ const RIDER_BENEFITS_MIGRATION_ID = 'riderPartnerBenefits_v1_20261002';
 const RIDER_BENEFITS_CATEGORIES = Object.freeze([
   '騎士裝備','保健','餐飲','車輛','生活服務'
 ]);
-const RIDER_BENEFITS_ADMIN_KEY = String(
-  process.env.UBEE_RIDER_BENEFITS_ADMIN_KEY ||
-  process.env.UBEE_RIDER_V4_ADMIN_KEY ||
-  ''
-).trim();
 const RIDER_BENEFITS_STORAGE_BUCKET = String(
   process.env.RIDER_BENEFITS_STORAGE_BUCKET ||
   process.env.FIREBASE_STORAGE_BUCKET ||
@@ -9575,42 +9570,6 @@ function riderBenefitAdminPayload(doc) {
   };
 }
 
-function riderBenefitAdminKeyFromRequest(req) {
-  return String(
-    req.headers['x-ubee-admin-key'] ||
-    req.body?.adminKey ||
-    req.query?.adminKey ||
-    ''
-  ).trim();
-}
-
-function requireRiderBenefitsAdmin(req, res, next) {
-  if (!RIDER_BENEFITS_ADMIN_KEY) {
-    return res.status(503).json({
-      success:false,
-      code:'RIDER_BENEFITS_ADMIN_KEY_NOT_CONFIGURED',
-      message:'尚未設定小U福利管理授權。請在 Render 設定 UBEE_RIDER_BENEFITS_ADMIN_KEY，或沿用 UBEE_RIDER_V4_ADMIN_KEY。',
-    });
-  }
-
-  const supplied = riderBenefitAdminKeyFromRequest(req);
-  const expectedBuffer = Buffer.from(RIDER_BENEFITS_ADMIN_KEY);
-  const suppliedBuffer = Buffer.from(supplied);
-  const valid =
-    expectedBuffer.length > 0 &&
-    expectedBuffer.length === suppliedBuffer.length &&
-    crypto.timingSafeEqual(expectedBuffer, suppliedBuffer);
-
-  if (!valid) {
-    return res.status(401).json({
-      success:false,
-      code:'RIDER_BENEFITS_ADMIN_UNAUTHORIZED',
-      message:'小U福利管理授權不正確。',
-    });
-  }
-
-  return next();
-}
 
 function riderBenefitImageExtension(mimeType='', originalName='') {
   const ext = String(originalName || '').toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1] || '';
@@ -9752,8 +9711,8 @@ app.get('/api/rider/benefits', riderAuthMiddleware, async (req, res) => {
   }
 });
 
-// 管理端：登入驗證＋完整清單。
-app.get('/api/admin/rider-benefits', requireRiderBenefitsAdmin, async (req, res) => {
+// 管理端：直接讀取完整清單，不使用管理授權碼。
+app.get('/api/admin/rider-benefits', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const benefits = await listRiderBenefitsForAdmin();
@@ -9771,7 +9730,7 @@ app.get('/api/admin/rider-benefits', requireRiderBenefitsAdmin, async (req, res)
 });
 
 // 管理端：上傳合作店家圖片。
-app.post('/api/admin/rider-benefits/image', requireRiderBenefitsAdmin, (req, res) => {
+app.post('/api/admin/rider-benefits/image', (req, res) => {
   riderBenefitImageUpload.single('file')(req, res, async error => {
     if (error) {
       const tooLarge = error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE';
@@ -9834,7 +9793,7 @@ app.post('/api/admin/rider-benefits/image', requireRiderBenefitsAdmin, (req, res
 });
 
 // 管理端：新增／編輯福利。草稿不會出現在騎士端。
-app.post('/api/admin/rider-benefits', requireRiderBenefitsAdmin, async (req, res) => {
+app.post('/api/admin/rider-benefits', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     await ensureRiderBenefitsSeeded();
@@ -9893,7 +9852,7 @@ app.post('/api/admin/rider-benefits', requireRiderBenefitsAdmin, async (req, res
 });
 
 // 管理端：快速切換草稿／上架／下架。
-app.post('/api/admin/rider-benefits/:benefitId/status', requireRiderBenefitsAdmin, async (req, res) => {
+app.post('/api/admin/rider-benefits/:benefitId/status', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const benefitId = riderBenefitSafeId(req.params.benefitId || '');
@@ -9920,7 +9879,7 @@ app.post('/api/admin/rider-benefits/:benefitId/status', requireRiderBenefitsAdmi
 });
 
 // 管理端：永久刪除福利與該筆目前使用的圖片。
-app.delete('/api/admin/rider-benefits/:benefitId', requireRiderBenefitsAdmin, async (req, res) => {
+app.delete('/api/admin/rider-benefits/:benefitId', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const benefitId = riderBenefitSafeId(req.params.benefitId || '');
