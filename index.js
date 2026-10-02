@@ -1,9 +1,10 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-02
-// Release: 2026_1002_RIDER_BENEFITS_ADMIN_V1_1_NO_AUTH｜Rider Benefits Management / No Authorization Code / V4.8 contracts preserved
+// Release: 2026_1002_RIDER_BENEFITS_DYNAMIC_CATEGORIES_V2_NO_AUTH｜Rider Benefits + Dynamic Categories / No Authorization Code / V4.9 contracts preserved
 //
 // 本次整理：
-// - 小U福利管理 API 改為免管理授權碼；Firestore 唯一資料來源、圖片上傳與 V4.8 既有福利一次性遷移維持。
+// - 小U福利管理維持免管理授權碼；新增 Firestore 動態分類，可新增／改名／排序／停用／刪除分類。
+// - V4.9 固定福利分類已移除；既有福利分類一次性遷移到 riderBenefitCategories。
 // - 新增 U幣整數帳本、七日簽到、完單／首單／評價／推薦獎勵。
 // - 新增訂單 U幣保留、完單扣除、取消退回與冪等交易事件。
 // - 折抵受服務費 20% 與平台收入雙重上限保護，不影響小U收入與代墊款。
@@ -9426,20 +9427,49 @@ app.post('/api/admin/rider-notifications/announcement', async (req, res) => {
 });
 
 
+
 // ============================================================
-// 2026-10-02｜Rider Benefits Management V1
-// 唯一正式資料來源：Firestore riderPartnerBenefits。
-// - 騎士端只讀 active 福利，不再內建合作店家清單。
-// - 管理端可新增／編輯／預覽／排序／草稿／上架／下架／刪除。
-// - 圖片上傳至 Firebase Storage；依營運需求，福利管理 API 不使用管理授權碼。
-// - 第一次啟用時只做一次 V4.8 既有兩筆福利資料遷移。
+// 2026-10-02｜Rider Benefits Management V2｜動態福利分類
+// 唯一正式資料來源：
+// - Firestore riderPartnerBenefits：福利資料。
+// - Firestore riderBenefitCategories：福利分類。
+// - 騎士端只讀 active 福利與 active 分類；不再內建分類清單。
+// - 管理端可自行新增／改名／排序／停用／刪除分類，不使用管理授權碼。
+// - 舊 V4.9 固定分類邏輯已移除；既有「保健／餐飲／車輛／生活服務」會一次性遷移。
 // ============================================================
 const RIDER_BENEFITS_COLLECTION = 'riderPartnerBenefits';
+const RIDER_BENEFIT_CATEGORIES_COLLECTION = 'riderBenefitCategories';
 const RIDER_BENEFITS_MIGRATION_COLLECTION = 'systemMigrations';
 const RIDER_BENEFITS_MIGRATION_ID = 'riderPartnerBenefits_v1_20261002';
-const RIDER_BENEFITS_CATEGORIES = Object.freeze([
-  '騎士裝備','保健','餐飲','車輛','生活服務'
+const RIDER_BENEFIT_CATEGORIES_SEED_ID = 'riderBenefitCategories_v2_seed_20261002';
+const RIDER_BENEFIT_CATEGORIES_MIGRATION_ID = 'riderBenefitCategories_v2_benefits_20261002';
+
+const RIDER_BENEFIT_DEFAULT_CATEGORIES = Object.freeze([
+  Object.freeze({ id:'rider-gear', name:'騎士裝備', sortOrder:10 }),
+  Object.freeze({ id:'vehicle-maintenance', name:'車輛保養', sortOrder:20 }),
+  Object.freeze({ id:'health-relax', name:'健康放鬆', sortOrder:30 }),
+  Object.freeze({ id:'food-supply', name:'餐飲補給', sortOrder:40 }),
+  Object.freeze({ id:'tech-telecom', name:'3C通訊', sortOrder:50 }),
+  Object.freeze({ id:'lifestyle', name:'生活優惠', sortOrder:60 }),
+  Object.freeze({ id:'ubee-exclusive', name:'UBee專屬', sortOrder:70 }),
+  Object.freeze({ id:'other', name:'其他', sortOrder:999 }),
 ]);
+
+const RIDER_BENEFIT_LEGACY_CATEGORY_MAP = Object.freeze({
+  '騎士裝備':'rider-gear',
+  '保健':'health-relax',
+  '健康放鬆':'health-relax',
+  '餐飲':'food-supply',
+  '餐飲補給':'food-supply',
+  '車輛':'vehicle-maintenance',
+  '車輛保養':'vehicle-maintenance',
+  '3C通訊':'tech-telecom',
+  '生活服務':'lifestyle',
+  '生活優惠':'lifestyle',
+  'UBee專屬':'ubee-exclusive',
+  '其他':'other',
+});
+
 const RIDER_BENEFITS_STORAGE_BUCKET = String(
   process.env.RIDER_BENEFITS_STORAGE_BUCKET ||
   process.env.FIREBASE_STORAGE_BUCKET ||
@@ -9464,6 +9494,21 @@ function riderBenefitSafeId(value='') {
   return String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
 }
 
+function riderBenefitCategorySafeId(value='') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 80);
+}
+
+function riderBenefitCategoryGeneratedId(name='') {
+  const safeName = cleanText(name, 40);
+  if (!safeName) return '';
+  const digest = crypto.createHash('sha1').update(`UBeeBenefitCategory|${safeName}`).digest('hex').slice(0, 16);
+  return `cat_${digest}`;
+}
+
 function riderBenefitNumber(value, { min=0, max=99999999, integer=true }={}) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -9476,9 +9521,13 @@ function riderBenefitStatus(value='draft') {
   return ['draft','active','inactive'].includes(normalized) ? normalized : 'draft';
 }
 
-function riderBenefitCategory(value='') {
-  const category = cleanText(value, 40);
-  return RIDER_BENEFITS_CATEGORIES.includes(category) ? category : '生活服務';
+function riderBenefitCategoryStatus(value='active') {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ['active','inactive'].includes(normalized) ? normalized : 'active';
+}
+
+function riderBenefitCategoryName(value='') {
+  return cleanText(value, 40);
 }
 
 function riderBenefitUsageSteps(value) {
@@ -9491,9 +9540,109 @@ function riderBenefitUsageSteps(value) {
     .slice(0, 8);
 }
 
-function normalizeRiderBenefitInput(payload={}, existing={}) {
+function riderBenefitCategoryPayload(doc, usage={}) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    id:riderBenefitCategorySafeId(data.categoryId || doc?.id || ''),
+    name:riderBenefitCategoryName(data.name || ''),
+    sortOrder:riderBenefitNumber(data.sortOrder ?? 100, {min:0,max:99999}),
+    status:riderBenefitCategoryStatus(data.status || 'active'),
+    benefitCount:Math.max(0, Number(usage.benefitCount || 0)),
+    activeBenefitCount:Math.max(0, Number(usage.activeBenefitCount || 0)),
+    createdAtMs:Math.max(0, Number(data.createdAtMs || 0)),
+    updatedAtMs:Math.max(0, Number(data.updatedAtMs || 0)),
+  };
+}
+
+async function ensureRiderBenefitCategoriesSeeded() {
+  const migrationRef = db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFIT_CATEGORIES_SEED_ID);
+  const categoryCollection = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION);
+  const categoryRefs = RIDER_BENEFIT_DEFAULT_CATEGORIES.map(item => categoryCollection.doc(item.id));
+
+  await db.runTransaction(async tx => {
+    const migrationDoc = await tx.get(migrationRef);
+    if (migrationDoc.exists) return;
+
+    const categoryDocs = [];
+    for (const ref of categoryRefs) categoryDocs.push(await tx.get(ref));
+    const nowMs = Date.now();
+
+    RIDER_BENEFIT_DEFAULT_CATEGORIES.forEach((item, index) => {
+      if (categoryDocs[index]?.exists) return;
+      tx.set(categoryRefs[index], {
+        categoryId:item.id,
+        name:item.name,
+        sortOrder:item.sortOrder,
+        status:'active',
+        createdAtMs:nowMs,
+        createdAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    tx.set(migrationRef, {
+      migrationId:RIDER_BENEFIT_CATEGORIES_SEED_ID,
+      source:'rider-benefit-default-categories-v2',
+      completed:true,
+      completedAtMs:nowMs,
+      completedAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+async function listRiderBenefitCategories({ includeInactive=true, includeUsage=false }={}) {
+  await ensureRiderBenefitCategoriesSeeded();
+  const categorySnapshot = await db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).limit(300).get();
+  const categories = categorySnapshot.docs.map(doc => riderBenefitCategoryPayload(doc));
+
+  let usageMap = new Map();
+  if (includeUsage) {
+    const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
+    usageMap = new Map(categories.map(item => [item.id, { benefitCount:0, activeBenefitCount:0 }]));
+    for (const doc of benefitsSnapshot.docs) {
+      const data = doc.data() || {};
+      const categoryId = riderBenefitCategorySafeId(data.categoryId || RIDER_BENEFIT_LEGACY_CATEGORY_MAP[riderBenefitCategoryName(data.category)] || '');
+      if (!categoryId || !usageMap.has(categoryId)) continue;
+      const usage = usageMap.get(categoryId);
+      usage.benefitCount += 1;
+      if (riderBenefitStatus(data.status) === 'active') usage.activeBenefitCount += 1;
+    }
+  }
+
+  return categories
+    .filter(item => item.id && item.name && (includeInactive || item.status === 'active'))
+    .map(item => ({ ...item, ...(usageMap.get(item.id) || {}) }))
+    .sort((a,b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'zh-Hant'));
+}
+
+async function resolveRiderBenefitCategory(categoryId='', categoryName='', { allowInactive=false }={}) {
+  await ensureRiderBenefitCategoriesSeeded();
+  const safeId = riderBenefitCategorySafeId(categoryId);
+  const safeName = riderBenefitCategoryName(categoryName);
+
+  let doc = null;
+  if (safeId) {
+    const candidate = await db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).doc(safeId).get();
+    if (candidate.exists) doc = candidate;
+  }
+
+  if (!doc && safeName) {
+    const snapshot = await db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION)
+      .where('name', '==', safeName)
+      .limit(1)
+      .get();
+    if (!snapshot.empty) doc = snapshot.docs[0];
+  }
+
+  if (!doc) return null;
+  const category = riderBenefitCategoryPayload(doc);
+  if (!allowInactive && category.status !== 'active') return null;
+  return category;
+}
+
+function normalizeRiderBenefitInput(payload={}, existing={}, resolvedCategory=null) {
   const name = cleanText(payload.name ?? existing.name ?? '', 120);
-  const category = riderBenefitCategory(payload.category ?? existing.category ?? '');
   const status = riderBenefitStatus(payload.status ?? existing.status ?? 'draft');
   const originalPrice = riderBenefitNumber(payload.originalPrice ?? existing.originalPrice ?? 0);
   const memberPrice = riderBenefitNumber(payload.memberPrice ?? existing.memberPrice ?? 0);
@@ -9505,7 +9654,8 @@ function normalizeRiderBenefitInput(payload={}, existing={}) {
 
   return {
     name,
-    category,
+    categoryId:riderBenefitCategorySafeId(resolvedCategory?.id || existing.categoryId || ''),
+    category:riderBenefitCategoryName(resolvedCategory?.name || existing.category || '其他') || '其他',
     badge: cleanText(payload.badge ?? existing.badge ?? '正式小U專屬', 80) || '正式小U專屬',
     offer: cleanText(payload.offer ?? existing.offer ?? '', 160),
     description: cleanLongText(payload.description ?? existing.description ?? '', 600),
@@ -9535,10 +9685,12 @@ function normalizeRiderBenefitInput(payload={}, existing={}) {
 
 function riderBenefitPublicPayload(doc) {
   const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  const categoryName = riderBenefitCategoryName(data.category || '') || '其他';
   return {
     id: riderBenefitSafeId(data.benefitId || doc?.id || ''),
     name: cleanText(data.name || '', 120),
-    category: riderBenefitCategory(data.category || ''),
+    categoryId:riderBenefitCategorySafeId(data.categoryId || RIDER_BENEFIT_LEGACY_CATEGORY_MAP[categoryName] || ''),
+    category:categoryName,
     badge: cleanText(data.badge || '正式小U專屬', 80) || '正式小U專屬',
     offer: cleanText(data.offer || '', 160),
     description: cleanLongText(data.description || '', 600),
@@ -9570,7 +9722,6 @@ function riderBenefitAdminPayload(doc) {
   };
 }
 
-
 function riderBenefitImageExtension(mimeType='', originalName='') {
   const ext = String(originalName || '').toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1] || '';
   if (['jpg','jpeg','png','webp'].includes(ext)) return ext === 'jpeg' ? 'jpg' : ext;
@@ -9592,6 +9743,7 @@ async function deleteRiderBenefitStorageObject(storageBucket='', storagePath='')
 }
 
 async function ensureRiderBenefitsSeeded() {
+  await ensureRiderBenefitCategoriesSeeded();
   const migrationRef = db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFITS_MIGRATION_ID);
   const manmanqiRef = db.collection(RIDER_BENEFITS_COLLECTION).doc('manmanqi');
   const xinhongRef = db.collection(RIDER_BENEFITS_COLLECTION).doc('xinhong');
@@ -9607,6 +9759,7 @@ async function ensureRiderBenefitsSeeded() {
       tx.set(manmanqiRef, {
         benefitId:'manmanqi',
         name:'慢慢騎',
+        categoryId:'rider-gear',
         category:'騎士裝備',
         badge:'正式小U專屬',
         offer:'小U專屬優惠',
@@ -9637,7 +9790,8 @@ async function ensureRiderBenefitsSeeded() {
       tx.set(xinhongRef, {
         benefitId:'xinhong',
         name:'昕紘整復推拿',
-        category:'保健',
+        categoryId:'health-relax',
+        category:'健康放鬆',
         badge:'正式小U專屬',
         offer:'小U專屬價 NT$800',
         description:'長時間騎乘、搬運、久坐久站的小U專屬合作福利。',
@@ -9673,36 +9827,104 @@ async function ensureRiderBenefitsSeeded() {
   });
 }
 
-async function listRiderBenefitsForAdmin() {
+async function ensureRiderBenefitCategoryMigration() {
+  await ensureRiderBenefitCategoriesSeeded();
   await ensureRiderBenefitsSeeded();
+
+  const migrationRef = db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFIT_CATEGORIES_MIGRATION_ID);
+  const migrationDoc = await migrationRef.get();
+  if (migrationDoc.exists) return;
+
+  const categoryCollection = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION);
+  const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
+  const nowMs = Date.now();
+
+  for (const benefitDoc of benefitsSnapshot.docs) {
+    const data = benefitDoc.data() || {};
+    const oldName = riderBenefitCategoryName(data.category || '') || '其他';
+    let categoryId = riderBenefitCategorySafeId(data.categoryId || RIDER_BENEFIT_LEGACY_CATEGORY_MAP[oldName] || '');
+    let categoryName = oldName;
+
+    if (!categoryId) {
+      categoryId = riderBenefitCategoryGeneratedId(oldName) || 'other';
+      const customRef = categoryCollection.doc(categoryId);
+      const customDoc = await customRef.get();
+      if (!customDoc.exists) {
+        await customRef.set({
+          categoryId,
+          name:oldName,
+          sortOrder:500,
+          status:'active',
+          createdAtMs:nowMs,
+          createdAt:admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs:nowMs,
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    const categoryDoc = await categoryCollection.doc(categoryId).get();
+    if (categoryDoc.exists) {
+      categoryName = riderBenefitCategoryPayload(categoryDoc).name || categoryName;
+    }
+
+    if (data.categoryId !== categoryId || data.category !== categoryName) {
+      await benefitDoc.ref.set({
+        categoryId,
+        category:categoryName,
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+    }
+  }
+
+  await migrationRef.set({
+    migrationId:RIDER_BENEFIT_CATEGORIES_MIGRATION_ID,
+    source:'rider-benefits-v49-fixed-categories',
+    completed:true,
+    completedAtMs:nowMs,
+    completedAt:admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function listRiderBenefitsForAdmin() {
+  await ensureRiderBenefitCategoryMigration();
   const snapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(300).get();
   return snapshot.docs
     .map(riderBenefitAdminPayload)
     .sort((a,b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'zh-Hant'));
 }
 
-// 騎士端：只回傳正式上架福利。
+// 騎士端：只回傳正式上架福利；分類由 Firestore 動態產生。
 app.get('/api/rider/benefits', riderAuthMiddleware, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    await ensureRiderBenefitsSeeded();
-    const snapshot = await db.collection(RIDER_BENEFITS_COLLECTION)
-      .where('status', '==', 'active')
-      .limit(200)
-      .get();
-    const benefits = snapshot.docs
+    await ensureRiderBenefitCategoryMigration();
+    const [benefitSnapshot, activeCategories] = await Promise.all([
+      db.collection(RIDER_BENEFITS_COLLECTION).where('status', '==', 'active').limit(200).get(),
+      listRiderBenefitCategories({ includeInactive:false, includeUsage:false }),
+    ]);
+
+    const activeCategoryIds = new Set(activeCategories.map(item => item.id));
+    const categoryById = new Map(activeCategories.map(item => [item.id, item]));
+    const benefits = benefitSnapshot.docs
       .map(riderBenefitPublicPayload)
-      .filter(item => item.id && item.name && item.offer)
+      .filter(item => item.id && item.name && item.offer && activeCategoryIds.has(item.categoryId))
+      .map(item => ({
+        ...item,
+        category:categoryById.get(item.categoryId)?.name || item.category,
+      }))
       .sort((a,b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'zh-Hant'));
-    const categories = [
-      '全部',
-      ...RIDER_BENEFITS_CATEGORIES.filter(category => benefits.some(item => item.category === category)),
-    ];
+
+    const usedCategoryIds = new Set(benefits.map(item => item.categoryId));
+    const categoryItems = activeCategories.filter(item => usedCategoryIds.has(item.id));
+
     return res.json({
       success:true,
-      version:'rider-benefits-v1',
+      version:'rider-benefits-v2-dynamic-categories',
       benefits,
-      categories,
+      categories:['全部', ...categoryItems.map(item => item.name)],
+      categoryItems,
       count:benefits.length,
     });
   } catch (error) {
@@ -9711,21 +9933,167 @@ app.get('/api/rider/benefits', riderAuthMiddleware, async (req, res) => {
   }
 });
 
-// 管理端：直接讀取完整清單，不使用管理授權碼。
+// 管理端：完整福利清單＋動態分類；維持免管理授權碼。
 app.get('/api/admin/rider-benefits', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const benefits = await listRiderBenefitsForAdmin();
+    const [benefits, categoryItems] = await Promise.all([
+      listRiderBenefitsForAdmin(),
+      listRiderBenefitCategories({ includeInactive:true, includeUsage:true }),
+    ]);
     return res.json({
       success:true,
-      version:'rider-benefits-admin-v1',
-      categories:RIDER_BENEFITS_CATEGORIES,
+      version:'rider-benefits-admin-v2-dynamic-categories',
+      categories:categoryItems.filter(item => item.status === 'active').map(item => item.name),
+      categoryItems,
       benefits,
       count:benefits.length,
     });
   } catch (error) {
     console.error('❌ 讀取小U福利管理清單失敗：', error);
     return res.status(500).json({ success:false, message:'讀取小U福利管理資料失敗。' });
+  }
+});
+
+// 管理端：讀取所有福利分類。
+app.get('/api/admin/rider-benefit-categories', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await ensureRiderBenefitCategoryMigration();
+    const categories = await listRiderBenefitCategories({ includeInactive:true, includeUsage:true });
+    return res.json({
+      success:true,
+      version:'rider-benefit-categories-v2',
+      categories,
+      count:categories.length,
+    });
+  } catch (error) {
+    console.error('❌ 讀取小U福利分類失敗：', error);
+    return res.status(500).json({ success:false, message:'讀取福利分類失敗。' });
+  }
+});
+
+// 管理端：新增／修改／排序／啟用／停用分類。
+app.post('/api/admin/rider-benefit-categories', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await ensureRiderBenefitCategoryMigration();
+
+    const requestedId = riderBenefitCategorySafeId(req.body?.categoryId || '');
+    const name = riderBenefitCategoryName(req.body?.name || '');
+    const status = riderBenefitCategoryStatus(req.body?.status || 'active');
+    const sortOrder = riderBenefitNumber(req.body?.sortOrder ?? 100, {min:0,max:99999});
+
+    if (!name) return res.status(400).json({ success:false, message:'請輸入福利分類名稱。' });
+    if (name === '全部') return res.status(400).json({ success:false, message:'「全部」是系統篩選名稱，不能建立為福利分類。' });
+
+    const categoryCollection = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION);
+    const categoryId = requestedId || riderBenefitCategoryGeneratedId(name);
+    if (!categoryId) return res.status(400).json({ success:false, message:'福利分類資料不正確。' });
+
+    const ref = categoryCollection.doc(categoryId);
+    const existingDoc = await ref.get();
+    const existing = existingDoc.exists ? (existingDoc.data() || {}) : {};
+
+    const sameNameSnapshot = await categoryCollection.where('name', '==', name).limit(2).get();
+    const duplicate = sameNameSnapshot.docs.find(doc => doc.id !== categoryId);
+    if (duplicate) {
+      return res.status(409).json({ success:false, message:'已經有相同名稱的福利分類。' });
+    }
+
+    if (status === 'inactive') {
+      const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
+      const activeUsage = benefitsSnapshot.docs.filter(doc => {
+        const data = doc.data() || {};
+        return riderBenefitStatus(data.status) === 'active' &&
+          riderBenefitCategorySafeId(data.categoryId || '') === categoryId;
+      });
+      if (activeUsage.length) {
+        return res.status(409).json({
+          success:false,
+          message:`這個分類目前有 ${activeUsage.length} 筆已上架福利，請先將福利改到其他分類或下架，再停用分類。`,
+        });
+      }
+    }
+
+    const nowMs = Date.now();
+    await ref.set({
+      categoryId,
+      name,
+      sortOrder,
+      status,
+      createdAtMs:existingDoc.exists ? Math.max(1, Number(existing.createdAtMs || nowMs)) : nowMs,
+      updatedAtMs:nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      ...(existingDoc.exists ? {} : { createdAt:admin.firestore.FieldValue.serverTimestamp() }),
+    }, { merge:true });
+
+    const oldName = riderBenefitCategoryName(existing.name || '');
+    if (existingDoc.exists && oldName && oldName !== name) {
+      const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
+      const affected = benefitsSnapshot.docs.filter(doc => {
+        const data = doc.data() || {};
+        return riderBenefitCategorySafeId(data.categoryId || '') === categoryId || riderBenefitCategoryName(data.category || '') === oldName;
+      });
+      for (let i=0; i<affected.length; i+=400) {
+        const batch = db.batch();
+        affected.slice(i, i+400).forEach(doc => {
+          batch.set(doc.ref, {
+            categoryId,
+            category:name,
+            updatedAtMs:nowMs,
+            updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge:true });
+        });
+        await batch.commit();
+      }
+    }
+
+    const fresh = await ref.get();
+    const categories = await listRiderBenefitCategories({ includeInactive:true, includeUsage:true });
+    return res.json({
+      success:true,
+      category:categories.find(item => item.id === fresh.id) || riderBenefitCategoryPayload(fresh),
+      categories,
+      message:existingDoc.exists ? '福利分類已更新。' : '福利分類已新增。',
+    });
+  } catch (error) {
+    console.error('❌ 儲存小U福利分類失敗：', error);
+    return res.status(500).json({ success:false, message:'儲存福利分類失敗，請稍後再試。' });
+  }
+});
+
+// 管理端：刪除未被任何福利使用的分類。
+app.delete('/api/admin/rider-benefit-categories/:categoryId', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await ensureRiderBenefitCategoryMigration();
+    const categoryId = riderBenefitCategorySafeId(req.params.categoryId || '');
+    if (!categoryId) return res.status(400).json({ success:false, message:'福利分類編號不正確。' });
+
+    const ref = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).doc(categoryId);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這個福利分類。' });
+    const category = riderBenefitCategoryPayload(doc);
+
+    const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
+    const usage = benefitsSnapshot.docs.filter(benefitDoc => {
+      const data = benefitDoc.data() || {};
+      return riderBenefitCategorySafeId(data.categoryId || '') === categoryId ||
+        riderBenefitCategoryName(data.category || '') === category.name;
+    });
+    if (usage.length) {
+      return res.status(409).json({
+        success:false,
+        message:`這個分類仍有 ${usage.length} 筆福利使用中，請先把這些福利改到其他分類後再刪除。`,
+      });
+    }
+
+    await ref.delete();
+    return res.json({ success:true, categoryId, message:'福利分類已刪除。' });
+  } catch (error) {
+    console.error('❌ 刪除小U福利分類失敗：', error);
+    return res.status(500).json({ success:false, message:'刪除福利分類失敗。' });
   }
 });
 
@@ -9792,11 +10160,11 @@ app.post('/api/admin/rider-benefits/image', (req, res) => {
   });
 });
 
-// 管理端：新增／編輯福利。草稿不會出現在騎士端。
+// 管理端：新增／編輯福利。分類必須存在；停用分類不可新增上架福利。
 app.post('/api/admin/rider-benefits', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    await ensureRiderBenefitsSeeded();
+    await ensureRiderBenefitCategoryMigration();
 
     let benefitId = riderBenefitSafeId(req.body?.benefitId || '');
     const collection = db.collection(RIDER_BENEFITS_COLLECTION);
@@ -9805,7 +10173,23 @@ app.post('/api/admin/rider-benefits', async (req, res) => {
 
     const existingDoc = await ref.get();
     const existing = existingDoc.exists ? (existingDoc.data() || {}) : {};
-    const normalized = normalizeRiderBenefitInput(req.body || {}, existing);
+    const requestedCategoryId = riderBenefitCategorySafeId(req.body?.categoryId || existing.categoryId || '');
+    const requestedCategoryName = riderBenefitCategoryName(req.body?.category || existing.category || '');
+    const sameExistingCategory = existingDoc.exists &&
+      requestedCategoryId &&
+      requestedCategoryId === riderBenefitCategorySafeId(existing.categoryId || '');
+
+    const resolvedCategory = await resolveRiderBenefitCategory(
+      requestedCategoryId,
+      requestedCategoryName,
+      { allowInactive:sameExistingCategory }
+    );
+
+    if (!resolvedCategory) {
+      return res.status(400).json({ success:false, message:'請選擇目前有效的福利分類。' });
+    }
+
+    const normalized = normalizeRiderBenefitInput(req.body || {}, existing, resolvedCategory);
 
     if (!normalized.name) {
       return res.status(400).json({ success:false, message:'請輸入合作店家名稱。' });
@@ -9815,6 +10199,9 @@ app.post('/api/admin/rider-benefits', async (req, res) => {
     }
     if (!normalized.address) {
       return res.status(400).json({ success:false, message:'請輸入合作店家地址。' });
+    }
+    if (normalized.status === 'active' && resolvedCategory.status !== 'active') {
+      return res.status(409).json({ success:false, message:'這個福利分類目前已停用，請先啟用分類或改選其他分類後再上架。' });
     }
 
     const nowMs = Date.now();
@@ -9855,6 +10242,7 @@ app.post('/api/admin/rider-benefits', async (req, res) => {
 app.post('/api/admin/rider-benefits/:benefitId/status', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
+    await ensureRiderBenefitCategoryMigration();
     const benefitId = riderBenefitSafeId(req.params.benefitId || '');
     const rawStatus = String(req.body?.status || '').trim().toLowerCase();
     if (!benefitId) return res.status(400).json({ success:false, message:'福利編號不正確。' });
@@ -9865,6 +10253,15 @@ app.post('/api/admin/rider-benefits/:benefitId/status', async (req, res) => {
     const ref = db.collection(RIDER_BENEFITS_COLLECTION).doc(benefitId);
     const doc = await ref.get();
     if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這筆福利。' });
+
+    if (status === 'active') {
+      const data = doc.data() || {};
+      const category = await resolveRiderBenefitCategory(data.categoryId || '', data.category || '', { allowInactive:true });
+      if (!category || category.status !== 'active') {
+        return res.status(409).json({ success:false, message:'這筆福利的分類目前已停用，請先啟用分類或改選其他分類。' });
+      }
+    }
+
     await ref.set({
       status,
       updatedAtMs:Date.now(),
@@ -9896,7 +10293,6 @@ app.delete('/api/admin/rider-benefits/:benefitId', async (req, res) => {
     return res.status(500).json({ success:false, message:'刪除福利失敗。' });
   }
 });
-
 
 app.get('/api/rider/notifications', riderAuthMiddleware, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
