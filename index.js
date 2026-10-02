@@ -1,8 +1,11 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-02
-// Release: 2026_1002_RIDER_BENEFITS_DYNAMIC_CATEGORIES_V2_NO_AUTH｜Rider Benefits + Dynamic Categories / No Authorization Code / V4.9 contracts preserved
+// Release: 2026_1002_RIDER_CITY_ISOLATED_DISPATCH_V4_12｜City-isolated rider dispatch / V4.11 contracts preserved
 //
 // 本次整理：
+// - City-isolated Dispatch V4.12：台中／彰化／台南等縣市任務依「取件縣市」分池；小U只接收目前服務縣市的任務。
+// - 小U申請固定單一服務縣市；同一縣市內行政區可複選。接單設定變更縣市時同步更新正式 ridersV2 服務區域。
+// - 任務池、Web Push、預約承接、一般接單、Smart Stack 全部加入後端縣市 Hard Lock，避免前端或舊快取跨縣市誤接。
 // - 小U福利管理維持免管理授權碼；新增 Firestore 動態分類，可新增／改名／排序／停用／刪除分類。
 // - V4.9 固定福利分類已移除；既有福利分類一次性遷移到 riderBenefitCategories。
 // - 新增 U幣整數帳本、七日簽到、完單／首單／評價／推薦獎勵。
@@ -3113,10 +3116,22 @@ async function sendNewOrderPushToRiders(
         // 現在把「webPushEnabled === true」這個既有必要條件提前到 Firestore 查詢，
         // 只讀真正可能收到 Web Push 的小U；核准、在線、資格、
         // 預約可用時段與略過名單等既有判斷保留；距離條件改為全區第一波通知。
+        const dispatchServiceCity = getOrderDispatchServiceCity(order);
+        if (!dispatchServiceCity) {
+          console.warn(`⚠️ 訂單 ${orderId} 無法判斷取件縣市，為避免跨縣市誤派，本輪不發送 Web Push。`);
+          return {
+            success:false,
+            orderId,
+            notifiedRiderDocIds:[],
+            error:'ORDER_SERVICE_CITY_UNRESOLVED',
+          };
+        }
+
         const ridersSnap = await db
           .collection(RIDER_V2_COLLECTIONS.riders)
+          .where('serviceCity', '==', dispatchServiceCity)
           .where('webPushEnabled', '==', true)
-          .limit(300)
+          .limit(1000)
           .get();
 
         let webPushSuccess = 0;
@@ -3161,6 +3176,9 @@ async function sendNewOrderPushToRiders(
           const riderDispatchEligible =
             canRiderReceiveDispatch(rider) &&
             riderMeetsOrderV4Requirements(rider, order);
+
+          const riderCityMatched =
+            riderMatchesOrderServiceCity(rider, order);
 
           const riderPresence =
             getRiderPresenceV2(rider);
@@ -3220,6 +3238,7 @@ async function sendNewOrderPushToRiders(
           if (
             !riderApproved ||
             !riderDispatchEligible ||
+            !riderCityMatched ||
             (!riderOnline && !allowOffline) ||
             !webPushEnabled ||
             !subscription ||
@@ -3238,7 +3257,7 @@ async function sendNewOrderPushToRiders(
             return;
           }
 
-                    // Global Task Pool：不再用取件距離、服務區或定位新鮮度擋掉待接任務通知。
+                    // City-isolated Dispatch V4.12：不使用距離半徑，但必須與訂單取件縣市相同。
           // 上線、審核通過、非忙碌、Web Push 可用與預約時段仍保留。
           
           pushTasks.push(
@@ -3379,11 +3398,11 @@ async function sendNewOrderPushToRiders(
 }
 
 // =====================================================
-// UBee 全區待接任務派單
+// UBee 縣市分區待接任務派單
 //
-// Rider Global Task Pool Backend V1.1 Clean
-// - 「我的任務 → 待接任務」由 /api/rider/tasks 作為全員可見任務池。
-// - Web Push 第一波直接全區通知，不再用距離圈擋住小U。
+// Rider City-isolated Task Pool Backend V4.12
+// - 「我的任務 → 待接任務」由 /api/rider/tasks 依小U目前服務縣市分池。
+// - Web Push 不用距離圈，但只通知與訂單取件縣市相同的小U。
 // - 距離仍可保留作為前端排序與參考資訊，但不再是能不能看見待接任務的條件。
 // - 已通知過的小U不重複通知；訂單被接走、取消或完成後，停止後續流程。
 // =====================================================
@@ -12321,7 +12340,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
           'redispatching',
         ]
       )
-      .limit(100)
+      .limit(300)
       .get();
 
     const nowMs = Date.now();
@@ -12347,6 +12366,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
         };
       })
       .filter(order => isRiderVisibleDispatchOrder(order))
+      .filter(order => riderMatchesOrderServiceCity(rider, order))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => {
         const status = String(order.status || '').trim();
@@ -12393,12 +12413,13 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       orders,
       tasks: orders,
       availableTaskCount: orders.length,
+      serviceCity: getRiderDispatchServiceCity(rider),
       mapPickupEnabled: true,
-      visibilityMode: 'global_pending_task_pool',
+      visibilityMode: 'city_isolated_task_pool',
       radiusLimited: false,
       dispatchRadiusKm: null,
-      taskPoolLabel: '全區待接任務',
-      apiVersion: 'rider-global-task-pool-v1',
+      taskPoolLabel: `${getRiderDispatchServiceCity(rider) || '目前縣市'}待接任務`,
+      apiVersion: 'rider-city-isolated-task-pool-v1',
       supportedWaitingStatuses: [
         ...UBEE_RIDER_PENDING_DISPATCH_STATUSES,
         'pending_schedule',
@@ -12478,12 +12499,13 @@ app.get('/api/rider/stack-candidates', riderAuthMiddleware, async (req, res) => 
 
     const snap = await db.collection('orders')
       .where('status', '==', 'pending_dispatch')
-      .limit(80)
+      .limit(200)
       .get();
 
     const routeCheckPool = snap.docs
       .map(doc => ({ id:doc.id, ...doc.data() }))
       .filter(order => isRiderVisibleDispatchOrder(order))
+      .filter(order => riderMatchesOrderServiceCity(rider, order))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => isSmartStackStandardDelivery(order))
       .map(order => {
@@ -12994,53 +13016,55 @@ function normalizeRiderDispatchPreferences(input = {}, rider = {}) {
     return fallback;
   };
 
-  const requestedDistrictsRaw = Array.isArray(input.serviceDistricts)
-    ? input.serviceDistricts
+  const inputHasDistricts = Object.prototype.hasOwnProperty.call(input, 'serviceDistricts');
+  const requestedDistrictsRaw = inputHasDistricts
+    ? (Array.isArray(input.serviceDistricts) ? input.serviceDistricts : [])
     : Array.isArray(saved.serviceDistricts)
       ? saved.serviceDistricts
-      : [];
+      : Array.isArray(rider.serviceDistricts)
+        ? rider.serviceDistricts
+        : [];
 
-  // 接單設定是小U的工作偏好，不再被「申請當下選的行政區」鎖住。
-  // 仍統一走台灣行政區正規化，避免重複值與格式不一致。
-  const safeDistricts = [
-    ...new Set(
-      normalizeTaiwanServiceDistricts(requestedDistrictsRaw)
-    ),
+  const normalizedDistricts = [
+    ...new Set(normalizeTaiwanServiceDistricts(requestedDistrictsRaw)),
   ];
 
-  const requestedCities = Array.isArray(input.serviceCities)
-    ? input.serviceCities
-    : Array.isArray(saved.serviceCities)
-      ? saved.serviceCities
-      : [];
+  const inputCities = Array.isArray(input.serviceCities) ? input.serviceCities : [];
+  const savedCities = Array.isArray(saved.serviceCities) ? saved.serviceCities : [];
+  const riderCities = Array.isArray(rider.serviceCities) ? rider.serviceCities : [];
 
-  const safeServiceCities = [
-    ...new Set(
-      requestedCities
-        .map(normalizeTaiwanCityName)
-        .filter(Boolean)
-        .concat(
-          safeDistricts
-            .map(item => inferTaiwanRegion(item).city)
-            .filter(Boolean)
-        )
-    ),
+  const cityCandidates = [
+    input.serviceCity,
+    inputCities[0],
+    ...normalizedDistricts.map(item => inferTaiwanRegion(item).city),
+    saved.serviceCity,
+    savedCities[0],
+    rider.serviceCity,
+    riderCities[0],
+    rider.residenceCity,
+    rider.city,
   ];
+
+  let serviceCity = '';
+  for (const candidate of cityCandidates) {
+    const normalized = normalizeTaiwanCityName(candidate || '');
+    if (normalized) {
+      serviceCity = normalized;
+      break;
+    }
+  }
+
+  // V4.12：一位小U同一時間只屬於一個服務縣市；行政區只能從該縣市挑選。
+  const safeDistricts = serviceCity
+    ? normalizedDistricts.filter(item => inferTaiwanRegion(item).city === serviceCity)
+    : [];
 
   const maxAdvanceRaw = String(input.maxAdvance ?? saved.maxAdvance ?? '1000');
   const maxDistanceRaw = String(input.maxDistance ?? saved.maxDistance ?? '5');
 
   return {
-    serviceCity:
-      normalizeTaiwanCityName(
-        input.serviceCity ??
-        saved.serviceCity ??
-        rider.serviceCity ??
-        ''
-      ) ||
-      safeServiceCities[0] ||
-      '',
-    serviceCities: safeServiceCities,
+    serviceCity,
+    serviceCities: serviceCity ? [serviceCity] : [],
     serviceDistricts: safeDistricts,
     serviceArea: safeDistricts.join('、'),
     maxAdvance: allowedAdvance.has(maxAdvanceRaw) ? maxAdvanceRaw : '1000',
@@ -13108,6 +13132,15 @@ app.post(
         .doc(riderResult.riderDoc.id)
         .set({
           dispatchPreferences: preferences,
+          serviceCity: preferences.serviceCity,
+          serviceCities: preferences.serviceCity ? [preferences.serviceCity] : [],
+          serviceDistricts: preferences.serviceDistricts,
+          serviceArea: preferences.serviceArea,
+          area: preferences.serviceArea,
+          serviceRegionVersion: 'city-isolated-v1',
+          serviceRegionChangedAtMs: Date.now(),
+          serviceRegionChangedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
           dispatchPreferencesUpdatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
           updatedAt:
@@ -13475,6 +13508,10 @@ app.post(
             );
           }
 
+          if (!riderMatchesOrderServiceCity(latestRider, order)) {
+            throw new Error('RIDER_SERVICE_CITY_MISMATCH');
+          }
+
           if (
             !riderMatchesScheduledOrderAvailability(
               latestRider,
@@ -13609,6 +13646,8 @@ app.post(
           [403, '你的帳戶目前有尚待財務確認的月結款，因此暫停承接新任務。完成回繳並經 UBee 財務確認後即可恢復。'],
         RIDER_V4_QUALIFICATION_REQUIRED:
           [403, '你的資格目前不符合這筆任務。'],
+        RIDER_SERVICE_CITY_MISMATCH:
+          [403, '這筆預約不屬於你目前的服務縣市。'],
         RIDER_SCHEDULE_NOT_MATCHED:
           [409, '這筆預約時間不在你設定的可接時段內。'],
         ORDER_SCHEDULE_EXPIRED:
@@ -18401,13 +18440,15 @@ function getDispatchRiderZone(rider = {}) {
 
   const inferred = inferDispatchRegion(residenceText);
 
-  const city = normalizeTaiwanCityName(
-    rider.residenceCity ||
-    rider.city ||
-    rider.serviceCity ||
-    inferred.city ||
-    ''
-  );
+  const city =
+    getRiderDispatchServiceCity(rider) ||
+    normalizeTaiwanCityName(
+      rider.serviceCity ||
+      rider.residenceCity ||
+      rider.city ||
+      inferred.city ||
+      ''
+    );
 
   let district = normalizeTaiwanRegionText(
     rider.residenceDistrict ||
@@ -18433,6 +18474,57 @@ function getDispatchRiderZone(rider = {}) {
     district: district || '未分區',
     zoneId: buildNationwideDispatchZoneId(city, district),
   };
+}
+
+// =====================================================
+// Rider City-isolated Dispatch V4.12｜縣市分池唯一正式規則
+// - 訂單所屬縣市以「取件縣市」為準；跨縣市送達仍由取件縣市的小U承接。
+// - 小U目前服務縣市優先讀 dispatchPreferences.serviceCity，再讀 ridersV2.serviceCity。
+// - 只有變更接單設定並成功寫回 ridersV2 後，才會切換到新的縣市任務池。
+// - 任一方縣市無法判斷時 Fail Closed，避免台中／彰化／台南任務互相混入。
+// =====================================================
+function getRiderDispatchServiceCity(rider = {}) {
+  const prefs =
+    rider.dispatchPreferences && typeof rider.dispatchPreferences === 'object'
+      ? rider.dispatchPreferences
+      : {};
+
+  const candidates = [
+    prefs.serviceCity,
+    ...(Array.isArray(prefs.serviceCities) ? prefs.serviceCities : []),
+    rider.serviceCity,
+    ...(Array.isArray(rider.serviceCities) ? rider.serviceCities : []),
+    ...(Array.isArray(prefs.serviceDistricts) ? prefs.serviceDistricts : []),
+    ...(Array.isArray(rider.serviceDistricts) ? rider.serviceDistricts : []),
+    prefs.serviceArea,
+    rider.serviceArea,
+    rider.area,
+    // 舊帳號相容：真的沒有正式服務縣市時，才退回申請居住縣市。
+    rider.residenceCity,
+    rider.city,
+  ];
+
+  for (const value of candidates) {
+    const direct = normalizeTaiwanCityName(value || '');
+    if (direct) return direct;
+    const inferred = inferTaiwanRegion(String(value || ''));
+    const city = normalizeTaiwanCityName(inferred.city || '');
+    if (city) return city;
+  }
+
+  return '';
+}
+
+function getOrderDispatchServiceCity(order = {}) {
+  const zone = getDispatchOrderZone(order);
+  const city = normalizeTaiwanCityName(zone?.city || '');
+  return city && city !== '未分縣市' ? city : '';
+}
+
+function riderMatchesOrderServiceCity(rider = {}, order = {}) {
+  const riderCity = getRiderDispatchServiceCity(rider);
+  const orderCity = getOrderDispatchServiceCity(order);
+  return Boolean(riderCity && orderCity && riderCity === orderCity);
 }
 
 function dispatchHaversineKm(lat1, lng1, lat2, lng2) {
@@ -21454,6 +21546,37 @@ app.post('/api/rider/register', async (req, res) => {
       finalResidenceCity ||
       '';
 
+    const distinctServiceCities = [
+      ...new Set(
+        normalizedServiceDistricts
+          .map(item => inferTaiwanRegion(item).city)
+          .concat(normalizedServiceCities)
+          .map(normalizeTaiwanCityName)
+          .filter(Boolean)
+      ),
+    ];
+
+    if (distinctServiceCities.length > 1) {
+      return res.status(400).json({
+        success: false,
+        code: 'RIDER_SINGLE_SERVICE_CITY_REQUIRED',
+        message: '小U申請一次只能選擇一個服務縣市；同縣市內可複選行政區。',
+      });
+    }
+
+    if (
+      finalServiceCity &&
+      normalizedServiceDistricts.some(
+        item => inferTaiwanRegion(item).city !== finalServiceCity
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: 'RIDER_SERVICE_DISTRICT_CITY_MISMATCH',
+        message: '服務行政區必須全部屬於同一個服務縣市。',
+      });
+    }
+
     const nowMs = Date.now();
 
     const submittedAtText = new Date(nowMs).toLocaleString('zh-TW', {
@@ -21712,7 +21835,7 @@ app.post('/api/rider/register', async (req, res) => {
       area: cleanText(finalServiceArea || '', 4000),
       serviceArea: cleanText(finalServiceArea || '', 4000),
       serviceCity: cleanText(finalServiceCity || '', 20),
-      serviceCities: normalizedServiceCities,
+      serviceCities: finalServiceCity ? [finalServiceCity] : [],
       serviceDistricts: normalizedServiceDistricts,
       availableTime: cleanText(availableTime || '', 80),
 
@@ -40598,6 +40721,13 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
 
     const preCurrent = {id:preCurrentDoc.id,...preCurrentDoc.data()};
     const preCandidate = {id:preCandidateDoc.id,...preCandidateDoc.data()};
+    if (!riderMatchesOrderServiceCity(rider, preCandidate)) {
+      return res.status(403).json({
+        success:false,
+        code:'RIDER_SERVICE_CITY_MISMATCH',
+        message:'這張下一任務不屬於你目前的服務縣市。',
+      });
+    }
     const preEligibility = await buildSmartStackEligibilityV11(preCurrent,preCandidate);
 
     if (!preEligibility.eligible) {
@@ -40673,6 +40803,9 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       if (!isOrderBelongsToRider(current, identity)) throw new Error('NOT_THIS_RIDER');
       if (!riderMeetsOrderV4Requirements(latestRider, candidate)) {
         throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
+      }
+      if (!riderMatchesOrderServiceCity(latestRider, candidate)) {
+        throw new Error('RIDER_SERVICE_CITY_MISMATCH');
       }
       if (isOrderSkippedForRider(candidate, identity)) throw new Error('RIDER_ALREADY_SKIPPED_ORDER');
       if (String(candidate.status || '').trim() !== 'pending_dispatch') {
@@ -40921,6 +41054,7 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       ORDER_PAYMENT_NOT_CONFIRMED:[409,'這張任務尚未符合可接單條件。'],
       NOT_THIS_RIDER:[403,'目前任務不屬於此小U。'],
       RIDER_V4_QUALIFICATION_REQUIRED:[403,'目前資格不符合此任務需求。'],
+      RIDER_SERVICE_CITY_MISMATCH:[403,'這張任務不屬於你目前的服務縣市。'],
       RIDER_ALREADY_SKIPPED_ORDER:[409,'你已略過這張任務。'],
       ORDER_NOT_FOUND:[404,'找不到此任務。'],
     };
@@ -41028,6 +41162,10 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
 
       if (!riderMeetsOrderV4Requirements(latestRider, order)) {
         throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
+      }
+
+      if (!riderMatchesOrderServiceCity(latestRider, order)) {
+        throw new Error('RIDER_SERVICE_CITY_MISMATCH');
       }
 
       if (
@@ -41298,6 +41436,14 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         success: false,
         code: 'RIDER_V4_QUALIFICATION_REQUIRED',
         message: '此任務需要更高等級或指定專業資格，目前無法承接。',
+      });
+    }
+
+    if (error.message === 'RIDER_SERVICE_CITY_MISMATCH') {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_SERVICE_CITY_MISMATCH',
+        message: '這張任務不屬於你目前的服務縣市；如需跨縣市接單，請先到接單設定變更服務縣市。',
       });
     }
 
