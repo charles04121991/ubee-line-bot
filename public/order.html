@@ -2,16 +2,16 @@
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
-  UBee 跑腿｜客戶端最新正式版｜2026-10-02
-  Release: Customer Compact Home V10
-  PWA: 20261002-customer-compact-home-v10
+  UBee 跑腿｜客戶端最新正式版｜2026-10-05
+  Release: Customer UCoin Automation V2 + Native Settings V2
+  PWA: 20261005-customer-ucoin-settings-v2
 
   本次整理：
   1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
   2. 訂單確認頁新增 U幣折抵；1 U = NT$1，只使用整數 U。
-  3. 折抵上限為跑腿服務費 20% 且不超過平台收入，不影響小U收入；代墊費不折抵。
+  3. U幣折抵加入單筆 NT$20 硬上限，並同時受跑腿服務費 20% 與平台收入限制；代墊費不折抵。
   4. 延續 Native Notification Tab V4、訂單、ETA、店家、會員與既有後端 API 契約。
-  5. 以通知設定全開關版 V8 為基底，將 14～33px 固定字級縮小 1px，保留 13px 閱讀下限與六個通知開關。
+  5. 設定頁改為 Native Settings V2：通知、震動與位置皆使用可操作切換按鈕；位置改為 App 內明確 opt-in，並移除設定列小字說明。
   6. 首頁移除情境教育卡與大型品牌頁尾，正式結束於即時小U運力卡。
 
   Canonical recent milestones:
@@ -23,7 +23,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261002-customer-compact-home-v10" rel="manifest"/>
+<link href="/manifest-order.json?v=20261005-customer-ucoin-settings-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -12185,29 +12185,21 @@ async function shouldAutoLocateCustomer(){
   const preferenceKey = 'ubee_setting_auto_location';
   const storedPreference = localStorage.getItem(preferenceKey);
 
-  // App 內設定是使用者的主動選擇：即使瀏覽器仍允許定位，
-  // 只要使用者在 UBee 設定中關閉，就不得自行重新打開。
-  if(storedPreference === 'false'){
+  // Native Settings V2：位置使用採 App 內明確 opt-in。
+  // 未曾開啟或已關閉時，即使作業系統仍保留定位權限，UBee 也不主動讀取位置。
+  if(storedPreference !== 'true'){
     return false;
   }
 
   try{
     if(navigator.permissions?.query){
       const permission = await navigator.permissions.query({name:'geolocation'});
-
-      if(permission.state === 'denied'){
-        return false;
-      }
-
-      if(permission.state === 'granted'){
-        return true;
-      }
+      if(permission.state === 'denied') return false;
     }
   }catch(_){
-    // Safari / 部分 PWA 不支援 Permissions API，沿用應用程式偏好。
+    // Safari / 部分 PWA 不支援 Permissions API；此時仍以 App 內已開啟偏好為準。
   }
 
-  // 尚未設定偏好時維持原本預設：允許首頁嘗試定位。
   return true;
 }
 
@@ -21908,7 +21900,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261001-customer-native-notification-tab-v4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261005-customer-ucoin-settings-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22673,7 +22665,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   #productionOrderFlow .ubee-settings-row{
     width:100%;
-    min-height:62px;
+    min-height:56px;
     display:grid;
     grid-template-columns:36px minmax(0,1fr) auto;
     align-items:center;
@@ -22711,15 +22703,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     font-size:15px;
     font-weight:1000;
     line-height:1.35;
-  }
-
-  #productionOrderFlow .ubee-settings-copy small{
-    display:block;
-    margin-top:3px;
-    color:#858a90;
-    font-size:13px;
-    font-weight:800;
-    line-height:1.45;
   }
 
   #productionOrderFlow .ubee-settings-value,
@@ -23596,7 +23579,7 @@ html,body{
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.10.01.2';
+  const APP_VERSION = '2026.10.05.1';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -23677,13 +23660,13 @@ html,body{
       <div class="ubee-settings-list">
         <div class="ubee-settings-row" id="ubeeSettingsPushRow" data-setting-row="pushNotifications">
           <span class="ubee-settings-icon" aria-hidden="true">🔔</span>
-          <span class="ubee-settings-copy"><strong>訂單進度通知</strong><small id="ubeeSettingsPushText">正在確認這台裝置的通知設定</small></span>
+          <span class="ubee-settings-copy"><strong>訂單進度通知</strong></span>
           <button class="ubee-setting-switch" id="ubeeSettingsPushSwitch" type="button" role="switch" data-setting-toggle="pushNotifications" aria-label="訂單進度通知" aria-checked="false"></button>
         </div>
         <div class="ubee-settings-row" data-setting-row="haptics">
-          <span class="ubee-settings-icon">〰</span>
-          <span class="ubee-settings-copy"><strong>按鈕震動回饋</strong><small>支援的手機在操作主要按鈕時提供短暫震動</small></span>
-          <button class="ubee-setting-switch" type="button" role="switch" data-setting-toggle="haptics" aria-label="按鈕震動回饋"></button>
+          <span class="ubee-settings-icon" aria-hidden="true">〰</span>
+          <span class="ubee-settings-copy"><strong>按鈕震動回饋</strong></span>
+          <button class="ubee-setting-switch" type="button" role="switch" data-setting-toggle="haptics" aria-label="按鈕震動回饋" aria-checked="true"></button>
         </div>
       </div>
 
@@ -23691,26 +23674,26 @@ html,body{
       <div class="ubee-settings-list">
         <div class="ubee-settings-row" id="ubeeSettingsLocationRow" data-setting-row="autoLocation">
           <span class="ubee-settings-icon" aria-hidden="true">⌖</span>
-          <span class="ubee-settings-copy"><strong>使用目前位置</strong><small id="ubeeSettingsLocationText">開啟後可取得目前位置並更新服務地區</small></span>
-          <button class="ubee-setting-switch" id="ubeeSettingsLocationSwitch" type="button" role="switch" data-setting-toggle="autoLocation" aria-label="使用目前位置"></button>
+          <span class="ubee-settings-copy"><strong>使用目前位置</strong></span>
+          <button class="ubee-setting-switch" id="ubeeSettingsLocationSwitch" type="button" role="switch" data-setting-toggle="autoLocation" aria-label="使用目前位置" aria-checked="false"></button>
         </div>
       </div>
 
       <div class="ubee-settings-section-title">App 與本機資料</div>
       <div class="ubee-settings-list">
         <button class="ubee-settings-row" type="button" data-settings-action="refresh">
-          <span class="ubee-settings-icon">↻</span>
-          <span class="ubee-settings-copy"><strong>檢查更新並重新載入</strong><small>更新 Service Worker 後重新開啟最新版本</small></span>
+          <span class="ubee-settings-icon" aria-hidden="true">↻</span>
+          <span class="ubee-settings-copy"><strong>檢查更新並重新載入</strong></span>
           <span class="ubee-settings-arrow">›</span>
         </button>
         <button class="ubee-settings-row" type="button" data-settings-action="clearDraft">
-          <span class="ubee-settings-icon">⌫</span>
-          <span class="ubee-settings-copy"><strong>清除未完成任務草稿</strong><small>不會刪除會員帳號、正式訂單或常用地址</small></span>
+          <span class="ubee-settings-icon" aria-hidden="true">⌫</span>
+          <span class="ubee-settings-copy"><strong>清除未完成任務草稿</strong></span>
           <span class="ubee-settings-arrow">›</span>
         </button>
         <button class="ubee-settings-row" type="button" data-settings-action="resetPreferences">
-          <span class="ubee-settings-icon">↺</span>
-          <span class="ubee-settings-copy"><strong>恢復 App 預設設定</strong><small>重設位置使用與震動回饋偏好</small></span>
+          <span class="ubee-settings-icon" aria-hidden="true">↺</span>
+          <span class="ubee-settings-copy"><strong>恢復 App 預設設定</strong></span>
           <span class="ubee-settings-arrow">›</span>
         </button>
       </div>
@@ -23720,11 +23703,7 @@ html,body{
       <div class="ubee-settings-section-title">帳號</div>
       <button id="flowProfileLogout" class="ubee-settings-danger" type="button" data-settings-action="logout">登出 UBee 帳號</button>
 
-      <div class="ubee-settings-about">
-        <strong>UBee 跑腿用戶端</strong>
-        App 版本 ${APP_VERSION}<br>
-        PWA、訂單通知、任務追蹤與 App 內頁導覽已啟用
-      </div>`;
+      <div class="ubee-settings-about"><strong>UBee 跑腿用戶端</strong>版本 ${APP_VERSION}</div>`;
     bindSettingControls(panel);
     return panel;
   }
@@ -23743,12 +23722,9 @@ html,body{
       handleSettingToggle(button);
     };
 
-    panel.addEventListener('pointerup',activate);
-    panel.addEventListener('keydown',event => {
-      if(!['Enter',' '].includes(event.key)) return;
-      if(!event.target.closest?.('[data-setting-toggle],[data-setting-row]')) return;
-      activate(event);
-    });
+    // 所有切換控制本身都是原生 button；只監聽 click，避免鍵盤 Enter/Space
+    // 先觸發 keydown 又再產生 click 而造成同一次操作被切換兩次。
+    panel.addEventListener('click',activate);
   }
 
   function preparePanels(){
@@ -23774,7 +23750,8 @@ html,body{
     root.querySelectorAll('[data-setting-toggle]').forEach(button => {
       const name = button.dataset.settingToggle;
       if(name === 'pushNotifications') return;
-      button.setAttribute('aria-checked',getPreference(name,true) ? 'true' : 'false');
+      const defaultValue = name === 'autoLocation' ? false : true;
+      button.setAttribute('aria-checked',getPreference(name,defaultValue) ? 'true' : 'false');
     });
   }
 
@@ -23797,8 +23774,7 @@ html,body{
 
   async function refreshPushCard(){
     const button = document.getElementById('ubeeSettingsPushSwitch');
-    const copy = document.getElementById('ubeeSettingsPushText');
-    if(!button || !copy) return;
+    if(!button) return;
 
     let state = 'disabled';
     try{
@@ -23816,25 +23792,20 @@ html,body{
     button.disabled = state === 'unsupported';
     button.dataset.pushState = state;
     button.setAttribute('aria-checked',state === 'enabled' ? 'true' : 'false');
-
-    if(state === 'enabled'){
-      copy.textContent = '小U接單、取件、配送與送達時接收通知';
-    }else if(state === 'denied'){
-      copy.textContent = '通知權限已封鎖，請到手機設定中重新允許';
-    }else if(state === 'unsupported'){
-      copy.textContent = '目前使用環境不支援裝置推播通知';
-    }else{
-      copy.textContent = '開啟後可接收小U接單、取件與送達進度';
-    }
+    button.setAttribute('aria-label',
+      state === 'enabled' ? '訂單進度通知，已開啟' :
+      state === 'denied' ? '訂單進度通知，系統權限已封鎖' :
+      state === 'unsupported' ? '訂單進度通知，此裝置不支援' :
+      '訂單進度通知，已關閉'
+    );
   }
 
   window.__UBEE_REFRESH_PUSH_SETTING__ = refreshPushCard;
 
   async function refreshEnvironmentStatus(){
     const locationSwitch = document.getElementById('ubeeSettingsLocationSwitch');
-    const locationText = document.getElementById('ubeeSettingsLocationText');
 
-    if(locationSwitch && locationText){
+    if(locationSwitch){
       locationSwitch.disabled = false;
       locationSwitch.removeAttribute('data-permission-state');
 
@@ -23842,26 +23813,25 @@ html,body{
         setPreference('autoLocation',false);
         locationSwitch.disabled = true;
         locationSwitch.dataset.permissionState = 'unsupported';
-        locationText.textContent = '目前使用環境不支援定位，仍可手動輸入地址';
       }else if(navigator.permissions?.query){
         try{
           const permission = await navigator.permissions.query({name:'geolocation'});
           locationSwitch.dataset.permissionState = permission.state;
-
-          if(permission.state === 'granted'){
-            locationText.textContent = '已允許定位；開啟時會更新目前服務地區';
-          }else if(permission.state === 'denied'){
-            setPreference('autoLocation',false);
-            locationText.textContent = '定位權限已封鎖，請到手機或瀏覽器設定中允許';
-          }else{
-            locationText.textContent = '開啟後會詢問定位權限並更新服務地區';
-          }
+          if(permission.state === 'denied') setPreference('autoLocation',false);
         }catch(_){
-          locationText.textContent = '開啟後可取得目前位置並更新服務地區';
+          // Safari / 部分 PWA 不支援 Permissions API；維持 App 內偏好狀態。
         }
-      }else{
-        locationText.textContent = '開啟後可取得目前位置並更新服務地區';
       }
+
+      const enabled = getPreference('autoLocation',false) && !locationSwitch.disabled;
+      locationSwitch.setAttribute('aria-checked',enabled ? 'true' : 'false');
+      locationSwitch.setAttribute('aria-label',
+        locationSwitch.dataset.permissionState === 'unsupported'
+          ? '使用目前位置，此裝置不支援定位'
+          : locationSwitch.dataset.permissionState === 'denied'
+            ? '使用目前位置，系統定位權限已封鎖'
+            : `使用目前位置，${enabled ? '已開啟' : '已關閉'}`
+      );
     }
 
     await refreshPushCard();
@@ -24432,7 +24402,7 @@ html,body{
   async function resetPreferences(){
     const ok=await showUBeeCustomerNativeConfirm(
       '恢復 App 預設設定？',
-      '通知、震動與其他本機使用偏好會恢復預設值。',
+      '位置使用與震動回饋會恢復預設值。',
       {confirmText:'恢復預設',cancelText:'取消'}
     );
     if(!ok){
@@ -24512,7 +24482,7 @@ html,body{
     }
 
     if(name === 'autoLocation'){
-      const currentlyEnabled = getPreference('autoLocation',true);
+      const currentlyEnabled = getPreference('autoLocation',false);
 
       if(currentlyEnabled){
         setPreference('autoLocation',false);
@@ -29259,7 +29229,7 @@ body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open
     if(state.tab==='rules'){
       return `<section class="ubee-ucoin-tabpanel"><div class="ubee-ucoin-panel-title">使用規則</div><div class="ubee-ucoin-rule-list">
         <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">1</b><span><strong>折抵比例</strong><small>1 U幣折抵 NT$1，只能使用整數 U幣，小數餘額會保留。</small></span></div>
-        <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">20</b><span><strong>每筆折抵上限</strong><small>最多折抵跑腿服務費 20%，並且不得超過 UBee 平台收入。</small></span></div>
+        <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">$${esc(rules.redemptionOrderCapTwd||20)}</b><span><strong>每筆折抵上限</strong><small>每筆最高 NT$${esc(rules.redemptionOrderCapTwd||20)}，且同時不得超過跑腿服務費 20% 與 UBee 平台收入。</small></span></div>
         <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">×</b><span><strong>不適用項目</strong><small>代墊費、停車費、過路費與小費不參與折抵，不影響小U收入。</small></span></div>
         <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">天</b><span><strong>使用期限</strong><small>U幣自取得日起 ${esc(rules.expiryDays||180)} 天有效；取消訂單時，已保留但尚未使用的 U幣會退回。</small></span></div>
       </div></section>`;
@@ -29319,7 +29289,7 @@ body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open
       const data=await customerApiFetch('/api/customer/u-coins/redemption-preview',{method:'POST',body:JSON.stringify({serviceSubtotal,platformIncome})});
       state.maxWhole=Math.max(0,Math.floor(Number(data.maxWhole||0)));setEntry(data.wallet||{});
       toggle.disabled=state.maxWhole<=0;
-      if(hint)hint.textContent=state.maxWhole>0?`本單最多可折抵 ${state.maxWhole} U幣（NT$${state.maxWhole}）`:`目前沒有可用的整數 U幣額度`;
+      if(hint)hint.textContent=state.maxWhole>0?`本單最多可折抵 ${state.maxWhole} U幣（NT$${state.maxWhole}；單筆上限 NT$${Math.max(0,Math.floor(Number(data.orderCapTwd||20))) }）`:`目前沒有可用的整數 U幣額度`;
     }catch(_){box.hidden=true}
     syncCheckout();
   }
