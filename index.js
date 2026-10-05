@@ -1,6 +1,6 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-02
-// Release: 2026_1002_RIDER_SELF_ORDER_HARD_LOCK_V4_13｜Self-order hard lock / V4.12 city-isolated dispatch preserved
+// UBee Backend｜Latest Release 2026-10-05
+// Release: 2026_1005_UCOIN_AUTOMATION_V2｜U幣單筆 NT$20 硬上限 / Customer Settings V2 相容
 //
 // 本次整理：
 // - Self-Order Hard Lock V4.13：正式小U可正常使用客戶端下單，但本人不得看見、收到 Push、承接、預約、疊單或被調度指定自己的訂單。
@@ -12,7 +12,7 @@
 // - V4.9 固定福利分類已移除；既有福利分類一次性遷移到 riderBenefitCategories。
 // - 新增 U幣整數帳本、七日簽到、完單／首單／評價／推薦獎勵。
 // - 新增訂單 U幣保留、完單扣除、取消退回與冪等交易事件。
-// - 折抵受服務費 20% 與平台收入雙重上限保護，不影響小U收入與代墊款。
+// - U幣折抵受單筆 NT$20、服務費 20% 與平台收入三重上限保護，不影響小U收入與代墊款。
 // - Customer Notification Tab V4、下單／派單／計價／財務／通知契約維持不變。
 //
 // Canonical recent milestones:
@@ -679,13 +679,13 @@ async function processUBeeGrowthCompletedOrder(order = {}) {
 }
 
 // =====================================================
-// UBee 客戶 U幣 V1
+// UBee 客戶 U幣 V2
 // - 所有金額以 0.1 U 為最小單位（units），避免浮點誤差。
 // - 1 U = NT$1；折抵只接受整數 U。
 // - 發放／扣抵皆以 deterministic event id 保證冪等。
 // =====================================================
 const UBEE_UCOIN = Object.freeze({
-  version:'ucoin-v1-20261001',
+  version:'ucoin-v2-20261005',
   unitsPerCoin:10,
   expiryDays:180,
   orderCompletedUnits:5,
@@ -694,6 +694,8 @@ const UBEE_UCOIN = Object.freeze({
   referralUnits:20,
   redemptionRateTwd:1,
   redemptionServicePercent:0.20,
+  // V2：單筆 U幣最多折抵 NT$20。此值是後端硬上限，前端不可繞過。
+  redemptionOrderCapTwd:20,
 });
 
 const UBEE_UCOIN_COLLECTIONS = Object.freeze({
@@ -704,6 +706,27 @@ const UBEE_UCOIN_COLLECTIONS = Object.freeze({
 
 function uCoinSafeUnits(value) {
   return Math.max(0, Math.floor(Number(value || 0)));
+}
+
+function calculateUCoinRedemptionCap({ balanceWhole = 0, serviceSubtotal = 0, platformIncome = 0 } = {}) {
+  const safeBalanceWhole = Math.max(0, Math.floor(Number(balanceWhole || 0)));
+  const safeServiceSubtotal = Math.max(0, Math.round(Number(serviceSubtotal || 0)));
+  const safePlatformIncome = Math.max(0, Math.floor(Number(platformIncome || 0)));
+  const percentCap = Math.max(0, Math.floor(safeServiceSubtotal * UBEE_UCOIN.redemptionServicePercent));
+  const orderCapTwd = Math.max(0, Math.floor(Number(UBEE_UCOIN.redemptionOrderCapTwd || 0)));
+  const maxWhole = Math.max(0, Math.min(
+    safeBalanceWhole,
+    percentCap,
+    safePlatformIncome,
+    orderCapTwd
+  ));
+  return {
+    maxWhole,
+    balanceWhole:safeBalanceWhole,
+    percentCap,
+    platformIncomeCap:safePlatformIncome,
+    orderCapTwd,
+  };
 }
 
 function uCoinEventId(customerId, eventKey) {
@@ -6461,7 +6484,8 @@ function uCoinRulesPayload() {
     redemptionRateTwd:UBEE_UCOIN.redemptionRateTwd,
     expiryDays:UBEE_UCOIN.expiryDays,
     redemptionServicePercent:UBEE_UCOIN.redemptionServicePercent,
-    redemptionText:'1 U幣折抵 NT$1；每筆最多折抵跑腿服務費 20%，且不得超過 UBee 平台收入。代墊費、停車費、過路費與小費不適用。',
+    redemptionOrderCapTwd:UBEE_UCOIN.redemptionOrderCapTwd,
+    redemptionText:`1 U幣折抵 NT$1；每筆最高折抵 NT$${UBEE_UCOIN.redemptionOrderCapTwd}，且同時不得超過跑腿服務費 20% 與 UBee 平台收入。代墊費、停車費、過路費與小費不適用。`,
     earn:[
       { key:'checkin', title:'每日簽到', amountText:'0.1～0.2 U幣' },
       { key:'order', title:'完成一趟跑腿', amountText:'0.5 U幣' },
@@ -6570,8 +6594,18 @@ app.post('/api/customer/u-coins/redemption-preview', requireCustomerAuth, async 
     const serviceSubtotal = Math.max(0, Math.round(Number(req.body?.serviceSubtotal || 0)));
     const platformIncome = Math.max(0, Math.floor(Number(req.body?.platformIncome || 0)));
     const balanceWhole = Math.floor(uCoinSafeUnits(wallet.availableUnits) / UBEE_UCOIN.unitsPerCoin);
-    const maxWhole = Math.max(0, Math.min(balanceWhole, Math.floor(serviceSubtotal * UBEE_UCOIN.redemptionServicePercent), platformIncome));
-    return res.json({ success:true, wallet:serializeUCoinWallet(wallet), serviceSubtotal, platformIncome, maxWhole, discountTwd:maxWhole });
+    const cap = calculateUCoinRedemptionCap({ balanceWhole, serviceSubtotal, platformIncome });
+    return res.json({
+      success:true,
+      wallet:serializeUCoinWallet(wallet),
+      serviceSubtotal,
+      platformIncome,
+      maxWhole:cap.maxWhole,
+      discountTwd:cap.maxWhole,
+      percentCap:cap.percentCap,
+      platformIncomeCap:cap.platformIncomeCap,
+      orderCapTwd:cap.orderCapTwd,
+    });
   } catch (error) {
     console.error('❌ U幣折抵預覽失敗：', error);
     return res.status(500).json({ success:false, error:'目前無法計算 U幣折抵。' });
@@ -29783,8 +29817,13 @@ async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
       const balanceWhole = Math.floor(uCoinSafeUnits(wallet.availableUnits) / UBEE_UCOIN.unitsPerCoin);
       const baseServiceSubtotal = Math.max(0, Math.round(Number(order.serviceSubtotal || order.serviceTotal || 0)));
       const platformIncome = Math.max(0, Math.floor(Number(order.platformIncome ?? order.platformFee ?? order.serviceFee ?? 0)));
-      const percentCap = Math.floor(baseServiceSubtotal * UBEE_UCOIN.redemptionServicePercent);
-      const redeemedWhole = Math.max(0, Math.min(requestedWhole, balanceWhole, percentCap, platformIncome));
+      const cap = calculateUCoinRedemptionCap({
+        balanceWhole,
+        serviceSubtotal:baseServiceSubtotal,
+        platformIncome,
+      });
+      // 最終扣抵額永遠由後端重算：餘額、服務費 20%、平台收入、單筆 NT$20 四者取最小值。
+      const redeemedWhole = Math.max(0, Math.min(requestedWhole, cap.maxWhole));
       const redeemedUnits = redeemedWhole * UBEE_UCOIN.unitsPerCoin;
       if (redeemedUnits > 0 && !reservationDoc.exists) {
         savedOrder = applyUCoinDiscountFields({ ...savedOrder }, {
@@ -39972,7 +40011,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     Number(lockedQuote.expiresAtMs || 0),
 
   // U幣只接受整數 U；實際可折抵額仍由 saveCustomerOrderWithQuoteLock
-  // 依錢包餘額、服務費 20% 與平台收入三者重新取最小值。
+  // 依錢包餘額、服務費 20%、平台收入與單筆 NT$20 上限重新取最小值。
   uCoinRequestedWhole:
     Math.max(0, Math.floor(Number(req.body.uCoinRedeemWhole || 0))),
 
