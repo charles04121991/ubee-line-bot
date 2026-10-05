@@ -1,9 +1,11 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-05
-// Release: 2026_1005_RIDER_QUIZ_SUBMIT_GUARD_V4_14｜Quiz submit validation / V4.13 self-order hard lock preserved
+// Release: 2026_1005_RIDER_NATIVE_QUIZ_V4_15｜Frontend Native Quiz / backend quiz validation unchanged / V4.13 self-order hard lock preserved
 //
 // 本次整理：
-// - Quiz Submit Guard V4.14：兩個測驗 API 在計分與累加 attempts 前，先驗證全部題目都有合法答案；不完整或非法 payload 回 422，不計入正式測驗次數。
+// - V4.15：測驗改版為騎士端全螢幕 Native Quiz；後端端點與完整答案驗證規則不變。
+// - V4.14.2：三個 UBee 社群加入流程免密碼。
+// - V4.14.1：學習中心 Hotfix 保留。
 // - Self-Order Hard Lock V4.13：正式小U可正常使用客戶端下單，但本人不得看見、收到 Push、承接、預約、疊單或被調度指定自己的訂單。
 // - 客戶下單時由後端建立不可逆身分指紋；偵測到小U身分下單後，自動寫入客戶通知中心與小U通知中心。
 // - City-isolated Dispatch V4.12：台中／彰化／台南等縣市任務依「取件縣市」分池；小U只接收目前服務縣市的任務。
@@ -1875,10 +1877,7 @@ const UBEE_JKOPAY_ACCOUNT =
   String(process.env.UBEE_JKOPAY_ACCOUNT || '901871793').trim();
 
 
-// Rider Community Server Config：公告／聊天／回報社群僅由後端提供給 bootstrap；騎士端不保存網址或密碼。
-const UBEE_RIDER_COMMUNITY_PASSWORD =
-  String(process.env.UBEE_RIDER_COMMUNITY_PASSWORD || '1234').trim();
-
+// Rider Community Server Config：公告／聊天／回報社群僅由後端提供給 bootstrap；社群加入不使用密碼。
 const UBEE_RIDER_COMMUNITIES = Object.freeze({
   announcement: String(
     process.env.UBEE_RIDER_ANNOUNCEMENT_GROUP ||
@@ -1895,17 +1894,15 @@ const UBEE_RIDER_COMMUNITIES = Object.freeze({
 });
 
 function buildRiderCommunityPublicConfig() {
-  const password = String(UBEE_RIDER_COMMUNITY_PASSWORD || '').trim();
   const announcement = String(UBEE_RIDER_COMMUNITIES.announcement || '').trim();
   const chat = String(UBEE_RIDER_COMMUNITIES.chat || '').trim();
   const report = String(UBEE_RIDER_COMMUNITIES.report || '').trim();
 
   return {
     source: 'server',
-    version: 'rider-community-server-v1',
+    version: 'rider-community-server-v2-no-password',
     required: true,
-    ready: Boolean(password && announcement && chat && report),
-    password,
+    ready: Boolean(announcement && chat && report),
     announcement,
     chat,
     report,
