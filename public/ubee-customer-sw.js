@@ -1,7 +1,7 @@
 /* ============================================================
- * UBee 跑腿｜客戶端 Service Worker｜最新正式版 2026-10-05
- * Release: Customer No-Register Order Session V3 + UCoin Automation V2 + Native Settings V2
- * Version: 20261005-customer-no-register-v3
+ * UBee 跑腿｜客戶端 Service Worker｜最新正式版 2026-10-06
+ * Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2
+ * Version: 20261006-customer-no-register-v4
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／訂單／通知／我的／我的U幣）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261005-customer-no-register-v3';
+const UBEE_CUSTOMER_SW_VERSION = '20261006-customer-no-register-v4';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
