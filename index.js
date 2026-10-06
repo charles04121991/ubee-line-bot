@@ -1,6 +1,8 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-05
-// Release: 2026_1005_RIDER_NATIVE_QUIZ_V4_15｜Frontend Native Quiz / backend quiz validation unchanged / V4.13 self-order hard lock preserved
+// UBee Backend｜Latest Release 2026-10-06
+// Release: 2026_1006_CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_QUIZ_V4_15
+// - Customer No-Register V4：移除舊傳統註冊端點，新增首單安全 Order Session；既有手機不會被重複建立帳號。
+// - UCoin Hard Cap V2：單筆折抵 NT$20 硬上限由後端 preview 與正式交易雙重強制。
 //
 // 本次整理：
 // - V4.15：測驗改版為騎士端全螢幕 Native Quiz；後端端點與完整答案驗證規則不變。
@@ -697,6 +699,7 @@ const UBEE_UCOIN = Object.freeze({
   referralUnits:20,
   redemptionRateTwd:1,
   redemptionServicePercent:0.20,
+  orderRedemptionCapTwd:20,
 });
 
 const UBEE_UCOIN_COLLECTIONS = Object.freeze({
@@ -4748,6 +4751,8 @@ function customerAccountResponse(account, customerId) {
     serviceDistrict: String(source.serviceDistrict || ''),
     growthReferralCode: String(source.growthReferralCode || ''),
     status: String(source.status || 'active'),
+    passwordConfigured: Boolean(source.passwordHash?.hash),
+    authMode: String(source.authMode || (source.passwordHash?.hash ? 'password' : 'order_session')),
     preferences: source.preferences || {},
     createdAtMs: Number(source.createdAtMs || 0),
 
@@ -4767,23 +4772,51 @@ function customerAccountResponse(account, customerId) {
 
 async function findCustomerAccountByPhone(phone) {
   const normalized = normalizeCustomerPhone(phone);
-  const indexDoc = await db
+  if (!isValidCustomerPhone(normalized)) return null;
+
+  const indexRef = db
     .collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex)
-    .doc(normalized)
-    .get();
-  if (!indexDoc.exists) return null;
-  const customerId = String(indexDoc.data()?.customerId || '').trim();
-  if (!customerId) return null;
-  const accountDoc = await db
+    .doc(normalized);
+  const indexDoc = await indexRef.get();
+
+  if (indexDoc.exists) {
+    const customerId = String(indexDoc.data()?.customerId || '').trim();
+    if (customerId) {
+      const accountDoc = await db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .doc(customerId)
+        .get();
+      if (accountDoc.exists) {
+        return { customerId, ref: accountDoc.ref, account: accountDoc.data() || {} };
+      }
+    }
+  }
+
+  // 相容早期資料：若舊帳號尚未建立 phoneIndex，直接以 accounts.phone 找回並補索引。
+  const fallbackSnap = await db
     .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-    .doc(customerId)
+    .where('phone', '==', normalized)
+    .limit(1)
     .get();
-  if (!accountDoc.exists) return null;
-  return {
+  if (fallbackSnap.empty) return null;
+
+  const accountDoc = fallbackSnap.docs[0];
+  const customerId = String(accountDoc.id || accountDoc.data()?.customerId || '').trim();
+  if (!/^customer_[a-f0-9]{32}$/.test(customerId)) return null;
+  const account = accountDoc.data() || {};
+
+  await indexRef.set({
     customerId,
-    ref: accountDoc.ref,
-    account: accountDoc.data() || {},
-  };
+    phone: normalized,
+    memberNumber: String(account.memberNumber || ''),
+    phoneVerified: account.phoneVerified === true,
+    repairedAtMs: Date.now(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true }).catch(error => {
+    console.warn('⚠️ customerPhoneIndex 自動補建失敗：', error.message || error);
+  });
+
+  return { customerId, ref: accountDoc.ref, account };
 }
 
 
@@ -5736,142 +5769,79 @@ function sendCustomerAuthError(res, error) {
   });
 }
 
-app.post('/api/customer-auth/register/complete', async (req, res) => {
+// =====================================================
+// UBee Customer No-Register Order Session V4
+// - 新客不經傳統註冊流程；第一次真正送出任務時才建立安全 Customer 身分。
+// - 只收下單必要的本人姓名、手機與條款同意，不要求密碼、Email 或預先設定常用行政區。
+// - 同一手機若已存在帳號，絕不覆寫、絕不重建；回傳既有身分登入／密碼設定流程。
+// - 建立 account / phone index / member counter / growth / session 於同一 Firestore transaction，避免半套帳號。
+// =====================================================
+app.post('/api/customer-auth/order-session', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
 
   try {
+    // 若瀏覽器本來就有有效 Session，直接沿用，不重複建立身分。
+    const existingAuth = await loadCustomerAuth(req).catch(() => null);
+    if (existingAuth) {
+      return res.json({
+        success: true,
+        authenticated: true,
+        reused: true,
+        customer: customerAccountResponse(existingAuth.account, existingAuth.customerId),
+      });
+    }
+
     const phone = normalizeCustomerPhone(req.body?.phone);
+    const name = cleanText(req.body?.name || '', 40);
+    const serviceCity = cleanText(req.body?.serviceCity || '', 30);
+    const referralCode = cleanText(req.body?.referralCode || '', 24).toUpperCase();
+    const agreements = req.body?.agreements && typeof req.body.agreements === 'object'
+      ? req.body.agreements
+      : {};
 
     if (!isValidCustomerPhone(phone)) {
-      throw customerAuthError(
-        '手機號碼格式不正確。',
-        400,
-        'CUSTOMER_PHONE_INVALID'
-      );
+      throw customerAuthError('請輸入正確的 09 開頭 10 碼手機號碼。', 400, 'CUSTOMER_PHONE_INVALID');
     }
-
-    const profile =
-      req.body?.profile &&
-      typeof req.body.profile === 'object'
-        ? req.body.profile
-        : {};
-
-    const preferences =
-      req.body?.preferences &&
-      typeof req.body.preferences === 'object'
-        ? req.body.preferences
-        : {};
-
-    const agreements =
-      req.body?.agreements &&
-      typeof req.body.agreements === 'object'
-        ? req.body.agreements
-        : {};
-
-    const name = cleanText(profile.name || '', 40);
-    const email = normalizeCustomerEmail(profile.email);
-    const serviceCity = cleanText(profile.serviceCity || '', 30);
-    const serviceDistrict = cleanText(profile.serviceDistrict || '', 30);
-    const referralCode = cleanText(profile.referralCode || '', 24);
-
     if (name.length < 2) {
-      throw customerAuthError(
-        '請輸入可供訂單與客服核對的姓名。',
-        400,
-        'CUSTOMER_NAME_INVALID'
-      );
+      throw customerAuthError('請填寫下單人本人姓名。', 400, 'CUSTOMER_NAME_INVALID');
+    }
+    if (!agreements.terms || !agreements.privacy || !agreements.pricing || !agreements.prohibitedTasks) {
+      throw customerAuthError('請完整同意服務條款、隱私權、計價與禁運規範。', 400, 'CUSTOMER_AGREEMENTS_REQUIRED');
     }
 
-    if (!isValidCustomerEmail(email)) {
-      throw customerAuthError(
-        '電子信箱格式不正確。',
-        400,
-        'CUSTOMER_EMAIL_INVALID'
-      );
+    // 快速判斷既有手機，提供正確的原生登入／密碼設定導流。
+    const existingRecord = await findCustomerAccountByPhone(phone);
+    if (existingRecord) {
+      const passwordSetupRequired = !Boolean(existingRecord.account?.passwordHash?.hash);
+      return res.status(409).json({
+        success: false,
+        authenticated: false,
+        code: 'CUSTOMER_EXISTING_LOGIN_REQUIRED',
+        passwordSetupRequired,
+        message: passwordSetupRequired
+          ? '這支手機已建立 UBee 使用身分，但尚未設定登入密碼。'
+          : '這支手機已有 UBee 使用身分，請使用既有帳號登入。',
+      });
     }
 
-    if (!serviceCity || !serviceDistrict) {
-      throw customerAuthError(
-        '請選擇常用服務縣市與行政區。',
-        400,
-        'CUSTOMER_AREA_REQUIRED'
-      );
-    }
-
-    if (
-      !agreements.terms ||
-      !agreements.privacy ||
-      !agreements.pricing ||
-      !agreements.prohibitedTasks
-    ) {
-      throw customerAuthError(
-        '請完整同意服務條款與隱私權政策。',
-        400,
-        'CUSTOMER_AGREEMENTS_REQUIRED'
-      );
-    }
-
-    const passwordHash =
-      await hashCustomerPassword(
-        req.body?.password,
-        phone
-      );
-
-    const customerId =
-      `customer_${crypto.randomBytes(16).toString('hex')}`;
-
-    const growthReferralCode = buildGrowthReferralCode('customer', customerId);
-    const incomingReferral = referralCode
-      ? await resolveGrowthReferralCode(referralCode)
-      : null;
-
+    const incomingReferral = referralCode ? await resolveGrowthReferralCode(referralCode) : null;
     if (referralCode && !incomingReferral) {
-      throw customerAuthError(
-        '推薦碼不存在或已失效，請確認後再試。',
-        400,
-        'CUSTOMER_REFERRAL_CODE_INVALID'
-      );
+      throw customerAuthError('推薦碼不存在或已失效，請確認後再試。', 400, 'CUSTOMER_REFERRAL_CODE_INVALID');
     }
 
-    const sessionRawToken =
-      customerAuthRandomToken(32);
-
-    const sessionHash =
-      customerAuthHash(sessionRawToken);
-
+    const customerId = `customer_${crypto.randomBytes(16).toString('hex')}`;
+    const growthReferralCode = buildGrowthReferralCode('customer', customerId);
+    const sessionRawToken = customerAuthRandomToken(32);
+    const sessionHash = customerAuthHash(sessionRawToken);
     const nowMs = Date.now();
+    const fingerprint = customerAuthClientFingerprint(req);
 
-    const fingerprint =
-      customerAuthClientFingerprint(req);
-
-    const accountRef =
-      db
-        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-        .doc(customerId);
-
-    const phoneIndexRef =
-      db
-        .collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex)
-        .doc(phone);
-
-    const counterRef =
-      db
-        .collection(CUSTOMER_AUTH_COLLECTIONS.counters)
-        .doc('customerMembers');
-
-    const sessionRef =
-      db
-        .collection(CUSTOMER_AUTH_COLLECTIONS.sessions)
-        .doc(sessionHash);
-
-    const growthCodeRef = db
-      .collection(UBEE_GROWTH_COLLECTIONS.referralCodes)
-      .doc(growthReferralCode);
-
-    const growthProfileRef = db
-      .collection(UBEE_GROWTH_COLLECTIONS.profiles)
-      .doc(getGrowthProfileId('customer', customerId));
-
+    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    const phoneIndexRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex).doc(phone);
+    const counterRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.counters).doc('customerMembers');
+    const sessionRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(sessionHash);
+    const growthCodeRef = db.collection(UBEE_GROWTH_COLLECTIONS.referralCodes).doc(growthReferralCode);
+    const growthProfileRef = db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('customer', customerId));
     const incomingReferralRef = incomingReferral
       ? db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`customer_${customerId}`)
       : null;
@@ -5879,36 +5849,26 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
     let memberNumber = '';
 
     await db.runTransaction(async transaction => {
-      const [phoneIndexDoc, counterDoc] =
-        await Promise.all([
-          transaction.get(phoneIndexRef),
-          transaction.get(counterRef),
-        ]);
+      const [phoneIndexDoc, counterDoc] = await Promise.all([
+        transaction.get(phoneIndexRef),
+        transaction.get(counterRef),
+      ]);
 
+      // 競態保護：即使兩個請求同時送出，同一手機也只能建立一個 Customer。
       if (phoneIndexDoc.exists) {
-        throw customerAuthError(
-          '這個手機號碼已經是 UBee 會員，請直接登入。',
-          409,
-          'CUSTOMER_ALREADY_EXISTS'
-        );
+        const conflict = customerAuthError('這支手機已建立 UBee 使用身分，請改用登入。', 409, 'CUSTOMER_EXISTING_LOGIN_REQUIRED');
+        conflict.passwordSetupRequired = true;
+        throw conflict;
       }
 
-      const nextNumber =
-        Number(counterDoc.data()?.nextNumber || 1);
+      const nextNumber = Math.max(1, Number(counterDoc.data()?.nextNumber || 1));
+      memberNumber = `UBC${String(nextNumber).padStart(8, '0')}`;
 
-      memberNumber =
-        `UBC${String(nextNumber).padStart(8, '0')}`;
-
-      transaction.set(
-        counterRef,
-        {
-          nextNumber: nextNumber + 1,
-          updatedAtMs: nowMs,
-          updatedAt:
-            admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+      transaction.set(counterRef, {
+        nextNumber: nextNumber + 1,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
 
       transaction.set(accountRef, {
         customerId,
@@ -5916,115 +5876,52 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         phone,
         phoneVerified: false,
         phoneVerificationStatus: 'not_verified',
-
-        // UBee 實名制與手機驗證完全分離。
         identityVerification: {
-          status: 'not_verified',
-          level: 0,
-          provider: '',
-          method: '',
-          verifiedName: '',
-          verificationId: '',
-          verifiedAtMs: 0,
-          lastAttemptAtMs: 0,
-          failureCode: '',
-          updatedAtMs: nowMs,
+          status: 'not_verified', level: 0, provider: '', method: '', verifiedName: '',
+          verificationId: '', verifiedAtMs: 0, lastAttemptAtMs: 0, failureCode: '', updatedAtMs: nowMs,
         },
-
         recoveryMethod: 'line_bot',
         recoveryLineUserId: '',
         recoveryLineTrustedAtMs: 0,
         recoveryLineTrustLevel: 'none',
         name,
-        email,
+        email: '',
         emailVerified: false,
         serviceCity,
-        serviceDistrict,
+        serviceDistrict: '',
         referralCode: incomingReferral ? incomingReferral.code : '',
         referredByType: incomingReferral ? String(incomingReferral.ownerType || '') : '',
         referredById: incomingReferral ? String(incomingReferral.ownerId || '') : '',
         growthReferralCode,
-        passwordHash,
+        passwordHash: null,
         passwordVersion: 1,
+        passwordConfigured: false,
+        authMode: 'order_session',
         status: 'active',
         failedLoginCount: 0,
         lockedUntilMs: 0,
-
         preferences: {
-          orderStatusNotifications:
-            preferences.orderStatusNotifications !== false,
-
-          paymentAndSafetyNotifications:
-            preferences.paymentAndSafetyNotifications !== false,
-
-          importantAnnouncements:
-            preferences.importantAnnouncements !== false,
-
-          marketingNotifications:
-            preferences.marketingNotifications === true,
-
-          setupAddressLater:
-            preferences.setupAddressLater !== false,
+          orderStatusNotifications: true,
+          paymentAndSafetyNotifications: true,
+          importantAnnouncements: true,
+          marketingNotifications: false,
+          setupAddressLater: true,
         },
-
         agreements: {
           terms: true,
           privacy: true,
           pricing: true,
           prohibitedTasks: true,
-          agreedAtClient:
-            cleanText(
-              agreements.agreedAtClient || '',
-              50
-            ),
+          agreedAtClient: cleanText(agreements.agreedAtClient || '', 50),
           agreedAtMs: nowMs,
         },
-
-        source: 'customer-pwa',
-        schemaVersion: 'customer-account-v2-no-otp',
+        source: 'customer-order-session',
+        schemaVersion: 'customer-account-v3-order-session',
         createdAtMs: nowMs,
         updatedAtMs: nowMs,
-        createdAt:
-          admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt:
-          admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      transaction.set(growthCodeRef, {
-        code:growthReferralCode,
-        ownerType:'customer',
-        ownerId:customerId,
-        active:true,
-        city:serviceCity,
-        district:serviceDistrict,
-        version:UBEE_GROWTH_VERSION,
-        createdAtMs:nowMs,
-        updatedAtMs:nowMs,
-        createdAt:admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge:true });
-
-      transaction.set(growthProfileRef, {
-        ownerType:'customer', ownerId:customerId, referralCode:growthReferralCode,
-        currentTier:'GENERAL', highestTier:'GENERAL', completedOrders:0, lifetimeCounterVersion:UBEE_GROWTH_COUNTER_VERSION,
-        validCustomerReferrals:0, validRiderReferrals:0, growthScore:0,
-        city:serviceCity, district:serviceDistrict, rulesVersion:UBEE_GROWTH_RULES_VERSION,
-        createdAtMs:nowMs, updatedAtMs:nowMs,
-        createdAt:admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge:true });
-
-      if (incomingReferralRef) {
-        transaction.set(incomingReferralRef, {
-          referralId:`customer_${customerId}`, referralCode:incomingReferral.code,
-          referrerType:String(incomingReferral.ownerType || ''),
-          referrerId:String(incomingReferral.ownerId || ''),
-          refereeType:'customer', refereeId:customerId, status:'registered',
-          city:serviceCity, district:serviceDistrict, createdAtMs:nowMs, updatedAtMs:nowMs,
-          createdAt:admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge:false });
-      }
 
       transaction.set(phoneIndexRef, {
         customerId,
@@ -6032,52 +5929,85 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         memberNumber,
         phoneVerified: false,
         createdAtMs: nowMs,
-        createdAt:
-          admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      transaction.set(growthCodeRef, {
+        code: growthReferralCode,
+        ownerType: 'customer',
+        ownerId: customerId,
+        active: true,
+        city: serviceCity,
+        district: '',
+        version: UBEE_GROWTH_VERSION,
+        createdAtMs: nowMs,
+        updatedAtMs: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(growthProfileRef, {
+        ownerType: 'customer', ownerId: customerId, referralCode: growthReferralCode,
+        currentTier: 'GENERAL', highestTier: 'GENERAL', completedOrders: 0,
+        lifetimeCounterVersion: UBEE_GROWTH_COUNTER_VERSION,
+        validCustomerReferrals: 0, validRiderReferrals: 0, growthScore: 0,
+        city: serviceCity, district: '', rulesVersion: UBEE_GROWTH_RULES_VERSION,
+        createdAtMs: nowMs, updatedAtMs: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      if (incomingReferralRef) {
+        transaction.set(incomingReferralRef, {
+          referralId: `customer_${customerId}`,
+          referralCode: incomingReferral.code,
+          referrerType: String(incomingReferral.ownerType || ''),
+          referrerId: String(incomingReferral.ownerId || ''),
+          refereeType: 'customer',
+          refereeId: customerId,
+          status: 'registered',
+          city: serviceCity,
+          district: '',
+          createdAtMs: nowMs,
+          updatedAtMs: nowMs,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: false });
+      }
 
       transaction.set(sessionRef, {
         customerId,
         passwordVersion: 1,
         createdAtMs: nowMs,
         lastSeenAtMs: nowMs,
-        expiresAtMs:
-          nowMs + CUSTOMER_AUTH.sessionTtlMs,
+        expiresAtMs: nowMs + CUSTOMER_AUTH.sessionTtlMs,
         revoked: false,
         ...fingerprint,
-        createdAt:
-          admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
 
-    setCustomerSessionCookie(
-      req,
-      res,
-      sessionRawToken
-    );
-
-    const accountDoc =
-      await accountRef.get();
+    setCustomerSessionCookie(req, res, sessionRawToken);
+    const accountDoc = await accountRef.get();
 
     return res.status(201).json({
       success: true,
       authenticated: true,
-      customer:
-        customerAccountResponse(
-          accountDoc.data() || {},
-          customerId
-        ),
+      created: true,
+      customer: customerAccountResponse(accountDoc.data() || {}, customerId),
     });
   } catch (error) {
-    console.error(
-      '❌ UBee 客戶註冊失敗：',
-      error
-    );
-
-    return sendCustomerAuthError(
-      res,
-      error
-    );
+    console.error('❌ UBee 首單安全使用身分建立失敗：', error);
+    if (error?.code === 'CUSTOMER_EXISTING_LOGIN_REQUIRED') {
+      return res.status(409).json({
+        success: false,
+        authenticated: false,
+        code: 'CUSTOMER_EXISTING_LOGIN_REQUIRED',
+        passwordSetupRequired: error.passwordSetupRequired === true,
+        message: error.message || '這支手機已建立 UBee 使用身分，請改用登入。',
+      });
+    }
+    return sendCustomerAuthError(res, error);
   }
 });
 
@@ -6229,6 +6159,8 @@ app.post('/api/customer-auth/password-reset/complete', async (req, res) => {
       transaction.set(first.accountRef, {
         passwordHash: newPasswordHash,
         passwordVersion: nextPasswordVersion,
+        passwordConfigured: true,
+        authMode: 'password',
         failedLoginCount: 0,
         lockedUntilMs: 0,
         lastFailedLoginAtMs: 0,
@@ -6459,7 +6391,8 @@ function uCoinRulesPayload() {
     redemptionRateTwd:UBEE_UCOIN.redemptionRateTwd,
     expiryDays:UBEE_UCOIN.expiryDays,
     redemptionServicePercent:UBEE_UCOIN.redemptionServicePercent,
-    redemptionText:'1 U幣折抵 NT$1；每筆最多折抵跑腿服務費 20%，且不得超過 UBee 平台收入。代墊費、停車費、過路費與小費不適用。',
+    orderRedemptionCapTwd:UBEE_UCOIN.orderRedemptionCapTwd,
+    redemptionText:'1 U幣折抵 NT$1；每筆最多折抵 NT$20，且同時不得超過跑腿服務費 20% 與 UBee 平台收入。代墊費、停車費、過路費與小費不適用。',
     earn:[
       { key:'checkin', title:'每日簽到', amountText:'0.1～0.2 U幣' },
       { key:'order', title:'完成一趟跑腿', amountText:'0.5 U幣' },
@@ -6568,8 +6501,10 @@ app.post('/api/customer/u-coins/redemption-preview', requireCustomerAuth, async 
     const serviceSubtotal = Math.max(0, Math.round(Number(req.body?.serviceSubtotal || 0)));
     const platformIncome = Math.max(0, Math.floor(Number(req.body?.platformIncome || 0)));
     const balanceWhole = Math.floor(uCoinSafeUnits(wallet.availableUnits) / UBEE_UCOIN.unitsPerCoin);
-    const maxWhole = Math.max(0, Math.min(balanceWhole, Math.floor(serviceSubtotal * UBEE_UCOIN.redemptionServicePercent), platformIncome));
-    return res.json({ success:true, wallet:serializeUCoinWallet(wallet), serviceSubtotal, platformIncome, maxWhole, discountTwd:maxWhole });
+    const percentCap = Math.floor(serviceSubtotal * UBEE_UCOIN.redemptionServicePercent);
+    const orderCapTwd = Math.max(0, Math.floor(Number(UBEE_UCOIN.orderRedemptionCapTwd || 0)));
+    const maxWhole = Math.max(0, Math.min(balanceWhole, percentCap, platformIncome, orderCapTwd));
+    return res.json({ success:true, wallet:serializeUCoinWallet(wallet), serviceSubtotal, platformIncome, percentCap, orderCapTwd, maxWhole, discountTwd:maxWhole });
   } catch (error) {
     console.error('❌ U幣折抵預覽失敗：', error);
     return res.status(500).json({ success:false, error:'目前無法計算 U幣折抵。' });
@@ -29830,7 +29765,8 @@ async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
       const baseServiceSubtotal = Math.max(0, Math.round(Number(order.serviceSubtotal || order.serviceTotal || 0)));
       const platformIncome = Math.max(0, Math.floor(Number(order.platformIncome ?? order.platformFee ?? order.serviceFee ?? 0)));
       const percentCap = Math.floor(baseServiceSubtotal * UBEE_UCOIN.redemptionServicePercent);
-      const redeemedWhole = Math.max(0, Math.min(requestedWhole, balanceWhole, percentCap, platformIncome));
+      const orderCapTwd = Math.max(0, Math.floor(Number(UBEE_UCOIN.orderRedemptionCapTwd || 0)));
+      const redeemedWhole = Math.max(0, Math.min(requestedWhole, balanceWhole, percentCap, platformIncome, orderCapTwd));
       const redeemedUnits = redeemedWhole * UBEE_UCOIN.unitsPerCoin;
       if (redeemedUnits > 0 && !reservationDoc.exists) {
         savedOrder = applyUCoinDiscountFields({ ...savedOrder }, {
