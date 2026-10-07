@@ -1,10 +1,11 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-06
-// Release: 2026_1006_CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_QUIZ_V4_15
+// Release: 2026_1006_CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_MENU_NATIVE_V5_17_CREDENTIAL_SUMMARY_V1
 // - Customer No-Register V4：移除舊傳統註冊端點，新增首單安全 Order Session；既有手機不會被重複建立帳號。
 // - UCoin Hard Cap V2：單筆折抵 NT$20 硬上限由後端 preview 與正式交易雙重強制。
 //
 // 本次整理：
+// - V5.17：新增 authenticated /api/rider/credential-summary，供正式騎士端車輛／文件／保險管理頁安全讀取審核摘要。
 // - V4.15：測驗改版為騎士端全螢幕 Native Quiz；後端端點與完整答案驗證規則不變。
 // - V4.14.2：三個 UBee 社群加入流程免密碼。
 // - V4.14.1：學習中心 Hotfix 保留。
@@ -21625,6 +21626,109 @@ app.get('/api/rider/profile-photo/view', riderAuthMiddleware, async (req, res) =
   }
 });
 
+
+
+// ============================================================
+// Rider Menu Native V5.17｜正式騎士資格摘要
+// - 只允許已登入／已審核小U透過 riderAuthMiddleware 讀取本人資料。
+// - 僅回傳車輛、保險與文件審核摘要；不回傳 Storage 路徑或證件影像。
+// - ridersV2 為正式營運資料，riderApplicationsV2 只補足原始文件審核狀態。
+// ============================================================
+app.get('/api/rider/credential-summary', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    let riderDoc = null;
+
+    if (req.riderAuth?.riderDocId) {
+      const candidate = await db
+        .collection(RIDER_V2_COLLECTIONS.riders)
+        .doc(String(req.riderAuth.riderDocId || '').trim())
+        .get();
+      if (candidate.exists) riderDoc = candidate;
+    }
+
+    if (!riderDoc) {
+      const resolved = await findApprovedRiderForApi(req.query || {});
+      if (!resolved.ok) {
+        return res.status(resolved.statusCode || 403).json({
+          success:false,
+          message:resolved.message || '小U身分驗證失敗。',
+        });
+      }
+      riderDoc = resolved.riderDoc;
+    }
+
+    if (!riderDoc?.exists) {
+      return res.status(404).json({ success:false, message:'找不到小U資料。' });
+    }
+
+    const rider = riderDoc.data() || {};
+    if (isBlockedRiderData(rider)) {
+      return res.status(403).json({ success:false, message:'此小U帳號目前無法使用。' });
+    }
+    if (!isApprovedRiderData(rider)) {
+      return res.status(403).json({ success:false, message:'小U尚未審核通過。' });
+    }
+
+    const phone = normalizePhone(rider.phone || rider.riderId || riderDoc.id || '');
+    const applicationDoc = phone ? await getRiderApplicationDocumentById(phone) : null;
+    const application = applicationDoc?.exists ? (applicationDoc.data() || {}) : {};
+    const documents = serializeRiderApplicationDocumentsForClient(application);
+
+    const approvedCount = documents.filter(item => String(item.reviewStatus || '').toLowerCase() === 'approved').length;
+    const supplementCount = documents.filter(item => String(item.reviewStatus || '').toLowerCase() === 'needs_supplement').length;
+    const pendingCount = documents.filter(item => ['pending','under_review','submitted','reviewing'].includes(String(item.reviewStatus || '').toLowerCase())).length;
+
+    return res.json({
+      success:true,
+      found:true,
+      riderId:String(rider.riderId || riderDoc.id || '').trim(),
+      vehicle:String(rider.vehicle || rider.vehicleType || application.vehicle || '').trim(),
+      vehicleMode:String(rider.vehicleMode || application.vehicleMode || '').trim(),
+      plateNumber:String(rider.plateNumber || application.plateNumber || '').trim(),
+      vehicleOwnerType:String(rider.vehicleOwnerType || application.vehicleOwnerType || '').trim(),
+      vehicleOwnerConsent:rider.vehicleOwnerConsent === true || application.vehicleOwnerConsent === true,
+      compulsoryInsuranceExpiryDate:String(
+        application.compulsoryInsuranceExpiryDate ||
+        rider.compulsoryInsuranceExpiryDate ||
+        ''
+      ).trim(),
+      documentReviewStatus:String(
+        application.documentReviewStatus ||
+        rider.documentVerificationStatus ||
+        (documents.length && supplementCount===0 && pendingCount===0 ? 'approved' : 'pending')
+      ).trim(),
+      credentialMaintenanceActive:
+        application.credentialMaintenanceActive === true ||
+        rider.credentialReviewRequired === true,
+      canSupplement:supplementCount > 0,
+      verification:{
+        identityVerified:typeof rider.identityVerified === 'boolean' ? rider.identityVerified : null,
+        driverLicenseVerified:typeof rider.driverLicenseVerified === 'boolean' ? rider.driverLicenseVerified : null,
+        vehicleLicenseVerified:typeof rider.vehicleLicenseVerified === 'boolean' ? rider.vehicleLicenseVerified : null,
+        compulsoryInsuranceVerified:typeof rider.compulsoryInsuranceVerified === 'boolean' ? rider.compulsoryInsuranceVerified : null,
+      },
+      documents,
+      documentSummary:{
+        totalCount:documents.length,
+        approvedCount,
+        supplementCount,
+        pendingCount,
+        allApproved:documents.length > 0 && approvedCount === documents.length,
+      },
+      updatedAtMs:Math.max(
+        Number(rider.updatedAtMs || 0),
+        Number(application.updatedAtMs || 0)
+      ),
+    });
+  } catch (error) {
+    console.error('❌ 讀取小U資格摘要失敗：', error);
+    return res.status(500).json({
+      success:false,
+      message:'車輛、文件與保險資料暫時無法讀取，請稍後再試。',
+    });
+  }
+});
 
 // ============================================================
 // UBee 小U註冊 API V2｜2026-10-02 Review Flow Hardening V4.7
