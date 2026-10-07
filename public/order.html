@@ -4,7 +4,7 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-07
   Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1
-  PWA: 20261007-customer-native-clean-ui-v1
+  PWA: 20261007-customer-native-smooth-ui-v1
 
   本次整理：
   0. Native Clean UI V1：移除主要下單流程、首頁、我的與通知設定中重複的灰色小字說明；功能標籤、即時狀態、價格、錯誤、安全與法律必要資訊保留。
@@ -16,6 +16,7 @@
   5. No-Register V4：移除舊傳統註冊殘留；首次送單以原生 Bottom Sheet 建立安全使用身分，處理中不關閉頁面、錯誤直接原地重試。
   6. 設定頁維持 Native Settings V2：通知、震動與位置皆使用可操作切換按鈕；位置採 App 內明確 opt-in，並移除設定列小字說明。
   7. 首頁維持精簡版：正式結束於即時小U運力卡。
+  8. Native Smooth UI V1：我的頁與成長／邀請資料改為快取優先、重複請求合併、背景預取與並行載入，點擊子頁先顯示可用資料再背景更新。
 
   Canonical recent milestones:
   - 2026-10-01 Customer Native Notification Tab V4 / Native Controls V2 / Notification Center
@@ -26,7 +27,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261007-customer-native-clean-ui-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261007-customer-native-smooth-ui-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -16299,15 +16300,74 @@ function getMemberLevelText(){
   return String(window.__ubeeCustomerGrowth?.tier?.label || '一般');
 }
 
-async function loadCustomerGrowth(){
-  const data=await customerApiFetch('/api/customer/growth');
-  window.__ubeeCustomerGrowth=data?.growth||null;
-  window.__ubeeCustomerGrowthHistory=Array.isArray(data?.history)?data.history:[];
-  return data;
+let ubeeCustomerGrowthRequestPromise=null;
+let ubeeCustomerGrowthReferralsRequestPromise=null;
+const UBEE_CUSTOMER_GROWTH_CACHE_MS=60000;
+const UBEE_CUSTOMER_GROWTH_REFERRALS_CACHE_MS=60000;
+
+function getCachedCustomerGrowthData(maxAgeMs=Infinity){
+  const growth=window.__ubeeCustomerGrowth||null;
+  if(!growth)return null;
+  const fetchedAt=Math.max(0,Number(window.__ubeeCustomerGrowthFetchedAt||0));
+  const age=fetchedAt>0?Math.max(0,Date.now()-fetchedAt):Infinity;
+  if(Number.isFinite(Number(maxAgeMs)) && age>Number(maxAgeMs))return null;
+  return {
+    success:true,
+    growth,
+    history:Array.isArray(window.__ubeeCustomerGrowthHistory)?window.__ubeeCustomerGrowthHistory:[],
+    fetchedAt,
+    cached:true
+  };
+}
+
+async function loadCustomerGrowth(options={}){
+  const maxAgeMs=Number.isFinite(Number(options?.maxAgeMs))?Math.max(0,Number(options.maxAgeMs)):0;
+  const force=options?.force===true;
+  const cached=!force?getCachedCustomerGrowthData(maxAgeMs):null;
+  if(cached)return cached;
+  if(ubeeCustomerGrowthRequestPromise)return ubeeCustomerGrowthRequestPromise;
+
+  ubeeCustomerGrowthRequestPromise=(async()=>{
+    const data=await customerApiFetch('/api/customer/growth');
+    window.__ubeeCustomerGrowth=data?.growth||null;
+    window.__ubeeCustomerGrowthHistory=Array.isArray(data?.history)?data.history:[];
+    window.__ubeeCustomerGrowthFetchedAt=Date.now();
+    return data;
+  })();
+
+  try{return await ubeeCustomerGrowthRequestPromise;}
+  finally{ubeeCustomerGrowthRequestPromise=null;}
+}
+
+function getCachedCustomerGrowthReferrals(maxAgeMs=Infinity){
+  const rows=Array.isArray(window.__ubeeCustomerGrowthReferrals)?window.__ubeeCustomerGrowthReferrals:null;
+  if(!rows)return null;
+  const fetchedAt=Math.max(0,Number(window.__ubeeCustomerGrowthReferralsFetchedAt||0));
+  const age=fetchedAt>0?Math.max(0,Date.now()-fetchedAt):Infinity;
+  if(Number.isFinite(Number(maxAgeMs)) && age>Number(maxAgeMs))return null;
+  return {success:true,referrals:rows,fetchedAt,cached:true};
+}
+
+async function loadCustomerGrowthReferrals(options={}){
+  const maxAgeMs=Number.isFinite(Number(options?.maxAgeMs))?Math.max(0,Number(options.maxAgeMs)):0;
+  const force=options?.force===true;
+  const cached=!force?getCachedCustomerGrowthReferrals(maxAgeMs):null;
+  if(cached)return cached;
+  if(ubeeCustomerGrowthReferralsRequestPromise)return ubeeCustomerGrowthReferralsRequestPromise;
+
+  ubeeCustomerGrowthReferralsRequestPromise=(async()=>{
+    const data=await customerApiFetch('/api/customer/growth/referrals');
+    window.__ubeeCustomerGrowthReferrals=Array.isArray(data?.referrals)?data.referrals:[];
+    window.__ubeeCustomerGrowthReferralsFetchedAt=Date.now();
+    return { ...data, referrals:window.__ubeeCustomerGrowthReferrals };
+  })();
+
+  try{return await ubeeCustomerGrowthReferralsRequestPromise;}
+  finally{ubeeCustomerGrowthReferralsRequestPromise=null;}
 }
 
 async function loadCustomerMemberStats(){
-  const data=await loadCustomerGrowth();
+  const data=await loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS});
   const growth=data?.growth||{};
   return {
     taskCount:Number(growth.completedOrders||0),
@@ -20878,26 +20938,42 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       if($('flowProfileTaskCount'))$('flowProfileTaskCount').textContent='0';
       if($('flowProfileLevel'))$('flowProfileLevel').textContent='一般';
       window.__ubeeCustomerGrowth=null;
+      window.__ubeeCustomerGrowthHistory=[];
+      window.__ubeeCustomerGrowthFetchedAt=0;
       return;
     }
     $('flowProfileName').textContent=displayName||'UBee 客戶';
     $('flowProfileSubtext').textContent='帳號資料與個人設定';
-    await loadAddresses();
-    renderProfileAddressList();
-    try{
-      if(typeof loadCustomerMemberStats==='function'){
-        const stats=await loadCustomerMemberStats();
-        $('flowProfileTaskCount').textContent=String(stats?.taskCount||0);
-        $('flowProfileLevel').textContent=typeof getMemberLevelText==='function'?getMemberLevelText(stats?.taskCount||0):'一般';
-        if(typeof window.openUBeeMySection==='function' && window.__ubeeCustomerGrowth){
-          const tierEl=document.getElementById('ubeeMyMemberTier');
-          const ordersEl=document.getElementById('ubeeMyMemberOrders');
-          if(tierEl) tierEl.textContent=`${String(window.__ubeeCustomerGrowth?.tier?.label||'一般')}會員`;
-          if(ordersEl) ordersEl.textContent=`${Number(window.__ubeeCustomerGrowth?.completedOrders||0).toLocaleString('zh-TW')} 單`;
+
+    const cachedGrowth=typeof getCachedCustomerGrowthData==='function'?getCachedCustomerGrowthData(Infinity):null;
+    if(cachedGrowth?.growth){
+      $('flowProfileTaskCount').textContent=String(Number(cachedGrowth.growth.completedOrders||0));
+      $('flowProfileLevel').textContent=String(cachedGrowth.growth?.tier?.label||'一般');
+    }
+
+    const addressTask=(async()=>{
+      await loadAddresses();
+      renderProfileAddressList();
+    })().catch(error=>console.warn('讀取常用地址失敗：',error));
+
+    const memberTask=(async()=>{
+      try{
+        if(typeof loadCustomerMemberStats==='function'){
+          const stats=await loadCustomerMemberStats();
+          $('flowProfileTaskCount').textContent=String(stats?.taskCount||0);
+          $('flowProfileLevel').textContent=typeof getMemberLevelText==='function'?getMemberLevelText(stats?.taskCount||0):'一般';
+          if(typeof window.openUBeeMySection==='function' && window.__ubeeCustomerGrowth){
+            const tierEl=document.getElementById('ubeeMyMemberTier');
+            const ordersEl=document.getElementById('ubeeMyMemberOrders');
+            if(tierEl) tierEl.textContent=`${String(window.__ubeeCustomerGrowth?.tier?.label||'一般')}會員`;
+            if(ordersEl) ordersEl.textContent=`${Number(window.__ubeeCustomerGrowth?.completedOrders||0).toLocaleString('zh-TW')} 單`;
+          }
         }
-      }
-    }catch(error){console.warn('讀取會員統計失敗：',error)}
+      }catch(error){console.warn('讀取會員統計失敗：',error)}
+    })();
+
     window.UBeeUCoinV1?.load?.().catch(()=>{});
+    await Promise.allSettled([addressTask,memberTask]);
   }
 
   async function detectLocation(){
@@ -21295,7 +21371,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261007-customer-native-clean-ui-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261007-customer-native-smooth-ui-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23268,6 +23344,8 @@ html,body{
 
   function showMyRoot(){
     try{
+      const profilePage=document.getElementById('flowPageProfile');
+      if(profilePage?.classList.contains('active'))return;
       window.openUBeeProfilePage?.();
     }catch(error){
       console.warn('UBee 我的頁面開啟失敗：',error);
@@ -23477,8 +23555,29 @@ html,body{
   async function fillGrowthPanel(mode='rewards'){
     if(mode!=='rewards'){ return openMyGrowthDetail('benefits'); }
     const target=document.getElementById('ubeeMyInviteContent');
-    if(target)target.innerHTML='<div class="ubee-my-empty-state">正在讀取推薦資料…</div>';
-    try{const data=await loadCustomerGrowth();renderMyMemberCard(data?.growth||{});let referralData={referrals:[]};try{referralData=await customerApiFetch('/api/customer/growth/referrals')}catch(_){}renderCustomerInvitePanel(data?.growth||{},referralData?.referrals||[])}catch(error){if(target)target.innerHTML='<div class="ubee-my-empty-state">推薦資料暫時無法讀取，請稍後再試。</div>'}
+    const cachedGrowth=getCachedCustomerGrowthData(Infinity);
+    const cachedReferrals=getCachedCustomerGrowthReferrals(Infinity);
+
+    if(cachedGrowth){
+      renderMyMemberCard(cachedGrowth.growth||{});
+      renderCustomerInvitePanel(cachedGrowth.growth||{},cachedReferrals?.referrals||[]);
+    }else if(target){
+      target.innerHTML='<div class="ubee-my-empty-state">正在讀取推薦資料…</div>';
+    }
+
+    const [growthResult,referralResult]=await Promise.allSettled([
+      loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS}),
+      loadCustomerGrowthReferrals({maxAgeMs:UBEE_CUSTOMER_GROWTH_REFERRALS_CACHE_MS})
+    ]);
+
+    const growthData=growthResult.status==='fulfilled'?growthResult.value:cachedGrowth;
+    const referralData=referralResult.status==='fulfilled'?referralResult.value:cachedReferrals;
+    if(growthData?.growth){
+      renderMyMemberCard(growthData.growth||{});
+      renderCustomerInvitePanel(growthData.growth||{},referralData?.referrals||[]);
+    }else if(!cachedGrowth && target){
+      target.innerHTML='<div class="ubee-my-empty-state">推薦資料暫時無法讀取，請稍後再試。</div>';
+    }
   }
 
   function renderMyMemberCard(growth){
@@ -23520,14 +23619,17 @@ html,body{
       document.getElementById('ubeeMyMemberProgressBar').style.width='0%';
       return;
     }
+    const cached=getCachedCustomerGrowthData(Infinity);
+    if(cached?.growth)renderMyMemberCard(cached.growth);
     try{
-      const data=window.__ubeeCustomerGrowth?{growth:window.__ubeeCustomerGrowth}:await loadCustomerGrowth();
+      const data=await loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS});
       renderMyMemberCard(data?.growth||{});
     }catch(_){
-      document.getElementById('ubeeMyMemberNext').textContent='會員資料暫時無法更新';
+      if(!cached)document.getElementById('ubeeMyMemberNext').textContent='會員資料暫時無法更新';
     }
   }
 
+  let growthDetailRequestToken=0;
   async function openMyGrowthDetail(type,options={}){
     const detail=safeText(type).toLowerCase();
     if(!['benefits','tasks','achievements','history'].includes(detail))return false;
@@ -23537,6 +23639,7 @@ html,body{
       window.UBeeCustomerAuthHost?.show('login');
       return true;
     }
+    const requestToken=++growthDetailRequestToken;
     showMyRoot();
     preparePanels();
     closeMySubPages();
@@ -23548,17 +23651,26 @@ html,body{
     root.setAttribute('data-my-section','growth');
     document.body.classList.add('ubee-my-subpage-open');
     const target=document.getElementById('ubeeMyGrowthContent');
-    if(target)target.innerHTML='<div class="ubee-my-empty-state">正在讀取會員資料…</div>';
+    const cached=getCachedCustomerGrowthData(Infinity);
+    if(cached?.growth){
+      renderMyMemberCard(cached.growth||{});
+      renderCustomerGrowthDetail(detail,cached.growth||{},cached.history||[]);
+    }else if(target){
+      target.innerHTML='<div class="ubee-my-empty-state">正在讀取會員資料…</div>';
+    }
     requestAnimationFrame(()=>panel.classList.add('is-open'));
     if(!options.fromHistory){
       window.UBeeCustomerNavigation?.pushGrowthDetail?.(detail);
     }
     try{
-      const data=await loadCustomerGrowth();
+      const data=await loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS});
+      if(requestToken!==growthDetailRequestToken || currentMySection!=='growth')return true;
       renderMyMemberCard(data?.growth||{});
       renderCustomerGrowthDetail(detail,data?.growth||{},data?.history||[]);
     }catch(_){
-      if(target)target.innerHTML='<div class="ubee-my-empty-state">會員資料暫時無法讀取，請稍後再試。</div>';
+      if(!cached && requestToken===growthDetailRequestToken && target){
+        target.innerHTML='<div class="ubee-my-empty-state">會員資料暫時無法讀取，請稍後再試。</div>';
+      }
     }
     return true;
   }
@@ -24536,16 +24648,35 @@ html,body{
   });
 
 
+  let ubeeMyPrefetchScheduled=false;
+  function scheduleUBeeMyGrowthPrefetch(){
+    if(ubeeMyPrefetchScheduled || !getCurrentCustomerSafe())return;
+    ubeeMyPrefetchScheduled=true;
+    const run=()=>{
+      ubeeMyPrefetchScheduled=false;
+      loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS}).catch(()=>{});
+      loadCustomerGrowthReferrals({maxAgeMs:UBEE_CUSTOMER_GROWTH_REFERRALS_CACHE_MS}).catch(()=>{});
+    };
+    if('requestIdleCallback' in window){
+      window.requestIdleCallback(run,{timeout:900});
+    }else{
+      setTimeout(run,120);
+    }
+  }
+
   const previousProfilePage = window.openUBeeProfilePage;
   if(typeof previousProfilePage === 'function'){
     window.openUBeeProfilePage = function(){
       closeMySubPages();
       const result=previousProfilePage.apply(this,arguments);
       refreshMyMemberCard();
+      scheduleUBeeMyGrowthPrefetch();
       return result;
     };
     window.showProfileTab = window.openUBeeProfilePage;
   }
+  setTimeout(scheduleUBeeMyGrowthPrefetch,900);
+  setTimeout(scheduleUBeeMyGrowthPrefetch,2200);
 })();
 </script>
 
