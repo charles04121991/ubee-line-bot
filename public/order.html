@@ -2,12 +2,13 @@
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
-  UBee 跑腿｜客戶端最新正式版｜2026-10-06
-  Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1
-  PWA: 20261007-customer-silent-reconnect-v1
+  UBee 跑腿｜客戶端最新正式版｜2026-10-07
+  Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1
+  PWA: 20261007-customer-native-clean-ui-v1
 
   本次整理：
-  0. Silent Reconnect V1：恢復連線成功後改為背景靜默同步，不再顯示「連線已恢復」Banner；斷線、後端不可達與防重複下單警告完整保留。
+  0. Native Clean UI V1：移除主要下單流程、首頁、我的與通知設定中重複的灰色小字說明；功能標籤、即時狀態、價格、錯誤、安全與法律必要資訊保留。
+  0a. Silent Reconnect V1：恢復連線成功後改為背景靜默同步，不再顯示「連線已恢復」Banner；斷線、後端不可達與防重複下單警告完整保留。
   1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
   2. 訂單確認頁新增 U幣折抵；1 U = NT$1，只使用整數 U。
   3. U幣折抵單筆 NT$20 硬上限改由前後端共同強制，並同時受跑腿服務費 20% 與平台收入限制；代墊費不折抵。
@@ -25,7 +26,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261007-customer-silent-reconnect-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261007-customer-native-clean-ui-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18982,7 +18983,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </section>
 <div class="ubee-ucoin-checkout-saving" id="ubeeUCoinCheckoutSaving" hidden></div>
 <label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務資料與服務規則</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間與費用，並同意 UBee 服務條款與隱私權政策。</small></span></label>
-<div class="ubee-native-form-note">建立任務後，系統會依目前付款流程要求你確認付款方式，再正式進入派單。</div>
+
 <div class="flow-status" id="flowConfirmStatus"></div>
 </div>
 <div class="ubee-native-checkout-actionbar"><div class="ubee-native-checkout-action-price"><span>預估費用</span><strong id="flowConfirmActionPrice">—</strong></div><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div>
@@ -21294,7 +21295,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261007-customer-silent-reconnect-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261007-customer-native-clean-ui-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -28740,6 +28741,101 @@ body:not(.flow-active) .app select,
 #ubeeCustomerAuthRoot textarea,
 #ubeeCustomerAuthRoot select{
   font-size:18px!important;
+}
+</style>
+
+
+<style id="ubee-customer-native-clean-ui-v1">
+/* =========================================================
+   UBee Customer Native Clean UI V1｜2026-10-07
+   只清理「重複解說型」灰色小字，不移除功能標籤、價格、
+   即時狀態、錯誤訊息、選填/必填、安全限制與法律同意內容。
+   ========================================================= */
+
+/* 首頁：保留服務、地址、運力與任務狀態，移除教學式副文案。 */
+#productionOrderFlow #flowPageHome .flow-home-action-head > span,
+#productionOrderFlow #flowPageHome .flow-home-store-shortcut-copy > small,
+#productionOrderFlow #flowPageHome .flow-live-supply-note,
+#productionOrderFlow #flowPageHome .flow-home-section-head > span,
+#productionOrderFlow #flowPageHome .flow-home-scenario > span,
+#productionOrderFlow #flowPageHome .flow-home-trust-item > span,
+#productionOrderFlow .flow-location-action small {
+  display:none !important;
+}
+
+/* Native 下單流程：標題後不再疊一行教學文字。 */
+#productionOrderFlow .flow-subtitle,
+#productionOrderFlow .ubee-native-form-section-caption,
+#productionOrderFlow .ubee-native-field-head > small,
+#productionOrderFlow .ubee-native-form-help,
+#productionOrderFlow .ubee-native-task-type-copy > small,
+#productionOrderFlow .ubee-native-selection-copy > small,
+#productionOrderFlow .review-section-edit-hint,
+#productionOrderFlow .customer-tracking-health-desc {
+  display:none !important;
+}
+
+/* 我的：選單名稱本身已足夠，不再顯示第二行灰字。 */
+#productionOrderFlow .ubee-my-member-copy > small,
+#productionOrderFlow .ubee-my-ucoin-copy > small,
+#productionOrderFlow .ubee-my-menu-copy > small {
+  display:none !important;
+}
+
+/* 通知設定：保留真正的系統權限狀態；一般功能說明與頁尾教學移除。 */
+#productionOrderFlow .ubee-notify-row:not(.ubee-notify-permission-row) .ubee-notify-copy > small,
+#productionOrderFlow .ubee-notify-footnote {
+  display:none !important;
+}
+
+/* 舊相容畫面仍可能被特定流程叫出，統一去除純教學型副文案。 */
+.subtext,
+.service-city-subtitle,
+.nearby-sub,
+.step4-page-sub,
+.review-section-edit-hint,
+.speed-desc,
+.ubee-timing-note,
+.home-service-status-note,
+.ubee-v3-hero-sub {
+  display:none !important;
+}
+
+/* 小字移除後同步收緊空間，避免留下 Web 表單式空白。 */
+#productionOrderFlow .ubee-native-form-section-title {
+  margin-bottom:8px !important;
+}
+#productionOrderFlow .ubee-native-field-head {
+  margin-bottom:7px !important;
+}
+#productionOrderFlow .ubee-native-task-type-row {
+  min-height:52px !important;
+}
+#productionOrderFlow .ubee-native-selection-row {
+  min-height:54px !important;
+  padding-top:10px !important;
+  padding-bottom:10px !important;
+}
+#productionOrderFlow .flow-location-action {
+  min-height:48px !important;
+  padding-top:9px !important;
+  padding-bottom:9px !important;
+}
+#productionOrderFlow .ubee-my-menu-item {
+  min-height:54px !important;
+}
+
+/* 安全/法規/金額限制不是一般灰色說明：改成明確的原生提醒卡保留。 */
+#productionOrderFlow .ubee-native-form-note {
+  margin:10px 0 0 !important;
+  padding:10px 12px !important;
+  border:1px solid #eee2a8 !important;
+  border-radius:13px !important;
+  background:#fff9df !important;
+  color:#3d3725 !important;
+  font-size:14px !important;
+  font-weight:700 !important;
+  line-height:1.5 !important;
 }
 </style>
 
