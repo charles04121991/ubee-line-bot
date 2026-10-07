@@ -3,10 +3,11 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-06
-  Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2
-  PWA: 20261006-customer-no-register-v4
+  Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1
+  PWA: 20261007-customer-silent-reconnect-v1
 
   本次整理：
+  0. Silent Reconnect V1：恢復連線成功後改為背景靜默同步，不再顯示「連線已恢復」Banner；斷線、後端不可達與防重複下單警告完整保留。
   1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
   2. 訂單確認頁新增 U幣折抵；1 U = NT$1，只使用整數 U。
   3. U幣折抵單筆 NT$20 硬上限改由前後端共同強制，並同時受跑腿服務費 20% 與平台收入限制；代墊費不折抵。
@@ -24,7 +25,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261006-customer-no-register-v4" rel="manifest"/>
+<link href="/manifest-order.json?v=20261007-customer-silent-reconnect-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17696,6 +17697,15 @@ activateUBeeCustomerRuntime();
     if(ok){ setTimeout(()=>{ if(el.textContent===message) el.style.display='none'; },2600); }
   }
 
+  // Silent Reconnect V1：恢復連線成功時不顯示成功 Banner。
+  // 斷線、後端不可達、防重複下單等真正需要處理的警告仍保留。
+  function hideStatus(){
+    const el = document.getElementById('ubeeNetworkStatusBanner');
+    if(!el) return;
+    el.style.display = 'none';
+    el.textContent = '';
+  }
+
   function setCreateOrderNetworkLock(locked){
     const btn = document.getElementById('createOrderBtn');
     if(!btn) return;
@@ -17733,7 +17743,7 @@ activateUBeeCustomerRuntime();
         return;
       }
       setCreateOrderNetworkLock(false);
-      showStatus('連線已恢復，正在同步最新訂單狀態。',true);
+      hideStatus();
       try{
         const cachedId = String((typeof currentOrderId !== 'undefined' ? currentOrderId : '') || localStorage.getItem('ubee_current_order_id') || '').trim();
         if(cachedId && typeof window.startOrderListener === 'function') window.startOrderListener(cachedId);
@@ -21284,7 +21294,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261006-customer-no-register-v4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261007-customer-silent-reconnect-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
