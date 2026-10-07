@@ -1,11 +1,12 @@
 // ============================================================
 // UBee Backend｜Latest Release 2026-10-06
-// Release: 2026_1006_CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_MENU_NATIVE_V5_17_CREDENTIAL_SUMMARY_V1
+// Release: 2026_1006_CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
 // - Customer No-Register V4：移除舊傳統註冊端點，新增首單安全 Order Session；既有手機不會被重複建立帳號。
 // - UCoin Hard Cap V2：單筆折抵 NT$20 硬上限由後端 preview 與正式交易雙重強制。
 //
 // 本次整理：
-// - V5.17：新增 authenticated /api/rider/credential-summary，供正式騎士端車輛／文件／保險管理頁安全讀取審核摘要。
+// - V5.18：新增 authenticated 小U公開基本資料與服務表現 API；公開資料可編輯，接單率讀 riderDispatchStats，準時率只採有明確預約／指定時間且有可信任狀態時間的任務。
+// - V5.17：保留 authenticated /api/rider/credential-summary，供正式騎士端車輛／文件／保險管理頁安全讀取審核摘要。
 // - V4.15：測驗改版為騎士端全螢幕 Native Quiz；後端端點與完整答案驗證規則不變。
 // - V4.14.2：三個 UBee 社群加入流程免密碼。
 // - V4.14.1：學習中心 Hotfix 保留。
@@ -21726,6 +21727,465 @@ app.get('/api/rider/credential-summary', riderAuthMiddleware, async (req, res) =
     return res.status(500).json({
       success:false,
       message:'車輛、文件與保險資料暫時無法讀取，請稍後再試。',
+    });
+  }
+});
+
+
+// ============================================================
+// Rider Native Profile & Performance V5.18
+// - 「我的 → 頭像 → 基本資料」與「跑腿服務」的正式資料契約。
+// - 公開基本資料只保存可公開文字／選項，不回傳私密證件或聯絡識別。
+// - 接單率使用 riderDispatchStats 的 received / accepted / skipped。
+// - 準時率只計算存在明確指定時間與可信任狀態時間的任務；無樣本回傳 null，不虛構數字。
+// ============================================================
+const UBEE_RIDER_PUBLIC_PROFILE_SERVICES = Object.freeze([
+  '幫取送',
+  '幫我買',
+  '幫排隊',
+  '全能跑腿',
+  '代駕服務',
+  '店家配送',
+]);
+
+const UBEE_RIDER_PUBLIC_PROFILE_LANGUAGES = Object.freeze([
+  '中文',
+  '台語',
+  '客語',
+  '英文',
+  '日文',
+  '韓文',
+  '越南文',
+  '泰文',
+]);
+
+function riderExperienceTimeMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 100000000000) return numeric;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value.toMillis === 'function') {
+    try { return value.toMillis(); } catch (_) { return 0; }
+  }
+  if (typeof value.toDate === 'function') {
+    try { return value.toDate().getTime(); } catch (_) { return 0; }
+  }
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  return 0;
+}
+
+function normalizeRiderPublicProfile(input = {}, existing = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const old = existing && typeof existing === 'object' ? existing : {};
+
+  const reason = cleanLongText(
+    Object.prototype.hasOwnProperty.call(source, 'reason') ? source.reason : old.reason || '',
+    280
+  ).trim();
+
+  const serviceSet = new Set(UBEE_RIDER_PUBLIC_PROFILE_SERVICES);
+  const languageSet = new Set(UBEE_RIDER_PUBLIC_PROFILE_LANGUAGES);
+
+  const services = Array.from(new Set(
+    (Array.isArray(source.services) ? source.services : Array.isArray(old.services) ? old.services : [])
+      .map(value => cleanText(value, 30))
+      .filter(value => serviceSet.has(value))
+  )).slice(0, 6);
+
+  const languages = Array.from(new Set(
+    (Array.isArray(source.languages) ? source.languages : Array.isArray(old.languages) ? old.languages : [])
+      .map(value => cleanText(value, 30))
+      .filter(value => languageSet.has(value))
+  )).slice(0, 6);
+
+  return {
+    reason,
+    services,
+    languages,
+    visibility: 'rider_public_profile',
+    version: 'rider-public-profile-v1',
+  };
+}
+
+function serializeRiderPublicProfile(rider = {}) {
+  const profile = normalizeRiderPublicProfile(rider.publicProfile || {}, {});
+  return {
+    ...profile,
+    updatedAtMs: Math.max(
+      0,
+      Number(rider.publicProfileUpdatedAtMs || rider.publicProfile?.updatedAtMs || 0)
+    ),
+  };
+}
+
+async function resolveAuthenticatedRiderForExperience(req, source = {}) {
+  if (req?.riderAuth?.riderDocId) {
+    const riderDocId = String(req.riderAuth.riderDocId || '').trim();
+    if (riderDocId) {
+      const riderDoc = await db
+        .collection(RIDER_V2_COLLECTIONS.riders)
+        .doc(riderDocId)
+        .get();
+
+      if (riderDoc.exists) {
+        const rider = riderDoc.data() || {};
+        if (isBlockedRiderData(rider)) {
+          return { ok:false, statusCode:403, message:'此小U帳號目前無法使用。' };
+        }
+        if (!isApprovedRiderData(rider)) {
+          return { ok:false, statusCode:403, message:'小U尚未審核通過。' };
+        }
+        return { ok:true, riderDoc, rider:{ id:riderDoc.id, ...rider } };
+      }
+    }
+  }
+  return findApprovedRiderForApi(source || {});
+}
+
+async function loadRiderExperienceOrders(identity = {}, maxPerIdentity = 220) {
+  const map = new Map();
+  const pairs = buildGrowthRiderQueryPairs(identity).slice(0, 5);
+
+  for (const [field, value] of pairs) {
+    if (!field || !value) continue;
+    try {
+      const snap = await db
+        .collection('orders')
+        .where(field, '==', value)
+        .limit(Math.max(1, Math.min(300, Number(maxPerIdentity || 220))))
+        .get();
+
+      snap.docs.forEach(doc => {
+        const order = { id:doc.id, ...(doc.data() || {}) };
+        if (isOrderBelongsToRider(order, identity)) map.set(doc.id, order);
+      });
+    } catch (error) {
+      console.warn(`⚠️ Rider experience orders query ${field}:`, error?.message || error);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function getRiderExperienceServiceLabel(order = {}) {
+  const raw = [
+    order.serviceKey,
+    order.serviceMode,
+    order.serviceGroup,
+    order.serviceType,
+    order.serviceName,
+    order.category,
+  ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean).join(' ');
+
+  if (/drive|代駕/.test(raw)) return '代駕服務';
+  if (/merchant|店家|商家|配送/.test(raw) && !/代買|幫我買|buy/.test(raw)) return '店家配送';
+  if (/queue|排隊/.test(raw)) return '幫排隊';
+  if (/buy|purchase|代買|幫我買|採買/.test(raw)) return '幫我買';
+  if (/萬能|全能|errand|跑腿/.test(raw)) return '全能跑腿';
+  if (/pickup|delivery|取送|幫取|送件|取件/.test(raw)) return '幫取送';
+  return '其他任務';
+}
+
+function getRiderExperiencePunctuality(order = {}) {
+  const statusTimes = order.statusTimes && typeof order.statusTimes === 'object'
+    ? order.statusTimes
+    : {};
+
+  const completionTarget = riderExperienceTimeMs(
+    order.scheduledEndAtMs ||
+    order.desiredCompletionAtMs ||
+    order.requestedCompletionAtMs ||
+    order.scheduleEndAtMs
+  );
+
+  const pickupTarget = riderExperienceTimeMs(
+    order.scheduledStartAtMs ||
+    order.requestedScheduleAtMs ||
+    order.scheduleStartAtMs ||
+    order.scheduledAtMs
+  );
+
+  const completedAt = riderExperienceTimeMs(
+    order.completedAt ||
+    order.finishedAt ||
+    order.completedAtMs ||
+    statusTimes.completed ||
+    statusTimes.done
+  );
+
+  const arrivedPickupAt = riderExperienceTimeMs(
+    order.arrivedPickupAt ||
+    order.arrivedPickupAtMs ||
+    statusTimes.arrived_pickup
+  );
+
+  const graceMs = 10 * 60 * 1000;
+
+  if (completionTarget > 0 && completedAt > 0) {
+    return {
+      eligible:true,
+      onTime:completedAt <= completionTarget + graceMs,
+      basis:'completion',
+      targetAtMs:completionTarget,
+      actualAtMs:completedAt,
+    };
+  }
+
+  if (pickupTarget > 0 && arrivedPickupAt > 0) {
+    return {
+      eligible:true,
+      onTime:arrivedPickupAt <= pickupTarget + graceMs,
+      basis:'pickup',
+      targetAtMs:pickupTarget,
+      actualAtMs:arrivedPickupAt,
+    };
+  }
+
+  return { eligible:false, onTime:false, basis:'', targetAtMs:0, actualAtMs:0 };
+}
+
+function buildRiderExperienceServiceBreakdown(orders = []) {
+  const labels = [
+    '幫取送',
+    '幫我買',
+    '幫排隊',
+    '全能跑腿',
+    '代駕服務',
+    '店家配送',
+    '其他任務',
+  ];
+
+  const map = new Map(labels.map(label => [label, {
+    label,
+    completedCount:0,
+    cancelledCount:0,
+  }]));
+
+  (Array.isArray(orders) ? orders : []).forEach(order => {
+    const label = getRiderExperienceServiceLabel(order);
+    if (!map.has(label)) map.set(label, { label, completedCount:0, cancelledCount:0 });
+    const row = map.get(label);
+    const status = String(order.status || '').trim().toLowerCase();
+
+    if (['completed','done'].includes(status)) row.completedCount += 1;
+
+    if (['cancelled','canceled'].includes(status)) {
+      const cancelledBy = String(order.cancelledBy || order.canceledBy || '').trim().toLowerCase();
+      const cancelType = String(order.cancelType || order.cancelReasonType || '').trim().toLowerCase();
+      if (
+        ['rider','driver','小u'].includes(cancelledBy) ||
+        cancelType.includes('rider') ||
+        cancelType.includes('driver')
+      ) {
+        row.cancelledCount += 1;
+      }
+    }
+  });
+
+  return Array.from(map.values())
+    .map(item => {
+      const handledCount = Math.max(0, Number(item.completedCount || 0)) + Math.max(0, Number(item.cancelledCount || 0));
+      return {
+        ...item,
+        handledCount,
+        completionRate:handledCount > 0 ? Math.max(0, Math.min(100, (Number(item.completedCount || 0) / handledCount) * 100)) : null,
+        cancellationRate:handledCount > 0 ? Math.max(0, Math.min(100, (Number(item.cancelledCount || 0) / handledCount) * 100)) : null,
+      };
+    })
+    .filter(item => item.completedCount > 0 || item.cancelledCount > 0)
+    .sort((a,b) => b.completedCount - a.completedCount || a.label.localeCompare(b.label, 'zh-TW'))
+    .slice(0, 8);
+}
+
+app.get('/api/rider/profile-experience', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const resolved = await resolveAuthenticatedRiderForExperience(req, req.query || {});
+    if (!resolved.ok) {
+      return res.status(resolved.statusCode || 403).json({
+        success:false,
+        message:resolved.message || '小U身分驗證失敗。',
+      });
+    }
+
+    const riderDoc = resolved.riderDoc;
+    const rider = resolved.rider || riderDoc.data() || {};
+    const identity = buildRiderApiIdentity(
+      riderDoc,
+      rider,
+      req.query || {}
+    );
+
+    const statsId = String(identity.riderId || rider.riderId || riderDoc.id || '').trim();
+
+    const [dispatchStatsDoc, orders] = await Promise.all([
+      statsId
+        ? db.collection('riderDispatchStats').doc(statsId).get().catch(() => null)
+        : Promise.resolve(null),
+      loadRiderExperienceOrders(identity, 220),
+    ]);
+
+    const dispatchStats = dispatchStatsDoc?.exists
+      ? (dispatchStatsDoc.data() || {})
+      : {};
+
+    // V5.18 Native Profile：服務品質沿用既有 Growth Engine 的唯一正式算法，
+    // 不在 Profile API 另創第二套評分公式。
+    const quality = getRiderGrowthQuality(rider, orders);
+    const riderGrowthId = String(identity.riderId || rider.riderId || riderDoc.id || '').trim();
+    const { data:growthProfile } = riderGrowthId
+      ? await loadGrowthProfile('rider', riderGrowthId).catch(() => ({ data:{} }))
+      : { data:{} };
+    const lifetimeCompletedOrders = Math.max(
+      0,
+      Number(growthProfile?.completedOrders || 0),
+      Number(rider.completedOrders || rider.totalCompletedOrders || 0),
+      Number(quality.completedCount || 0)
+    );
+    const contribution = {
+      validCustomerReferrals:Math.max(0, Number(growthProfile?.validCustomerReferrals || 0)),
+      validRiderReferrals:Math.max(0, Number(growthProfile?.validRiderReferrals || 0)),
+    };
+    const tierResult = getRiderGrowthTier(lifetimeCompletedOrders, quality);
+    const achievements = buildRiderGrowthAchievements(lifetimeCompletedOrders, quality, contribution);
+    const customerRating = quality.customerRating && typeof quality.customerRating === 'object'
+      ? quality.customerRating
+      : { count:0, average:null, stars:{}, tags:{} };
+    const customerRatingCount = Math.max(0, Number(customerRating.count || 0));
+    const positiveRatingCount = Math.max(0, Number(customerRating.stars?.['4'] || 0)) + Math.max(0, Number(customerRating.stars?.['5'] || 0));
+    const satisfactionRate = customerRatingCount > 0
+      ? Math.max(0, Math.min(100, (positiveRatingCount / customerRatingCount) * 100))
+      : null;
+
+    const receivedOrders = Math.max(0, Number(dispatchStats.receivedOrders || 0));
+    const acceptedOrders = Math.max(0, Number(dispatchStats.acceptedOrders || 0));
+    const skippedOrders = Math.max(0, Number(dispatchStats.skippedOrders || 0));
+    const decisions = Math.max(receivedOrders, acceptedOrders + skippedOrders);
+    const acceptanceRate = decisions > 0
+      ? Math.max(0, Math.min(100, (acceptedOrders / decisions) * 100))
+      : null;
+
+    let punctualEligibleCount = 0;
+    let punctualOnTimeCount = 0;
+
+    orders.forEach(order => {
+      const punctuality = getRiderExperiencePunctuality(order);
+      if (!punctuality.eligible) return;
+      punctualEligibleCount += 1;
+      if (punctuality.onTime) punctualOnTimeCount += 1;
+    });
+
+    const punctualityRate = punctualEligibleCount > 0
+      ? Math.max(0, Math.min(100, (punctualOnTimeCount / punctualEligibleCount) * 100))
+      : null;
+
+    const governance = rider.governance && typeof rider.governance === 'object'
+      ? rider.governance
+      : {};
+
+    const joinedAtMs = Math.max(
+      riderExperienceTimeMs(rider.approvedAtMs),
+      riderExperienceTimeMs(rider.createdAtMs),
+      riderExperienceTimeMs(rider.approvedAt),
+      riderExperienceTimeMs(rider.createdAt)
+    );
+
+    return res.json({
+      success:true,
+      publicProfile:serializeRiderPublicProfile(rider),
+      joinedAtMs,
+      summary:{
+        lifetimeCompletedOrders,
+        tier:{
+          key:String(tierResult?.key || 'NEW'),
+          label:String(tierResult?.label || '新加入'),
+        },
+        satisfactionRate,
+        customerRating,
+        cancellationRate:Number.isFinite(Number(quality.cancellationRate)) ? Number(quality.cancellationRate) : null,
+        completionRate:Number.isFinite(Number(quality.completionRate)) ? Number(quality.completionRate) : null,
+        qualityScore:Number.isFinite(Number(quality.score)) ? Number(quality.score) : null,
+        qualitySampleReady:quality.sampleReady === true,
+      },
+      quality,
+      achievements,
+      dispatch:{
+        receivedOrders,
+        acceptedOrders,
+        skippedOrders,
+        decisions,
+        acceptanceRate,
+      },
+      punctuality:{
+        eligibleCount:punctualEligibleCount,
+        onTimeCount:punctualOnTimeCount,
+        rate:punctualityRate,
+        rule:'只計入有明確指定時間且有可信任抵達／完成時間的任務，容許 10 分鐘緩衝。',
+      },
+      reports:{
+        warningCount:Math.max(0, Number(governance.warningCount || 0)),
+        violationCount:Math.max(0, Number(governance.violationCount || 0)),
+        complaintCount:Math.max(0, Number(governance.complaintCount || 0)),
+        incompleteReportCount:Math.max(0, Number(governance.incompleteReportCount || 0)),
+      },
+      serviceBreakdown:buildRiderExperienceServiceBreakdown(orders),
+      sampledOrderCount:orders.length,
+      updatedAtMs:Date.now(),
+    });
+  } catch (error) {
+    console.error('❌ 讀取小U基本資料／服務表現失敗：', error);
+    return res.status(500).json({
+      success:false,
+      message:'基本資料與服務表現暫時無法同步，請稍後再試。',
+    });
+  }
+});
+
+app.patch('/api/rider/profile-experience', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const resolved = await resolveAuthenticatedRiderForExperience(req, req.body || {});
+    if (!resolved.ok) {
+      return res.status(resolved.statusCode || 403).json({
+        success:false,
+        message:resolved.message || '小U身分驗證失敗。',
+      });
+    }
+
+    const riderDoc = resolved.riderDoc;
+    const rider = resolved.rider || riderDoc.data() || {};
+    const publicProfile = normalizeRiderPublicProfile(
+      req.body?.publicProfile || req.body || {},
+      rider.publicProfile || {}
+    );
+
+    const nowMs = Date.now();
+
+    await riderDoc.ref.set({
+      publicProfile,
+      publicProfileUpdatedAtMs:nowMs,
+      publicProfileUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs:nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+
+    return res.json({
+      success:true,
+      publicProfile:{ ...publicProfile, updatedAtMs:nowMs },
+      message:'公開基本資料已儲存。',
+    });
+  } catch (error) {
+    console.error('❌ 儲存小U公開基本資料失敗：', error);
+    return res.status(500).json({
+      success:false,
+      message:'公開基本資料儲存失敗，請稍後再試。',
     });
   }
 });
