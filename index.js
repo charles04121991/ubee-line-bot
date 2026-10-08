@@ -1,10 +1,11 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-06
-// Release: 2026_1006_CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
+// UBee Backend｜Latest Release 2026-10-08
+// Release: 2026_1008_RIDER_PRODUCTION_RELIABILITY_RC1_V5_20_4 + CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
 // - Customer No-Register V4：移除舊傳統註冊端點，新增首單安全 Order Session；既有手機不會被重複建立帳號。
 // - UCoin Hard Cap V2：單筆折抵 NT$20 硬上限由後端 preview 與正式交易雙重強制。
 //
 // 本次整理：
+// - V5.20.4 Production Reliability RC1：補齊 Rider CORS PATCH/PUT、上線狀態與最新 GPS 同批寫入、正式營運錯誤韌性與前端互動可靠性契約。
 // - V5.18：新增 authenticated 小U公開基本資料與服務表現 API；公開資料可編輯，接單率讀 riderDispatchStats，準時率只採有明確預約／指定時間且有可信任狀態時間的任務。
 // - V5.17：保留 authenticated /api/rider/credential-summary，供正式騎士端車輛／文件／保險管理頁安全讀取審核摘要。
 // - V4.15：測驗改版為騎士端全螢幕 Native Quiz；後端端點與完整答案驗證規則不變。
@@ -1834,7 +1835,7 @@ app.use((req, res, next) => {
   }
 
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-UBee-Support-Case-Id, X-UBee-Support-Access-Token, X-UBee-Support-Admin-Key, X-UBee-Support-Operator, X-UBee-Support-File-Name, X-UBee-Support-Evidence-Type, X-UBee-Rider-Phone, X-UBee-Rider-Line-User-Id, X-UBee-Rider-Document-Type, X-UBee-Rider-File-Name, X-UBee-Admin-Key');
 
   if (req.method === 'OPTIONS') {
@@ -26537,7 +26538,17 @@ function isOrderSkippedForRider(order = {}, identity = {}) {
 // 手機登入正式版：支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
   try {
-    const { lineUserId, phone, riderId, online } = req.body || {};
+    const {
+      lineUserId,
+      phone,
+      riderId,
+      online,
+      lat,
+      lng,
+      accuracy,
+      heading,
+      speed,
+    } = req.body || {};
 
     if (typeof online !== 'boolean') {
       return res.status(400).json({
@@ -26561,6 +26572,34 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
 
     const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
+
+    // V5.20.4：新版 Rider 在上線前已取得 GPS。
+    // 若本次 request 帶有有效座標，和 online presence 使用同一個 batch 寫入，
+    // 避免「已上線但第一筆定位尚未同步」的短暫不一致。舊版未帶座標仍保持相容。
+    const statusLatitude = Number(lat);
+    const statusLongitude = Number(lng);
+    const hasFreshOnlineLocation =
+      online === true &&
+      Number.isFinite(statusLatitude) &&
+      statusLatitude >= -90 &&
+      statusLatitude <= 90 &&
+      Number.isFinite(statusLongitude) &&
+      statusLongitude >= -180 &&
+      statusLongitude <= 180;
+
+    const optionalStatusNumber = value => {
+      if (value === null || value === undefined || value === '') return null;
+      const numberValue = Number(value);
+      return Number.isFinite(numberValue) ? numberValue : null;
+    };
+
+    const statusAccuracy = optionalStatusNumber(accuracy);
+    const rawStatusHeading = optionalStatusNumber(heading);
+    const statusHeading = rawStatusHeading === null
+      ? null
+      : ((rawStatusHeading % 360) + 360) % 360;
+    const rawStatusSpeed = optionalStatusNumber(speed);
+    const statusSpeed = rawStatusSpeed === null ? null : Math.max(0, rawStatusSpeed);
 
     if (online === true && !canRiderReceiveDispatch(rider)) {
       return res.status(403).json(
@@ -26599,6 +26638,24 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
       updateData.currentOrderId = '';
     }
 
+    if (hasFreshOnlineLocation) {
+      updateData.currentLat = statusLatitude;
+      updateData.currentLng = statusLongitude;
+      updateData.currentLocation = {
+        lat: statusLatitude,
+        lng: statusLongitude,
+        ...(statusAccuracy !== null ? { accuracy: statusAccuracy } : {}),
+        ...(statusHeading !== null ? { heading: statusHeading } : {}),
+        ...(statusSpeed !== null ? { speed: statusSpeed } : {}),
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      updateData.locationUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+      updateData.locationUpdatedAtMs = nowMs;
+      updateData.locationHealthState = 'healthy';
+      updateData.lastLocationSuccessAtMs = nowMs;
+    }
+
     const operationalRefs = riderV2OperationalRefs(riderDoc.id);
     const presenceData = {
       riderDocId: riderDoc.id,
@@ -26622,10 +26679,50 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
         rider.webPushEnabled === true &&
         !!String(rider.webPushSubscription?.endpoint || '').trim(),
       dispatchPresenceState: online ? 'ACCEPTING' : 'PAUSED',
+      ...(hasFreshOnlineLocation ? {
+        lat: statusLatitude,
+        lng: statusLongitude,
+        locationUpdatedAtMs: nowMs,
+        locationHealthState: 'healthy',
+      } : {}),
       dataVersion: RIDER_V2_DATA_VERSION,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAtMs: nowMs,
     };
+
+    const statusLocationData = hasFreshOnlineLocation
+      ? {
+          riderDocId: riderDoc.id,
+          riderId: rider.riderId || riderDoc.id,
+          phone: normalizePhone(rider.phone || riderDoc.id || ''),
+          lineUserId: String(rider.lineUserId || '').trim(),
+          name: cleanText(rider.name || rider.riderName || '', 80),
+          lat: statusLatitude,
+          lng: statusLongitude,
+          accuracy: statusAccuracy,
+          heading: statusHeading,
+          speed: statusSpeed,
+          currentLocation: {
+            lat: statusLatitude,
+            lng: statusLongitude,
+            ...(statusAccuracy !== null ? { accuracy: statusAccuracy } : {}),
+            ...(statusHeading !== null ? { heading: statusHeading } : {}),
+            ...(statusSpeed !== null ? { speed: statusSpeed } : {}),
+            updatedAtMs: nowMs,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          trackingSource: 'online_status',
+          isBackground: false,
+          activeOrderId: String(updateData.currentOrderId || '').trim().toUpperCase(),
+          taskTrackingStatus: updateData.currentOrderId ? 'live' : 'idle',
+          locationHealthState: 'healthy',
+          connectionState: 'connected',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+          dataVersion: RIDER_V2_DATA_VERSION,
+        }
+      : null;
+
     const statusBatch = db.batch();
     statusBatch.set(operationalRefs.rider, {
       ...updateData,
@@ -26633,10 +26730,14 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
       dataVersion: RIDER_V2_DATA_VERSION,
     }, { merge: true });
     statusBatch.set(operationalRefs.presence, presenceData, { merge: true });
+    if (statusLocationData) {
+      statusBatch.set(operationalRefs.location, statusLocationData, { merge: true });
+    }
     await statusBatch.commit();
 
     return res.json({
       success: true,
+      locationSynced: Boolean(statusLocationData),
       message: online ? '已開始接單。' : '已暫停接單。',
       online,
       rider: {
