@@ -1,7 +1,7 @@
 /* ============================================================
  * UBee 跑腿｜客戶端 Service Worker｜最新正式版 2026-10-07
  * Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261008-customer-checkout-no-loop-v2
+ * Version: 20261008-customer-checkout-auto-resume-v3
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／訂單／通知／我的／我的U幣）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261008-customer-checkout-no-loop-v2';
+const UBEE_CUSTOMER_SW_VERSION = '20261008-customer-checkout-auto-resume-v3';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
