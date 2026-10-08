@@ -1,5 +1,5 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-06
+// UBee Backend｜Photo Recovery V5.21.2｜2026-10-08
 // Release: 2026_1006_CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
 // - Customer No-Register V4：移除舊傳統註冊端點，新增首單安全 Order Session；既有手機不會被重複建立帳號。
 // - UCoin Hard Cap V2：單筆折抵 NT$20 硬上限由後端 preview 與正式交易雙重強制。
@@ -7909,6 +7909,7 @@ app.post('/api/rider/login', async (req, res) => {
     // 避免 Firebase Auth 過渡期間影響現有接單與訂單流程。
     let firebaseUid = '';
     let firebaseCustomToken = '';
+    let firebaseTokenStatus = 'unavailable';
 
     try {
       const tokenResult =
@@ -7919,6 +7920,7 @@ app.post('/api/rider/login', async (req, res) => {
       firebaseUid = tokenResult.firebaseUid;
       firebaseCustomToken =
         tokenResult.firebaseCustomToken;
+      firebaseTokenStatus = firebaseCustomToken ? 'ready' : 'unavailable';
     } catch (tokenError) {
       console.warn(
         '⚠️ 建立小U Firebase Custom Token 失敗，暫時維持舊版登入：',
@@ -7939,6 +7941,7 @@ app.post('/api/rider/login', async (req, res) => {
       // rider.html 完成串接前，既有流程仍不依賴這兩個欄位。
       firebaseUid,
       firebaseCustomToken,
+      firebaseTokenStatus,
     });
   } catch (err) {
     console.error('❌ 騎士手機登入失敗：', err);
@@ -21590,7 +21593,7 @@ app.get('/api/rider/profile-photo/change/status',riderAuthMiddleware,requireVeri
     const rider=await ref.get();
     if(!rider.exists)return res.status(404).json({success:false,message:'找不到小U資料。'});
     const data=rider.data()||{};
-    const id=String(data.profilePhotoChangeLatestId||'').trim();
+    const id=String(data.profilePhotoChangePendingId||data.profilePhotoChangeLatestId||'').trim();
     let change=null;
     if(id){const snap=await db.collection(RIDER_PHOTO_CHANGE_COLLECTION).doc(id).get();if(snap.exists&&snap.data()?.phone===req.photoChangeRiderPhone)change={id:snap.id,...snap.data()};}
     return res.json({success:true,hasPhoto:Boolean(data.profilePhoto?.storagePath),change:riderPhotoChangePublicStatus(change)});
@@ -21617,7 +21620,7 @@ app.post('/api/rider/profile-photo/change',riderAuthMiddleware,requireVerifiedRi
       tx.update(riderRef,{profilePhotoChangePendingId:changeId,profilePhotoChangeLatestId:changeId,profilePhotoChangeUpdatedAtMs:now});
     });
     return res.json({success:true,message:'已提交平台審核。審核前仍使用原本的大頭照，接單資格不變。',change:{id:changeId,status:'pending',submittedAtMs:now}});
-  }catch(error){const status=error.httpStatus||500;if(status===500)console.error('❌ 小U照片申請失敗:',error);return res.status(status).json({success:false,message:status===500?'申請送出失敗，請稍後再試。':error.message});}
+  }catch(error){const status=error.httpStatus||500;if(status===500)console.error('❌ 小U照片申請失敗:',error);return res.status(status).json({success:false,code:status===500?'RIDER_PHOTO_CHANGE_COMMIT_FAILED':status===409?'RIDER_PHOTO_CHANGE_CONFLICT':'RIDER_PHOTO_CHANGE_REQUEST_FAILED',message:status===500?'申請送出失敗，請由管理端檢查 Firestore 與照片申請日誌。':error.message});}
 });
 app.get('/api/admin/rider-profile-photos/pending',requireRiderV4AdminKey,async(req,res)=>{
   try{
