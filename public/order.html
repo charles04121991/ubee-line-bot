@@ -4,7 +4,7 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-07
   Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
-  PWA: 20261008-customer-checkout-no-loop-v2
+  PWA: 20261008-customer-checkout-auto-resume-v3
 
   本次整理：
   0. Native Clean UI V1：移除主要下單流程、首頁、我的與通知設定中重複的灰色小字說明；功能標籤、即時狀態、價格、錯誤、安全與法律必要資訊保留。
@@ -28,7 +28,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261008-customer-checkout-no-loop-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20261008-customer-checkout-auto-resume-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -13744,6 +13744,24 @@ async function createOrder(options = {}){
       throw new Error('正式報價識別碼不存在，請重新估價後再送出。');
     }
 
+    // 登入前點過的送單動作可自動繼續，但報價變動必須重新取得客人同意。
+    const priorApprovedTotal=window.UBeeCheckoutAuthResume?.expectedTotal?.();
+    if(Number.isFinite(priorApprovedTotal) && Math.round(Number(lastEstimatedTotal))!==priorApprovedTotal){
+      const latest=Number(lastEstimatedTotal);
+      for(const id of ['flowConfirmPrice','flowConfirmActionPrice']){
+        const el=document.getElementById(id);
+        if(el)el.textContent=latest>0?`NT$${Math.round(latest)}`:'待估價';
+      }
+      // 新價格不能沿用先前的同意狀態，必須由客人重新勾選。
+      for(const id of ['flowAgree','agreeCheck']){
+        const el=document.getElementById(id);
+        if(el)el.checked=false;
+      }
+      const quoteChanged=new Error('登入後最新估價與原確認金額不同，請重新勾選同意並確認費用後，再按「確認並建立任務」。');
+      quoteChanged.code='UBEE_AUTH_RESUME_PRICE_CHANGED';
+      throw quoteChanged;
+    }
+
     const data = await customerApiFetch('/api/orders', {
       method:'POST',
       body:JSON.stringify(payload),
@@ -13816,7 +13834,7 @@ async function createOrder(options = {}){
 
     const handledIdentityFlow = ['CUSTOMER_EXISTING_LOGIN_REQUIRED','CUSTOMER_IDENTITY_CANCELLED'].includes(String(err?.code||''));
     // 401 已由下單按鈕開啟登入；勿再疊一個提示框擋住登入操作。
-    if(!handledIdentityFlow && err?.status !== 401){
+    if(options.propagateError !== true && !handledIdentityFlow && err?.status !== 401){
       showUBeeCustomerNativeAlert(
         err.message ||
         '建立訂單失敗，請稍後再試。'
@@ -17686,7 +17704,23 @@ renderCustomerAddressPage=function(){UBeeEnhancements.renderAddressManager()};
 
 // 建立訂單前先完成欄位檢查；不改動既有正式估價與 /api/orders 流程。
 const __ubeeOriginalCreateOrder=createOrder;
-createOrder=async function(){try{await UBeeEnhancements.beforeCreate();await __ubeeOriginalCreateOrder();if(currentOrderId)await UBeeEnhancements.clearDraft()}catch(err){console.error('提交前檢查失敗:',err);showUBeeCustomerNativeAlert(err.message||'提交前檢查失敗，請稍後再試。')}};
+createOrder=async function(options={}){
+  try{
+    await UBeeEnhancements.beforeCreate();
+    // 向正式下單函式傳遞 options，並將本次真正建立的訂單編號回傳。
+    const createdId=await __ubeeOriginalCreateOrder(options);
+    if(createdId){
+      try{await UBeeEnhancements.clearDraft()}
+      catch(error){console.warn('訂單已成功建立，草稿清除未完成：',error)}
+    }
+    return createdId||null;
+  }catch(err){
+    console.error('提交前檢查失敗:',err);
+    if(options.propagateError===true)throw err;
+    if(err?.status!==401)showUBeeCustomerNativeAlert(err.message||'提交前檢查失敗，請稍後再試。');
+    return null;
+  }
+};
 
 // 確認頁顯示即時系統檢查。
 const __ubeeOriginalRenderSummary=renderSummary;
@@ -17805,8 +17839,11 @@ window.onUBeeCustomerAuthenticated = async (customer, target) => {
     try{renderCustomerMemberInfo?.()}catch(_){}
     const statusEl=document.getElementById('flowConfirmStatus');
     if(statusEl){
-      statusEl.textContent='登入成功，已保留這筆任務。請檢查資料後，再按「確認送出」。';
+      const resuming=window.UBeeCheckoutAuthResume?.onLoginComplete?.()===true;
+      statusEl.textContent=resuming?'登入成功，正在接續建立剛才的任務…':'登入成功，已保留這筆任務，可繼續送單。';
       statusEl.classList.remove('error');
+    }else{
+      window.UBeeCheckoutAuthResume?.onLoginComplete?.();
     }
     return true;
   }
@@ -20636,15 +20673,90 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);const priceText=total>0?`NT$${Math.round(total)}`:'待估價';$('flowConfirmPrice').textContent=priceText;$('flowConfirmActionPrice').textContent=priceText;await window.UBeeUCoinV1?.refreshCheckout?.();const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'道路時間已計算，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
   }
 
+  // 本次登入只承接使用者剛剛明確點過的送單意圖；只存在記憶體，不跨重新載入。
+  let submitAuthInProgress=false;
+  let authResumePending=null;
+  let authResumeExpectedTotal=null;
+  const checkoutStillConfirmed=()=>state.page==='confirm'&&
+    Boolean(root.querySelector('.flow-page[data-page="confirm"].active'))&&
+    Boolean($('flowAgree')?.checked)&&Boolean(state.pickup)&&Boolean(state.dropoff);
+  function armAuthResume(reason){
+    if(!checkoutStillConfirmed())return false;
+    authResumePending={at:Date.now(),reason,approvedTotal:Math.round(Number(lastEstimatedTotal)||0)};
+    status('flowConfirmStatus','完成登入後將自動繼續建立此任務，不必再次按下單。');
+    return true;
+  }
+  function afterLoginResume(){
+    if(!authResumePending)return false;
+    let attempt=0;
+    const resume=()=>{
+      if(!authResumePending)return;
+      if(Date.now()-authResumePending.at>10*60*1000||!checkoutStillConfirmed()){
+        authResumePending=null;
+        status('flowConfirmStatus','登入已完成；因確認頁已變動或等待時間過久，請重新確認內容後送出。',true);
+        return;
+      }
+      if(state.submitting||submitAuthInProgress||window.UBeeCustomerAuthHost?.isOpen?.()){
+        if(attempt++<30){setTimeout(resume,100);return}
+        authResumePending=null;
+        status('flowConfirmStatus','登入成功，請確認內容後按「確認並建立任務」。',true);
+        return;
+      }
+      const pending=authResumePending;
+      authResumePending=null; // 先消耗一次性意圖；杜絕後續登入重複送單。
+      authResumeExpectedTotal=pending.approvedTotal;
+      status('flowConfirmStatus','登入成功，正在自動接續剛才的下單…');
+      Promise.resolve(submitOrder()).catch(error=>{
+        console.error('登入後自動接續送單失敗：',error);
+      }).finally(()=>{authResumeExpectedTotal=null});
+    };
+    setTimeout(resume,60); // 等登入畫面真正關閉再開始
+    return true;
+  }
+  window.UBeeCheckoutAuthResume=Object.freeze({
+    arm:armAuthResume,
+    onLoginComplete:afterLoginResume,
+    expectedTotal:()=>authResumeExpectedTotal,
+    cancel:()=>{authResumePending=null;authResumeExpectedTotal=null},
+    isPending:()=>Boolean(authResumePending)
+  });
+
   async function submitOrder(){
-    if(state.submitting)return;if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
+    if(state.submitting||submitAuthInProgress)return;
+    if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
     syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
     try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
     let uid='';
-    try{uid=await resolveCustomerIdForSubmit()}catch(error){const handled=['CUSTOMER_EXISTING_LOGIN_REQUIRED','CUSTOMER_IDENTITY_CANCELLED'].includes(String(error?.code||''));if(!handled)status('flowConfirmStatus',error?.message||'目前無法確認下單人身分。',true);return}
+    submitAuthInProgress=true;
+    try{uid=await resolveCustomerIdForSubmit()}
+    catch(error){
+      const code=String(error?.code||'');
+      if(code==='CUSTOMER_EXISTING_LOGIN_REQUIRED'){
+        armAuthResume('existing-account');
+      }else if(code!=='CUSTOMER_IDENTITY_CANCELLED'){
+        status('flowConfirmStatus',error?.message||'目前無法確認下單人身分。',true);
+      }
+      return;
+    }finally{submitAuthInProgress=false}
     if(!/^customer_[a-f0-9]{32}$/.test(uid)){status('flowConfirmStatus','目前無法建立安全的客戶使用身分，請稍後再試。',true);return}
     state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
-    try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');const createdOrderId=await createOrder({propagateError:true});if(createdOrderId && typeof currentOrderId!=='undefined'&&String(currentOrderId)===String(createdOrderId)){document.body.classList.add('ubee-active-order');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',window.UBeeCustomerAuthHost?.isOpen?.()?'請先完成登入，回到此頁再按一次「確認送出」，不會自動重複下單。':(error.message||'建立訂單失敗，請稍後再試。'),true)}finally{state.submitting=false;setLoading(false)}
+    try{
+      if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');
+      const createdOrderId=await createOrder({propagateError:true});
+      if(createdOrderId && typeof currentOrderId!=='undefined'&&String(currentOrderId)===String(createdOrderId)){
+        authResumePending=null;
+        document.body.classList.add('ubee-active-order');
+        try{showOnlyStep(5)}catch(_){ }
+        resetNewTask(false);
+      }else throw new Error('訂單尚未成功建立，請重新確認後再試');
+    }catch(error){
+      console.error('建立訂單失敗：',error);
+      if(error?.status===401 && window.UBeeCustomerAuthHost?.isOpen?.()){
+        armAuthResume('expired-session');
+      }else{
+        status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true);
+      }
+    }finally{state.submitting=false;setLoading(false)}
   }
 
   function resetNewTask(clearLegacy=true){
@@ -21187,6 +21299,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function showFlow(options={}){
+    // 主動開啟新任務時取消前一次尚未完成的登入續單意圖。
+    window.UBeeCheckoutAuthResume?.cancel?.();
     if(options.fresh!==false) resetNewTask(true);
     document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
     root.classList.add('active');
@@ -21560,7 +21674,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261008-customer-checkout-no-loop-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261008-customer-checkout-auto-resume-v3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
