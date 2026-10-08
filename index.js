@@ -6412,9 +6412,16 @@ app.get('/api/customer/u-coins', requireCustomerAuth, async (req, res) => {
   try {
     const customerId = req.customerAuth.customerId;
     await reconcileExpiredUCoin(customerId);
+    const historyQuery = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).where('customerId', '==', customerId);
+    const historyRequest = historyQuery.orderBy('createdAtMs','desc').limit(100).get()
+      .catch(async error => {
+        // Continue serving the page while the required composite index is being provisioned.
+        console.warn('UBee U幣最新明細查詢需檢查 Firestore 索引：', error?.code || error?.message || error);
+        return historyQuery.limit(100).get();
+      });
     const [walletDoc, historySnap] = await Promise.all([
       db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId).get(),
-      db.collection(UBEE_UCOIN_COLLECTIONS.transactions).where('customerId', '==', customerId).limit(100).get(),
+      historyRequest,
     ]);
     const walletData = walletDoc.exists ? walletDoc.data() || {} : {};
     const today = uCoinTaipeiDateKey();
@@ -30455,6 +30462,17 @@ async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
       }
     }
 
+    // Only the new customer client supplies this expectation. Legacy clients remain compatible.
+    // A concurrent wallet change must never silently increase the amount after agreement.
+    const expectedPayable = Number(order.checkoutExpectedPayableTotal);
+    if (order.checkoutExpectedPayableTotal !== undefined &&
+        (!Number.isInteger(expectedPayable) || expectedPayable < 0 ||
+         Math.round(Number(savedOrder.customerPayableTotal || 0)) !== expectedPayable)) {
+      const conflict = new Error('下單期間費用或 U幣餘額發生變動，尚未建立訂單。請重新確認最新費用。');
+      conflict.code='CHECKOUT_TOTAL_CHANGED';
+      conflict.statusCode=409;
+      throw conflict;
+    }
     transaction.set(orderRef, savedOrder, { merge: true });
     transaction.set(quoteRef, {
       status: 'used',
@@ -31543,6 +31561,12 @@ function getDuplicateFingerprint(data) {
   ].join('|');
 }
 
+function isRecoverableRecentCustomerOrder(order) {
+  if (!order) return false;
+  const status = String(order.status || '').trim().toLowerCase();
+  return !['cancelled', 'canceled', 'completed', 'done', 'failed', 'expired', 'rejected', 'void', 'refunded'].includes(status);
+}
+
 async function findRecentDuplicateOrder(data) {
   const now = Date.now();
   const fingerprint = getDuplicateFingerprint(data);
@@ -31550,7 +31574,7 @@ async function findRecentDuplicateOrder(data) {
   for (const order of Object.values(orders)) {
     if (!order || !order.createdAt) continue;
     if (now - Number(order.createdAt) > DUPLICATE_ORDER_WINDOW_MS) continue;
-    if (['cancelled', 'canceled', 'completed', 'done'].includes(String(order.status || '').toLowerCase())) continue;
+    if (!isRecoverableRecentCustomerOrder(order)) continue;
     if (order.duplicateFingerprint === fingerprint) return order;
   }
 
@@ -31560,10 +31584,17 @@ async function findRecentDuplicateOrder(data) {
       .where('userId', '==', data.userId)
       .where('duplicateFingerprint', '==', fingerprint)
       .where('createdAt', '>=', now - DUPLICATE_ORDER_WINDOW_MS)
-      .limit(1)
+      .limit(30)
       .get();
 
-    if (!snap.empty) return { id: snap.docs[0].id, ...(snap.docs[0].data() || {}) };
+    if (!snap.empty) {
+      const recoverable = snap.docs
+        .map(doc => ({ ...(doc.data() || {}), id:doc.id }))
+        .filter(order => isRecoverableRecentCustomerOrder(order) &&
+          Number(order.createdAt || 0) >= now - DUPLICATE_ORDER_WINDOW_MS)
+        .sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      if (recoverable.length) return recoverable[0];
+    }
   } catch (err) {
     console.error('❌ 查詢重複訂單失敗：', err);
   }
@@ -40026,8 +40057,12 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       });
     }
 
-    console.log('========== H5 建立訂單 ==========');
-    console.log('req.body:', req.body);
+    // Production privacy: never log customer contact details, locations or task notes.
+    console.info('[UBee Customer Order] validated quote submission', {
+      serviceMode: String(data.serviceMode || '').slice(0, 32),
+      serviceGroup: String(data.serviceGroup || '').slice(0, 32),
+      quotePresent: Boolean(data.quoteId || req.body.quoteId),
+    });
 
     const inputErrors = validateOrderInput(data);
     if (inputErrors.length > 0) {
@@ -40775,6 +40810,15 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     // 建單前先結清已到期的可用 U幣，避免以過期餘額建立折抵保留。
     await reconcileExpiredUCoin(req.customerAuth.customerId);
 
+    // Final amount is an optional strict contract for the new customer client.
+    if (req.body.checkoutExpectedPayableTotal !== undefined) {
+      const agreed = Number(req.body.checkoutExpectedPayableTotal);
+      if (!Number.isInteger(agreed) || agreed < 0 || agreed > 1000000) {
+        return res.status(400).json({success:false, code:'CHECKOUT_TOTAL_INVALID',error:'確認金額資料不正確，請重新估價。'});
+      }
+      order.checkoutExpectedPayableTotal = agreed;
+    }
+
     // 訂單與 Quote 在同一 transaction 內提交：成功就兩者一起成功，失敗就兩者都不寫入。
     await saveCustomerOrderWithQuoteLock(order, quoteValidation.ref);
 
@@ -40802,7 +40846,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     notifyCustomer(order, createTextMessage(
       `✅ 訂單已建立：${order.id}\n\n` +
       `目前 UBee 跑腿先開放現金單。\n` +
-      `請回到網頁確認使用現金單，確認後系統才會開始媒合騎士。`
+      `系統將接續確認現金付款並開始媒合；請在「我的訂單」查看狀態。如顯示待確認，可在訂單頁點選「確認現金單」繼續。`
     )).catch(error => {
       console.warn(`⚠️ 訂單 ${order.id} 已建立，但客戶通知失敗：`, error?.message || error);
     });
