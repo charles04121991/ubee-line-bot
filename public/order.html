@@ -4,7 +4,7 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-07
   Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
-  PWA: 20261008-customer-checkout-auto-resume-v3
+  PWA: 20261008-customer-production-reliability-hotfix-v1
 
   本次整理：
   0. Native Clean UI V1：移除主要下單流程、首頁、我的與通知設定中重複的灰色小字說明；功能標籤、即時狀態、價格、錯誤、安全與法律必要資訊保留。
@@ -28,7 +28,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261008-customer-checkout-auto-resume-v3" rel="manifest"/>
+<link href="/manifest-order.json?v=20261008-customer-production-reliability-hotfix-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -13683,6 +13683,21 @@ function getCustomerPayableTotal(order){
     : null;
 }
 
+// Customer Production Reliability Hotfix V1: price snapshot belongs to a single explicit tap.
+function captureApprovedCustomerCheckoutPricing(){
+  const quote = (typeof lastQuoteData !== 'undefined' && lastQuoteData) || {};
+  const price = quote.price && typeof quote.price === 'object' ? quote.price : quote;
+  const roundMoney = value => Math.max(0, Math.round(Number(value) || 0));
+  const base = roundMoney(typeof lastEstimatedTotal !== 'undefined' ? lastEstimatedTotal : 0);
+  const advance = roundMoney(quote.advancePayment ?? price.advancePayment ?? (typeof getAdvancePaymentAmount === 'function' ? getAdvancePaymentAmount() : 0));
+  const discount = Math.min(20, roundMoney(window.__ubeeUCoinRedeemWhole || 0));
+  return {
+    base, advance, discount, payable:Math.max(0,base-discount),
+    serviceSubtotal:roundMoney(price.serviceSubtotal ?? price.serviceTotal ?? base-advance),
+    platformIncome:roundMoney(price.platformIncome ?? price.platformFee ?? price.serviceFee ?? 0)
+  };
+}
+
 async function createOrder(options = {}){
   if(isSubmittingOrder){
     return;
@@ -13714,6 +13729,8 @@ async function createOrder(options = {}){
     clearTimeout(quoteRefreshTimer);
     quoteRefreshTimer = null;
 
+    // Snapshot before repricing. The visible amount is what the customer approved.
+    const approved = options.approvedPricing || captureApprovedCustomerCheckoutPricing();
     invalidateQuote();
 
     const freshQuote = await renderEstimate();
@@ -13729,6 +13746,37 @@ async function createOrder(options = {}){
       );
     }
 
+    const refreshed = captureApprovedCustomerCheckoutPricing();
+    let maxRedeemNow = approved.discount;
+    if (approved.discount > 0) {
+      // Wallet and platform share may have changed since checkout preview.
+      const preview = await customerApiFetch('/api/customer/u-coins/redemption-preview', {
+        method:'POST',
+        body:JSON.stringify({serviceSubtotal:refreshed.serviceSubtotal, platformIncome:refreshed.platformIncome})
+      });
+      maxRedeemNow = Math.max(0, Math.floor(Number(preview.maxWhole || 0)));
+    }
+    const resumedApprovedBase = window.UBeeCheckoutAuthResume?.expectedTotal?.();
+    const changed = approved.base !== refreshed.base || approved.advance !== refreshed.advance ||
+      approved.discount !== refreshed.discount || maxRedeemNow < approved.discount ||
+      (Number.isFinite(resumedApprovedBase) && resumedApprovedBase !== refreshed.base);
+    if (changed) {
+      // Update visible quote/discount; customer must explicitly accept the new amount.
+      try{await window.UBeeUCoinV1?.refreshCheckout?.()}catch(error){console.warn('U幣重算失敗：',error)}
+      const shown = captureApprovedCustomerCheckoutPricing();
+      for (const id of ['flowConfirmPrice','flowConfirmActionPrice']) {
+        const el=document.getElementById(id);
+        if(el)el.textContent=shown.base>0?`NT$${shown.payable}`:'待估價';
+      }
+      for (const id of ['flowAgree','agreeCheck']) {
+        const el=document.getElementById(id);
+        if(el)el.checked=false;
+      }
+      const quoteChanged = new Error('最新費用或 U幣折抵額度已有變動，請重新確認畫面金額並勾選同意後再送出。');
+      quoteChanged.code='UBEE_CHECKOUT_PRICE_CHANGED';
+      throw quoteChanged;
+    }
+
     btn.innerText = '確認下單人身分...';
     const ensuredCustomerId = typeof window.ensureCustomerSessionForOrder === 'function'
       ? await window.ensureCustomerSessionForOrder()
@@ -13739,27 +13787,10 @@ async function createOrder(options = {}){
     btn.innerText = '建立訂單中...';
     const payload = getPayload();
     payload.uCoinRedeemWhole = Math.max(0, Math.floor(Number(window.__ubeeUCoinRedeemWhole || 0)));
+    payload.checkoutExpectedPayableTotal = approved.payable;
 
     if(!payload.quoteId){
       throw new Error('正式報價識別碼不存在，請重新估價後再送出。');
-    }
-
-    // 登入前點過的送單動作可自動繼續，但報價變動必須重新取得客人同意。
-    const priorApprovedTotal=window.UBeeCheckoutAuthResume?.expectedTotal?.();
-    if(Number.isFinite(priorApprovedTotal) && Math.round(Number(lastEstimatedTotal))!==priorApprovedTotal){
-      const latest=Number(lastEstimatedTotal);
-      for(const id of ['flowConfirmPrice','flowConfirmActionPrice']){
-        const el=document.getElementById(id);
-        if(el)el.textContent=latest>0?`NT$${Math.round(latest)}`:'待估價';
-      }
-      // 新價格不能沿用先前的同意狀態，必須由客人重新勾選。
-      for(const id of ['flowAgree','agreeCheck']){
-        const el=document.getElementById(id);
-        if(el)el.checked=false;
-      }
-      const quoteChanged=new Error('登入後最新估價與原確認金額不同，請重新勾選同意並確認費用後，再按「確認並建立任務」。');
-      quoteChanged.code='UBEE_AUTH_RESUME_PRICE_CHANGED';
-      throw quoteChanged;
     }
 
     const data = await customerApiFetch('/api/orders', {
@@ -13792,37 +13823,22 @@ async function createOrder(options = {}){
       );
     }
 
-    localStorage.setItem(
-      'ubee_current_order_id',
-      currentOrderId
-    );
+    // HttpOnly session and server response are authoritative; storage may be disabled.
+    try{localStorage.setItem('ubee_current_order_id', String(currentOrderId))}
+    catch(error){console.warn('UBee 訂單已建立，本機快取無法寫入：',error)}
 
-    setOrderNo(currentOrderId);
+    // Post-create presentation failures must never ask customer to submit again.
+    try{setOrderNo(currentOrderId)}catch(error){console.warn('訂單編號顯示失敗：',error)}
+    try{showOnlyStep(5)}catch(error){console.warn('追蹤頁啟動失敗：',error)}
+    try{renderTimeline(currentOrderData?.status || 'pending_payment', currentOrderData)}
+    catch(error){console.warn('進度渲染失敗：',error)}
+    try{startOrderListener(currentOrderId)}catch(error){console.warn('訂單同步啟動失敗：',error)}
+    try{selectPaymentMethod('cash')}catch(error){console.warn('現金選項顯示失敗：',error)}
 
-    showOnlyStep(5);
-
-    renderTimeline(
-      currentOrderData?.status ||
-        'pending_payment',
-      currentOrderData
-    );
-
-    startOrderListener(
-      currentOrderId
-    );
-
-    selectPaymentMethod('cash');
-
-    // Customer Dispatch Recovery V1：訂單建立後立刻要求完成現金單確認，
-    // 不讓新任務因為確認按鈕位於頁面下方而停留在 pending_payment。
-    window.setTimeout(() => {
-      const latestStatus = String(currentOrderData?.status || 'pending_payment').trim().toLowerCase();
-      if(latestStatus === 'pending_payment' && !isConfirmingPaid){
-        confirmPaid().catch(error => {
-          console.warn('UBee 建單後現金確認未完成：', error);
-        });
-      }
-    }, 220);
+    // The customer has explicitly agreed to cash payment on the checkout page.
+    // If the second API request fails, keep the real order and the visible retry action.
+    try{await confirmPaid({skipDialog:true})}
+    catch(error){console.warn('現金單尚待確認，保留訂單供重試：',error)}
     return String(currentOrderId);
 
   }catch(err){
@@ -13941,7 +13957,7 @@ async function submitPaymentMethodToServer(method){
   );
 }
 
-async function confirmPaid(){
+async function confirmPaid({skipDialog=false}={}){
   if(!currentOrderId){
     showUBeeCustomerNativeAlert('找不到訂單編號。');
     return;
@@ -13987,7 +14003,7 @@ async function confirmPaid(){
     btn.disabled = true;
     btn.innerText = '確認中...';
 
-    const ok = await showUBeeCustomerNativeConfirm(
+    const ok = skipDialog === true ? true : await showUBeeCustomerNativeConfirm(
       '確認現金單？',
       '開始派單後，付款方式就不能再更改。',
       {confirmText:'確認並開始派單',cancelText:'取消'}
@@ -17896,16 +17912,20 @@ activateUBeeCustomerRuntime();
   }
 
   function setCreateOrderNetworkLock(locked){
-    const btn = document.getElementById('createOrderBtn');
-    if(!btn) return;
-    if(locked){
-      if(!btn.dataset.networkOriginalText) btn.dataset.networkOriginalText = btn.innerText || '建立訂單';
-      if(!(typeof isSubmittingOrder !== 'undefined' && isSubmittingOrder)) btn.disabled = true;
-      if(!(typeof isSubmittingOrder !== 'undefined' && isSubmittingOrder)) btn.innerText = '網路中斷，暫停送出';
-    }else if(!(typeof isSubmittingOrder !== 'undefined' && isSubmittingOrder) && btn.dataset.networkOriginalText){
-      btn.disabled = false;
-      btn.innerText = btn.dataset.networkOriginalText;
-      delete btn.dataset.networkOriginalText;
+    for (const id of ['createOrderBtn','flowSubmitOrder']) {
+      const btn=document.getElementById(id);
+      if(!btn)continue;
+      const submitting=(typeof isSubmittingOrder !== 'undefined' && isSubmittingOrder) ||
+        id==='flowSubmitOrder' && btn.dataset.ubeeSubmissionBusy==='1';
+      if(locked){
+        if(!btn.dataset.networkOriginalText)btn.dataset.networkOriginalText=btn.innerText || '確認並建立任務';
+        btn.disabled=true;
+        if(!submitting)btn.innerText='網路中斷，暫停送出';
+      }else if(btn.dataset.networkOriginalText){
+        if(!submitting)btn.disabled=false;
+        if(!submitting)btn.innerText=btn.dataset.networkOriginalText;
+        delete btn.dataset.networkOriginalText;
+      }
     }
   }
 
@@ -17921,6 +17941,7 @@ activateUBeeCustomerRuntime();
     }catch(e){ backendReachable=false; return false; }
   }
 
+  window.UBeeCustomerCheckBackend = checkBackend;
   async function recover(){
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(async()=>{
@@ -19170,11 +19191,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <label class="ubee-ucoin-switch"><input id="ubeeUCoinUseToggle" type="checkbox"><span></span></label>
 </section>
 <div class="ubee-ucoin-checkout-saving" id="ubeeUCoinCheckoutSaving" hidden></div>
-<label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務資料與服務規則</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間與費用，並同意 UBee 服務條款與隱私權政策。</small></span></label>
+<label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務、現金付款與服務規則</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間及最終顯示費用，同意以現金付款。按下建立任務後將開始媒合小U；我也同意 UBee 服務條款與隱私權政策。</small></span></label>
 
 <div class="flow-status" id="flowConfirmStatus"></div>
 </div>
-<div class="ubee-native-checkout-actionbar"><div class="ubee-native-checkout-action-price"><span>預估費用</span><strong id="flowConfirmActionPrice">—</strong></div><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div>
+<div class="ubee-native-checkout-actionbar"><div class="ubee-native-checkout-action-price"><span>預估費用</span><strong id="flowConfirmActionPrice">—</strong></div><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立現金任務</button></div>
 </section>
 
 <section class="flow-page" data-page="search" id="flowPageSearch">
@@ -20724,11 +20745,19 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   async function submitOrder(){
     if(state.submitting||submitAuthInProgress)return;
     if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
+    const approvedPricing = captureApprovedCustomerCheckoutPricing();
+    if(approvedPricing.base<=0){status('flowConfirmStatus','正式估價尚未完成，請重新估價後再送出。',true);return}
+    if(!navigator.onLine){status('flowConfirmStatus','目前網路中斷，請恢復連線後再送出。',true);return}
     syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
     try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
     let uid='';
     submitAuthInProgress=true;
-    try{uid=await resolveCustomerIdForSubmit()}
+    try{
+      if(typeof window.UBeeCustomerCheckBackend==='function' && !await window.UBeeCustomerCheckBackend()){
+        throw new Error('目前無法連上 UBee 系統，為避免訂單狀態不明，請確認連線後再試。');
+      }
+      uid=await resolveCustomerIdForSubmit();
+    }
     catch(error){
       const code=String(error?.code||'');
       if(code==='CUSTOMER_EXISTING_LOGIN_REQUIRED'){
@@ -20742,12 +20771,12 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
     try{
       if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');
-      const createdOrderId=await createOrder({propagateError:true});
+      const createdOrderId=await createOrder({propagateError:true,approvedPricing});
       if(createdOrderId && typeof currentOrderId!=='undefined'&&String(currentOrderId)===String(createdOrderId)){
         authResumePending=null;
         document.body.classList.add('ubee-active-order');
-        try{showOnlyStep(5)}catch(_){ }
-        resetNewTask(false);
+        // A successful order is the source of truth. Do not navigate back to Home.
+        try{showOnlyStep(5)}catch(error){console.warn('UBee 訂單追蹤頁顯示失敗：',error)}
       }else throw new Error('訂單尚未成功建立，請重新確認後再試');
     }catch(error){
       console.error('建立訂單失敗：',error);
@@ -21674,7 +21703,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261008-customer-checkout-auto-resume-v3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261008-customer-production-reliability-hotfix-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
