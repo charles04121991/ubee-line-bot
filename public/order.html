@@ -4,7 +4,7 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-07
   Release: Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
-  PWA: 20261007-customer-my-service-smooth-v1
+  PWA: 20261008-customer-checkout-no-loop-v2
 
   本次整理：
   0. Native Clean UI V1：移除主要下單流程、首頁、我的與通知設定中重複的灰色小字說明；功能標籤、即時狀態、價格、錯誤、安全與法律必要資訊保留。
@@ -28,7 +28,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261007-customer-my-service-smooth-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261008-customer-checkout-no-loop-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -7376,7 +7376,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 </style>
 <div aria-hidden="true" id="ubeeOrderIdentityGate">
 <div class="ubee-order-identity-sheet" role="dialog" aria-modal="true" aria-labelledby="ubeeOrderIdentityTitle">
-<div class="ubee-order-identity-handle"></div><div class="ubee-order-identity-head"><h2 id="ubeeOrderIdentityTitle">第一次送出任務</h2><p>不用註冊、不用先設定密碼。只要留下「下單人本人」姓名與手機，UBee 會建立安全使用身分；成功後立即繼續送單。</p></div>
+<div class="ubee-order-identity-handle"></div><div class="ubee-order-identity-head"><h2 id="ubeeOrderIdentityTitle">確認下單人資料</h2><p>新客首次送單只需填寫本人姓名與手機，不必先註冊或設定密碼。若手機曾使用 UBee，為保護既有訂單與會員資料，請登入原帳號。</p></div>
 <div class="ubee-order-identity-field"><label for="ubeeOrderIdentityName">下單人姓名</label><input id="ubeeOrderIdentityName" maxlength="40" autocomplete="name" enterkeyhint="next" placeholder="請填寫本人姓名"/></div>
 <div class="ubee-order-identity-field"><label for="ubeeOrderIdentityPhone">下單人手機</label><input id="ubeeOrderIdentityPhone" maxlength="10" inputmode="numeric" autocomplete="tel" enterkeyhint="done" placeholder="09xxxxxxxx" type="tel"/></div>
 <div class="ubee-order-identity-status" id="ubeeOrderIdentityStatus" role="status" aria-live="polite"></div>
@@ -7443,10 +7443,23 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
       const data=await rawApi('/api/customer-auth/order-session',{method:'POST',body:JSON.stringify({name,phone,serviceCity:(typeof selectedServiceCity!=='undefined'?selectedServiceCity:''),referralCode,agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})});
       const customer=data.customer||{};
       if(!/^customer_[a-f0-9]{32}$/.test(String(customer.customerId||'')))throw new Error('後端未回傳有效的 Customer ID。');
+      // 確保此瀏覽器已真的保存 HttpOnly Session；避免新帳號建立成功卻無法送單。
+      let confirmedMe;
+      try{confirmedMe=await rawApi('/api/customer-auth/me')}
+      catch(_){
+        const cookieError=new Error('使用身分已建立，但瀏覽器未能確認登入狀態。請以 Safari 或 Chrome 開啟 UBee，勿重複建立；如仍失敗，請由 LINE 客服協助恢復。');
+        cookieError.code='CUSTOMER_SESSION_NOT_PERSISTED';
+        throw cookieError;
+      }
+      if(String(confirmedMe?.customer?.customerId||'')!==String(customer.customerId)){
+        const cookieError=new Error('登入狀態未正確保存，請以 Safari 或 Chrome 開啟 UBee，勿重複建立。');
+        cookieError.code='CUSTOMER_SESSION_NOT_PERSISTED';
+        throw cookieError;
+      }
       promoteGuestLocalContext(customer.customerId);
-      if(typeof currentCustomer!=='undefined')currentCustomer=customer;
+      if(typeof currentCustomer!=='undefined')currentCustomer=confirmedMe.customer;
       if(typeof userId!=='undefined')userId=String(customer.customerId);
-      window.__ubeeCurrentCustomer=customer;
+      window.__ubeeCurrentCustomer=confirmedMe.customer;
       try{renderCustomerMemberInfo?.()}catch(_){}
       const resolve=pendingResolve;pendingResolve=pendingReject=null;close();resolve?.(String(customer.customerId));
     }catch(error){
@@ -7454,7 +7467,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
         const reject=pendingReject;pendingResolve=pendingReject=null;close();
         const passwordSetupRequired=error.payload?.passwordSetupRequired===true;
         const message=passwordSetupRequired
-          ? '這支手機已建立 UBee 使用身分，但尚未設定登入密碼。請先透過 LINE 自動設定密碼。'
+          ? '這支手機已有 UBee 使用身分，但尚未設定密碼。LINE 自動恢復需核對歷史任務或其他已建立的驗證資料；若無法完成，請透過 LINE 客服安全核對，請勿重複建立帳號。'
           : '這支手機已有 UBee 使用身分，請先登入後再繼續送單。';
         window.UBeeCustomerAuthHost?.show(passwordSetupRequired?'forgot':'login',{phone,message});
         if(reject){error.message=message;reject(error)}
@@ -8187,7 +8200,10 @@ function showCustomerAuthConnectionError(message){
 function redirectToCustomerLogin(mode = 'login'){
   currentCustomer = null;
   userId = '';
-  window.UBeeCustomerAuthHost?.show(mode);
+  window.__ubeeCurrentCustomer = null;
+  window.UBeeCustomerAuthHost?.show(mode,{
+    message:'登入狀態已失效。完成登入後，原本填寫的訂單將保留；請再次確認送出。'
+  });
 }
 
 async function customerApiFetch(url, options = {}){
@@ -8203,10 +8219,14 @@ async function customerApiFetch(url, options = {}){
   });
   const data = await response.json().catch(() => ({}));
   if(response.status === 401){
-    redirectToCustomerLogin();
-    const error = new Error(data.message || '請先登入 UBee 會員帳號。');
+    // 背景更新（訂單、通知、成長、地址、雲端草稿）不可強制打開登入畫面。
+    // 只有客人主動按「建立訂單」的操作才允許顯示登入提示。
+    const error = new Error(data.message || '登入狀態已失效，請重新登入後再送單。');
     error.code = data.code || 'CUSTOMER_LOGIN_REQUIRED';
     error.status = 401;
+    if(options.authPrompt === true){
+      redirectToCustomerLogin();
+    }
     throw error;
   }
   if(!response.ok || data.success === false){
@@ -13663,7 +13683,7 @@ function getCustomerPayableTotal(order){
     : null;
 }
 
-async function createOrder(){
+async function createOrder(options = {}){
   if(isSubmittingOrder){
     return;
   }
@@ -13726,7 +13746,8 @@ async function createOrder(){
 
     const data = await customerApiFetch('/api/orders', {
       method:'POST',
-      body:JSON.stringify(payload)
+      body:JSON.stringify(payload),
+      authPrompt:true
     });
 
     currentOrderId =
@@ -13784,6 +13805,7 @@ async function createOrder(){
         });
       }
     }, 220);
+    return String(currentOrderId);
 
   }catch(err){
 
@@ -13793,12 +13815,14 @@ async function createOrder(){
     );
 
     const handledIdentityFlow = ['CUSTOMER_EXISTING_LOGIN_REQUIRED','CUSTOMER_IDENTITY_CANCELLED'].includes(String(err?.code||''));
-    if(!handledIdentityFlow){
+    // 401 已由下單按鈕開啟登入；勿再疊一個提示框擋住登入操作。
+    if(!handledIdentityFlow && err?.status !== 401){
       showUBeeCustomerNativeAlert(
         err.message ||
         '建立訂單失敗，請稍後再試。'
       );
     }
+    if(options.propagateError === true) throw err;
 
   }finally{
 
@@ -17771,6 +17795,20 @@ window.onUBeeCustomerAuthenticated = async (customer, target) => {
   if(customer?.customerId){
     currentCustomer = customer;
     userId = String(customer.customerId);
+    window.__ubeeCurrentCustomer = customer;
+  }
+
+  // 已在確認訂單：只完成登入，保留目前頁面、路線、估價、備註及條款狀態。
+  // 不能再次呼叫 showFlow({fresh:false})，因為它仍會 showPage('home')。
+  const checkoutConfirm = document.querySelector('#productionOrderFlow .flow-page[data-page="confirm"].active');
+  if(ubeeCustomerRuntimeStarted && checkoutConfirm && customer?.customerId && target === 'order'){
+    try{renderCustomerMemberInfo?.()}catch(_){}
+    const statusEl=document.getElementById('flowConfirmStatus');
+    if(statusEl){
+      statusEl.textContent='登入成功，已保留這筆任務。請檢查資料後，再按「確認送出」。';
+      statusEl.classList.remove('error');
+    }
+    return true;
   }
 
   return activateUBeeCustomerRuntime({
@@ -20606,7 +20644,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     try{uid=await resolveCustomerIdForSubmit()}catch(error){const handled=['CUSTOMER_EXISTING_LOGIN_REQUIRED','CUSTOMER_IDENTITY_CANCELLED'].includes(String(error?.code||''));if(!handled)status('flowConfirmStatus',error?.message||'目前無法確認下單人身分。',true);return}
     if(!/^customer_[a-f0-9]{32}$/.test(uid)){status('flowConfirmStatus','目前無法建立安全的客戶使用身分，請稍後再試。',true);return}
     state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
-    try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');await createOrder();if(typeof currentOrderId!=='undefined'&&currentOrderId){document.body.classList.add('ubee-active-order');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true)}finally{state.submitting=false;setLoading(false)}
+    try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');const createdOrderId=await createOrder({propagateError:true});if(createdOrderId && typeof currentOrderId!=='undefined'&&String(currentOrderId)===String(createdOrderId)){document.body.classList.add('ubee-active-order');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',window.UBeeCustomerAuthHost?.isOpen?.()?'請先完成登入，回到此頁再按一次「確認送出」，不會自動重複下單。':(error.message||'建立訂單失敗，請稍後再試。'),true)}finally{state.submitting=false;setLoading(false)}
   }
 
   function resetNewTask(clearLegacy=true){
@@ -21522,7 +21560,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261007-customer-my-service-smooth-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261008-customer-checkout-no-loop-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
