@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+	<key>PayloadIdentifier</key>
+	<string>tw.ubee.install.customer.webclip.v2</string>
+	<key>PayloadUUID</key>
+	<string>6F21C4B3-A245-4E0D-B053-9A9922F49A4D</string>
+	<key>PayloadDisplayName</key>
+	<string>UBee 跑腿｜主畫面安裝</string>
+	<key>PayloadDescription</key>
+	<string>僅建立 UBee 跑腿 的主畫面 Web Clip。可在設定中移除，不包含裝置管理、VPN、憑證或其他權限設定。</string>
+	<key>PayloadOrganization</key>
+	<string>UBee 跑腿</string>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.webClip.managed</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>PayloadIdentifier</key>
+			<string>tw.ubee.install.customer.webclip.v2.icon</string>
+			<key>PayloadUUID</key>
+			<string>14CD35E8-D679-424A-B3DD-466E9B2D800F</string>
+			<key>PayloadDisplayName</key>
+			<string>UBee 跑腿</string>
+			<key>Label</key>
+			<string>UBee 跑腿</string>
+			<key>URL</key>
+			<string>https://ubee-line-bot-2-zezw.onrender.com/order.html</string>
+			<key>FullScreen</key>
+			<true/>
+			<key>IsRemovable</key>
+			<true/>
+			<key>Precomposed</key>
+			<true/>
+			<key>IgnoreManifestScope</key>
+			<false/>
+			<key>Icon</key>
+			<data>
+			iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAEnUlE
+			QVR42u3bT0zbZRzH8c8DhUKCuLJ1nUxEmGaO6dwYMcYxlBkVlzij
+			HhxGDxhN0KkcjCY7+C/ay4hxiQc10xiN4bCEzRg9LUs2t8MSB8No
+			rIQsyDCBZo5FxuZogccDFw8zuqe/lj6/vV9nvn2elHd//f3aX03m
+			ZFzAlZTwFIA4QBwgDhAHiAPEAeIAcYA4QBwAcYA4QBwgDhAHiAPE
+			AeIAcYA4AOIAcYA4QBwgDhAHiAPEAeIAcQDEAeIAcYA4QBwgDhAH
+			iAPEAeIAcQDEAeIAcYA4QBwgDhAHfBfxbse1HdZhKvmi6doRzAa2
+			PmdP/37VU12PKLnLcOQAbysgDhAHQBwgDhAHiAPEAeIAcYA4QBwg
+			DoA4QBwgDhAHiAPEAeIAcYA4QBwAcYA4QBwgDhAHiAPEAeIAcYA4
+			QBwAcYA4QBwgDhAHiOPaZIgj/yKlLlMLNrANzM+7TJVFiCP/ouUu
+			U5lsYBvIOsURLSOOAsTh9CxfuhzYoWPmkstURdQQR95VVrhMnb8Q
+			zOoLVhcuOm07ypEj/+LLXKbS54JZ/eyU4+lLPEYc+bdqhcvU2EQw
+			q5+ZdN32cuIoQBw1LlMj45qbD2D1X0aJo4g1rHY5s5vNKDUawOpD
+			wy5vKpFS1SWII/+aGh0HjwzkurS1OjroMnhLncq5lC2A29c4Dn59
+			JNer2RM/a9LpxHZ9o3zkXxzXV6lhtctgalQnfspp6c+/ccyr+TZD
+			HAXS3uI4mPzMOn+OPpDSd8cdZ+/bzJGjcHE4vhAHftV7n7rUMfGH
+			XtpjrVNY9Tc4HuqIw0Xrnaqucpz9uF9vfXJ1/+bxtB5/zTp/UrJ9
+			izzlZRzRcj2xzX1830F1vGyPD/33X178S+9/pW3dNpfP0J7qMJ7G
+			YTIn4z7uOzWq+1/I9epjbb3u3azWjaYuoVi1YtdpNqvz05r6Uz+O
+			6Ngpe2xI0zM5LXH3HTrQSxwF98wb9vAPxb7JvqTx9GxUXt8JtrvL
+			mOJ+Td6zQf6W4XccTY3a+WDxbi9SqjefNxJxLJF3uk3RfmfR02k2
+			3CriWDJVlfrwdVOEt2e2NKmnU77z/u7zu9Zr76vFdfKx5kZ98bZx
+			uxGaOAL2WLve7S6WPuoS6kuaWHUIntew/G7l2Uf10W7jdmN6gDat
+			1bd7jY+3boQ5Dkk72nSg1zQu3bcYT29Xf6/x8V7Rf+Pxh2BXNJvR
+			ni/tvoPB3BT4P920Sr09ZusmhUzY4lg0NqEP+mz/Yc0v5Heh2rhe
+			2Wk6H/LyB23XaByLxtPaf8juP6TxdMCPXFqitmY9+YB5eEs4swh/
+			HIus1eCwjg7o+0F7aljZOfeHisfUulFtzaa9RStjCr3wx/FP2TmN
+			nFHqNw2P2YmzSk9p8pymZ3Q5q9mMslmVlCharmiZKiu0YpkSNUrU
+			qL7WrLtZ6xq8/HkBcYBLWRAHiAPEAeIAcYA4AOIAcYA4QBwgDhAH
+			iAPEAeIAcYA4AOIAcYA4QBwgDhAHiAPEAeIAcQDEAeIAcYA4QBwg
+			DhAHiAPEAeIAiAPEAeIAcYA4QBwgDhAHiAPEAeIAiAPEAeIAcYA4
+			QBwgDhAHwuxvKkPuLsBh6OQAAAAASUVORK5CYII=
+			</data>
+		</dict>
+	</array>
+</dict>
+</plist>
