@@ -21508,10 +21508,17 @@ app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
   lastModified: false,
   maxAge: 0,
-  setHeaders: (res) => {
+  setHeaders: (res, filePath) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+
+    // UBee App Install Center V2: only the approved customer Web Clip profile.
+    // Other static files, APIs, sessions, orders, dispatch and finances are unchanged.
+    if (path.resolve(filePath) === path.join(__dirname, 'public', 'profiles', 'UBee-Customer.mobileconfig')) {
+      res.setHeader('Content-Type', 'application/x-apple-aspen-config');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
   },
 }));
 
