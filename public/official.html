@@ -1,3153 +1,474 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-
-  <title>安裝 UBee APP｜UBee 跑腿官方入口</title>
-
-  <meta name="description" content="UBee 跑腿官方 APP 安裝入口。將 UBee 安裝到手機主畫面，即可直接快速估價、下單、查看任務與追蹤進度，不必每次回到 LINE 尋找入口。" />
-  <meta name="keywords" content="UBee跑腿, 系統化跑腿平台, 台中跑腿, 跑腿PWA, 幫我送, 幫我取, 幫我買, 幫排隊, 全能跑腿, 文件急送, 代送, 代買, 任務追蹤, 快速估價" />
-
-  <meta property="og:title" content="安裝 UBee APP｜UBee 跑腿官方入口" />
-  <meta property="og:description" content="把 UBee 安裝到手機主畫面，之後直接開啟 APP，即可快速估價、下單與追蹤任務。" />
-  <meta property="og:type" content="website" />
-
-  <!-- UBee 跑腿用戶端 PWA｜正式安裝設定 -->
-  <link rel="manifest" href="/manifest-order.json?v=20260803-2" />
-  <link rel="apple-touch-icon" href="/ubee-customer-icon-192.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/ubee-customer-icon-192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="/ubee-customer-icon-512.png" />
-  <meta name="theme-color" content="#f8c832" />
-  <meta name="application-name" content="UBee 跑腿" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="UBee 跑腿" />
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8c832">
+  <meta name="description" content="UBee 跑腿提供文件物品配送、代取、代買、代排隊、全能跑腿與依條件開放的代駕服務。免事先註冊即可開始使用，快速估價、線上下單、追蹤任務進度。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="UBee 跑腿｜生活大小事，交給 UBee">
+  <meta property="og:description" content="從代買、代取到配送與生活任務，一個入口完成估價、下單與進度追蹤。">
+  <meta name="color-scheme" content="light">
+  <title>UBee 跑腿｜生活大小事，交給 UBee</title>
+  <!-- 保留正式用戶端既有的 Manifest 與圖示來源，避免擅自更換安裝身分。 -->
+  <link rel="manifest" href="/manifest-order.json?v=20260803-2">
+  <link rel="apple-touch-icon" href="/ubee-customer-icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/ubee-customer-icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/ubee-customer-icon-512.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="UBee 跑腿">
+  <meta name="application-name" content="UBee 跑腿">
   <style>
-    :root {
-      --bg: #f4f5f7;
-      --bg-2: #ffffff;
-      --text: #121212;
-      --muted: #666;
-      --muted-2: #8a8a8a;
-      --black: #101010;
-      --black-2: #1b1b1b;
-      --yellow: #f8c832;
-      --yellow-2: #ffeaa3;
-      --yellow-soft: #fff7db;
-      --line: #e9e9e9;
-      --card: #ffffff;
-      --radius-lg: 34px;
-      --radius-md: 24px;
-      --radius-sm: 16px;
-      --shadow: 0 22px 60px rgba(0, 0, 0, 0.10);
-      --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.06);
-      --max: 1180px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      margin: 0;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 10% 0%, rgba(248, 200, 50, 0.22), transparent 28%),
-        radial-gradient(circle at 95% 15%, rgba(248, 200, 50, 0.16), transparent 24%),
-        var(--bg);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
-      line-height: 1.7;
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    .page {
-      overflow: hidden;
-    }
-
-    .container {
-      max-width: var(--max);
-      margin: 0 auto;
-      padding: 0 22px;
-    }
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-      background: rgba(16, 16, 16, 0.86);
-      backdrop-filter: blur(18px);
-    }
-
-    .topbar-inner {
-      max-width: var(--max);
-      margin: 0 auto;
-      padding: 14px 22px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 11px;
-      color: #fff;
-    }
-
-    .brand-mark {
-      width: 42px;
-      height: 42px;
-      border-radius: 16px;
-      background: linear-gradient(135deg, var(--yellow), #ffdf72);
-      color: #111;
-      display: grid;
-      place-items: center;
-      font-size: 22px;
-      box-shadow: 0 12px 28px rgba(248, 200, 50, 0.28);
-      font-weight: 950;
-    }
-
-    .brand-text {
-      display: grid;
-      line-height: 1.15;
-    }
-
-    .brand-name {
-      font-size: 18px;
-      font-weight: 950;
-      letter-spacing: 0.2px;
-    }
-
-    .brand-sub {
-      color: rgba(255, 255, 255, 0.58);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .nav {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      color: rgba(255, 255, 255, 0.78);
-      font-size: 14px;
-      white-space: nowrap;
-    }
-
-    .nav a:hover {
-      color: #fff;
-    }
-
-    .nav-cta {
-      color: #111 !important;
-      padding: 9px 15px;
-      border-radius: 999px;
-      font-weight: 950;
-      box-shadow: 0 10px 24px rgba(255, 255, 255, 0.12);
-    }
-
-    .nav-cta.user-entry {
-      background: var(--yellow);
-    }
-
-    .nav-cta.rider-entry {
-      background: #fff;
-    }
-
-    .hero-wrap {
-      background:
-        linear-gradient(135deg, #101010 0%, #181818 45%, #25210f 100%);
-      color: #fff;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-wrap::before {
-      content: "";
-      position: absolute;
-      width: 520px;
-      height: 520px;
-      border-radius: 999px;
-      right: -160px;
-      top: -180px;
-      background: rgba(248, 200, 50, 0.20);
-      filter: blur(2px);
-    }
-
-    .hero-wrap::after {
-      content: "";
-      position: absolute;
-      width: 380px;
-      height: 380px;
-      border-radius: 999px;
-      left: -140px;
-      bottom: -170px;
-      background: rgba(248, 200, 50, 0.11);
-    }
-
-    .hero {
-      position: relative;
-      z-index: 2;
-      max-width: var(--max);
-      margin: 0 auto;
-      padding: 74px 22px 58px;
-      display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
-      align-items: center;
-      gap: 42px;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: #111;
-      background: linear-gradient(135deg, var(--yellow), #ffe28a);
-      border-radius: 999px;
-      padding: 8px 14px;
-      font-size: 14px;
-      font-weight: 950;
-      margin-bottom: 18px;
-      box-shadow: 0 12px 28px rgba(248, 200, 50, 0.22);
-    }
-
-    .hero h1 {
-      margin: 0;
-      font-size: clamp(42px, 6vw, 76px);
-      line-height: 1.04;
-      letter-spacing: -2.4px;
-      font-weight: 1000;
-    }
-
-    .hero h1 .highlight {
-      color: var(--yellow);
-    }
-
-    .hero-desc {
-      max-width: 680px;
-      margin: 22px 0 0;
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 18px;
-    }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-      margin-top: 30px;
-    }
-
-    .btn {
-      min-height: 50px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      border-radius: 999px;
-      padding: 12px 20px;
-      border: 1px solid transparent;
-      font-weight: 950;
-      transition: 0.2s ease;
-      cursor: pointer;
-    }
-
-    .btn:hover {
-      transform: translateY(-2px);
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--yellow), #ffe28a);
-      color: #111;
-      box-shadow: 0 16px 34px rgba(248, 200, 50, 0.24);
-    }
-
-    .btn-dark {
-      background: #111;
-      color: #fff;
-      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
-    }
-
-    .btn-ghost {
-      color: #fff;
-      border-color: rgba(255, 255, 255, 0.20);
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .trust-row {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 28px;
-      max-width: 680px;
-    }
-
-    .trust-item {
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.07);
-      backdrop-filter: blur(12px);
-      border-radius: 18px;
-      padding: 14px;
-    }
-
-    .trust-value {
-      color: var(--yellow);
-      font-size: 20px;
-      font-weight: 1000;
-      line-height: 1.2;
-    }
-
-    .trust-label {
-      color: rgba(255, 255, 255, 0.65);
-      font-size: 13px;
-      font-weight: 750;
-      margin-top: 4px;
-    }
-
-    .phone-shell {
-      justify-self: center;
-      position: relative;
-      width: min(360px, 100%);
-      border-radius: 42px;
-      padding: 14px;
-      background: linear-gradient(180deg, #3a3a3a, #090909);
-      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
-    }
-
-    .phone-shell::before {
-      content: "";
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 90px;
-      height: 22px;
-      border-radius: 999px;
-      background: #050505;
-      z-index: 3;
-    }
-
-    .phone-screen {
-      position: relative;
-      z-index: 2;
-      overflow: hidden;
-      min-height: 620px;
-      border-radius: 32px;
-      background:
-        radial-gradient(circle at top right, rgba(248, 200, 50, 0.26), transparent 35%),
-        #fff;
-      color: #111;
-      padding: 34px 18px 18px;
-    }
-
-    .app-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18px;
-    }
-
-    .app-title {
-      font-size: 22px;
-      font-weight: 1000;
-      letter-spacing: -0.5px;
-    }
-
-    .app-pill {
-      background: #111;
-      color: var(--yellow);
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 950;
-    }
-
-    .app-card {
-      border: 1px solid #eee;
-      background: #fff;
-      border-radius: 22px;
-      padding: 16px;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
-      margin-bottom: 14px;
-    }
-
-    .app-card.dark {
-      background: #111;
-      color: #fff;
-      border-color: #111;
-    }
-
-    .app-card.yellow {
-      background: linear-gradient(135deg, var(--yellow), #ffe69a);
-      border-color: transparent;
-    }
-
-    .app-mini-title {
-      font-size: 13px;
-      color: #777;
-      font-weight: 850;
-      margin-bottom: 8px;
-    }
-
-    .app-card.dark .app-mini-title {
-      color: rgba(255, 255, 255, 0.56);
-    }
-
-    .app-route {
-      display: grid;
-      gap: 10px;
-    }
-
-    .route {
-      display: grid;
-      grid-template-columns: 16px 1fr;
-      gap: 10px;
-      align-items: start;
-    }
-
-    .route-dot {
-      width: 12px;
-      height: 12px;
-      margin-top: 7px;
-      border-radius: 999px;
-      background: #111;
-    }
-
-    .route-dot.end {
-      background: var(--yellow);
-    }
-
-    .route-label {
-      color: #777;
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .route-place {
-      font-weight: 950;
-      font-size: 15px;
-    }
-
-    .mini-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 9px;
-      margin-top: 12px;
-    }
-
-    .mini-service {
-      background: #f6f6f6;
-      border: 1px solid #eee;
-      border-radius: 15px;
-      padding: 12px 8px;
-      text-align: center;
-      font-size: 13px;
-      font-weight: 950;
-    }
-
-    .app-status {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      font-weight: 950;
-    }
-
-    .progress {
-      height: 9px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.14);
-      margin-top: 14px;
-    }
-
-    .progress span {
-      display: block;
-      height: 100%;
-      width: 68%;
-      border-radius: 999px;
-      background: var(--yellow);
-    }
-
-    .platform-entry-section {
-      position: relative;
-      z-index: 5;
-      margin-top: -18px;
-      padding: 0 0 18px;
-    }
-
-    .platform-entry-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
-    }
-
-    .platform-entry-card {
-      position: relative;
-      overflow: hidden;
-      min-height: 210px;
-      padding: 26px;
-      border-radius: 30px;
-      border: 1px solid rgba(16, 16, 16, 0.08);
-      box-shadow: var(--shadow-soft);
-    }
-
-    .platform-entry-card.user {
-      background: linear-gradient(135deg, var(--yellow), #ffeaa3);
-      color: #111;
-    }
-
-    .platform-entry-card.rider {
-      background: linear-gradient(135deg, #111 0%, #262626 68%, #3a310b 100%);
-      color: #fff;
-    }
-
-    .platform-entry-card::after {
-      content: "";
-      position: absolute;
-      width: 190px;
-      height: 190px;
-      right: -72px;
-      bottom: -92px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.16);
-      pointer-events: none;
-    }
-
-    .platform-entry-icon {
-      position: relative;
-      z-index: 2;
-      width: 52px;
-      height: 52px;
-      display: grid;
-      place-items: center;
-      margin-bottom: 18px;
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.72);
-      font-size: 26px;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
-    }
-
-    .platform-entry-card.rider .platform-entry-icon {
-      background: var(--yellow);
-      color: #111;
-    }
-
-    .platform-entry-card h2 {
-      position: relative;
-      z-index: 2;
-      margin: 0;
-      font-size: 27px;
-      line-height: 1.2;
-      font-weight: 1000;
-      letter-spacing: -0.7px;
-    }
-
-    .platform-entry-card p {
-      position: relative;
-      z-index: 2;
-      margin: 10px 0 20px;
-      max-width: 520px;
-      color: rgba(17, 17, 17, 0.68);
-      font-size: 14px;
-      font-weight: 800;
-    }
-
-    .platform-entry-card.rider p {
-      color: rgba(255, 255, 255, 0.68);
-    }
-
-    .platform-entry-card .btn {
-      position: relative;
-      z-index: 2;
-    }
-
-    .section {
-      padding: 70px 0;
-    }
-
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 24px;
-      align-items: end;
-      margin-bottom: 26px;
-    }
-
-    .kicker {
-      color: #8b6800;
-      font-size: 13px;
-      font-weight: 1000;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-
-    .section h2 {
-      margin: 0;
-      font-size: clamp(30px, 4vw, 48px);
-      line-height: 1.18;
-      letter-spacing: -1.2px;
-      font-weight: 1000;
-    }
-
-    .section-desc {
-      max-width: 600px;
-      color: var(--muted);
-      margin: 10px 0 0;
-      font-size: 16px;
-    }
-
-    .service-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 22px;
-    }
-
-    .service-card {
-      min-height: 0;
-      padding: 0;
-      border-radius: 32px;
-      background: #fff;
-      border: 1px solid rgba(16, 16, 16, 0.08);
-      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
-      overflow: hidden;
-      isolation: isolate;
-      transition: 0.2s ease;
-    }
-
-    .service-card:hover {
-      transform: translateY(-8px);
-      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.14);
-    }
-
-    .service-visual {
-      position: relative;
-      height: 230px;
-      overflow: hidden;
-      background: #111;
-    }
-
-    .service-visual::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.40), transparent 12%),
-        radial-gradient(circle at 86% 18%, rgba(255, 255, 255, 0.28), transparent 16%),
-        radial-gradient(circle at 50% 120%, rgba(0, 0, 0, 0.40), transparent 42%);
-      z-index: 1;
-    }
-
-    .service-visual::after {
-      content: "";
-      position: absolute;
-      inset: auto 18px 18px 18px;
-      height: 74px;
-      border-radius: 24px;
-      background: rgba(255, 255, 255, 0.18);
-      border: 1px solid rgba(255, 255, 255, 0.24);
-      backdrop-filter: blur(14px);
-      z-index: 2;
-    }
-
-    .visual-delivery {
-      background:
-        linear-gradient(135deg, rgba(255, 201, 50, 0.95), rgba(255, 231, 150, 0.9)),
-        linear-gradient(135deg, #111, #2a260f);
-    }
-
-    .visual-buy {
-      background:
-        linear-gradient(135deg, rgba(255, 214, 86, 0.95), rgba(255, 246, 215, 0.95)),
-        linear-gradient(135deg, #111, #2a260f);
-    }
-
-    .visual-pickup {
-      background:
-        linear-gradient(135deg, rgba(250, 198, 45, 0.95), rgba(255, 232, 150, 0.92)),
-        linear-gradient(135deg, #111, #2a260f);
-    }
-
-    .visual-queue {
-      background:
-        linear-gradient(135deg, rgba(255, 208, 70, 0.95), rgba(255, 242, 190, 0.94)),
-        linear-gradient(135deg, #111, #2a260f);
-    }
-
-    .visual-anything {
-      background:
-        linear-gradient(135deg, rgba(255, 225, 118, 0.98), rgba(255, 248, 220, 0.95)),
-        linear-gradient(135deg, #111, #2a260f);
-    }
-
-    .visual-express {
-      background:
-        linear-gradient(135deg, rgba(255, 195, 36, 0.96), rgba(255, 225, 118, 0.96)),
-        linear-gradient(135deg, #111, #2a260f);
-    }
-
-    .visual-city {
-      position: absolute;
-      left: -16px;
-      right: -16px;
-      bottom: 0;
-      height: 86px;
-      z-index: 1;
-      opacity: 0.72;
-      background:
-        linear-gradient(to top, rgba(17, 17, 17, 0.92), rgba(17, 17, 17, 0)),
-        repeating-linear-gradient(
-          90deg,
-          rgba(17, 17, 17, 0.84) 0 22px,
-          rgba(17, 17, 17, 0.64) 22px 34px,
-          rgba(17, 17, 17, 0.78) 34px 56px
-        );
-      clip-path: polygon(
-        0 36%, 8% 36%, 8% 22%, 18% 22%, 18% 44%,
-        27% 44%, 27% 12%, 38% 12%, 38% 40%,
-        48% 40%, 48% 26%, 58% 26%, 58% 48%,
-        68% 48%, 68% 16%, 78% 16%, 78% 38%,
-        90% 38%, 90% 24%, 100% 24%, 100% 100%, 0 100%
-      );
-    }
-
-    .visual-main {
-      position: absolute;
-      left: 50%;
-      top: 42%;
-      z-index: 3;
-      transform: translate(-50%, -50%);
-      width: 112px;
-      height: 112px;
-      display: grid;
-      place-items: center;
-      border-radius: 34px;
-      background: rgba(17, 17, 17, 0.90);
-      color: var(--yellow);
-      font-size: 54px;
-      box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
-    }
-
-    .visual-main.wide {
-      width: 132px;
-    }
-
-    .visual-tag {
-      position: absolute;
-      left: 32px;
-      bottom: 38px;
-      z-index: 4;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 1000;
-      letter-spacing: 0.4px;
-    }
-
-    .visual-note {
-      position: absolute;
-      right: 32px;
-      bottom: 38px;
-      z-index: 4;
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 12px;
-      font-weight: 850;
-    }
-
-    .visual-bubble {
-      position: absolute;
-      z-index: 2;
-      width: 48px;
-      height: 48px;
-      display: grid;
-      place-items: center;
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.72);
-      border: 1px solid rgba(255, 255, 255, 0.54);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12);
-      font-size: 24px;
-    }
-
-    .bubble-a {
-      left: 24px;
-      top: 30px;
-    }
-
-    .bubble-b {
-      right: 24px;
-      top: 42px;
-    }
-
-    .bubble-c {
-      left: 34px;
-      bottom: 104px;
-      width: 38px;
-      height: 38px;
-      border-radius: 14px;
-      font-size: 18px;
-    }
-
-    .service-body {
-      padding: 24px;
-    }
-
-    .service-topline {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-
-    .service-chip {
-      display: inline-flex;
-      align-items: center;
-      min-height: 28px;
-      padding: 5px 10px;
-      border-radius: 999px;
-      background: var(--yellow-soft);
-      color: #6a5000;
-      font-size: 12px;
-      font-weight: 1000;
-      white-space: nowrap;
-    }
-
-    .service-card h3 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 1000;
-      letter-spacing: -0.6px;
-    }
-
-    .service-card p {
-      margin: 10px 0 0;
-      color: var(--muted);
-      font-size: 15px;
-    }
-
-    .service-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 18px;
-    }
-
-    .service-meta span {
-      display: inline-flex;
-      align-items: center;
-      min-height: 30px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #f5f5f5;
-      border: 1px solid #ececec;
-      color: #333;
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .service-usecase {
-      margin-top: 18px;
-      padding: 16px;
-      border-radius: 20px;
-      background:
-        linear-gradient(135deg, rgba(248, 200, 50, 0.16), rgba(255, 255, 255, 0.86));
-      border: 1px solid rgba(248, 200, 50, 0.28);
-    }
-
-    .service-usecase strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 13px;
-      font-weight: 1000;
-    }
-
-    .service-usecase span {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 750;
-    }
-
-    .service-section-note {
-      margin-top: 22px;
-      padding: 20px 22px;
-      border-radius: 26px;
-      background: #111;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
-    }
-
-    .service-section-note strong {
-      display: block;
-      font-size: 18px;
-      font-weight: 1000;
-    }
-
-    .service-section-note span {
-      display: block;
-      margin-top: 4px;
-      color: rgba(255, 255, 255, 0.64);
-      font-size: 14px;
-    }
-
-    .why-wrap {
-      display: grid;
-      grid-template-columns: 0.9fr 1.1fr;
-      gap: 18px;
-      align-items: stretch;
-    }
-
-    .why-main {
-      color: #fff;
-      background:
-        linear-gradient(135deg, #101010 0%, #181818 60%, #2e270c 100%);
-      border-radius: var(--radius-lg);
-      padding: 34px;
-      box-shadow: var(--shadow);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .why-main::after {
-      content: "";
-      position: absolute;
-      width: 220px;
-      height: 220px;
-      border-radius: 999px;
-      right: -80px;
-      bottom: -90px;
-      background: rgba(248, 200, 50, 0.18);
-    }
-
-    .why-main h2 {
-      color: #fff;
-    }
-
-    .why-main p {
-      color: rgba(255, 255, 255, 0.70);
-      margin: 14px 0 0;
-    }
-
-    .why-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-
-    .why-item {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-md);
-      padding: 22px;
-      box-shadow: var(--shadow-soft);
-    }
-
-    .why-num {
-      color: #111;
-      background: var(--yellow);
-      width: 34px;
-      height: 34px;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      font-weight: 1000;
-      margin-bottom: 12px;
-    }
-
-    .why-title {
-      font-size: 18px;
-      font-weight: 1000;
-      margin-bottom: 6px;
-    }
-
-    .why-text {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .flow {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      padding: 28px;
-      box-shadow: var(--shadow-soft);
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 14px;
-    }
-
-    .flow-step {
-      position: relative;
-      padding: 20px;
-      border-radius: 22px;
-      background: #f7f7f7;
-      border: 1px solid #eeeeee;
-    }
-
-    .flow-badge {
-      width: 38px;
-      height: 38px;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      background: #111;
-      color: var(--yellow);
-      font-weight: 1000;
-      margin-bottom: 14px;
-    }
-
-    .flow-step h3 {
-      margin: 0 0 8px;
-      font-size: 18px;
-      font-weight: 1000;
-    }
-
-    .flow-step p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .area-box {
-      border-radius: var(--radius-lg);
-      background:
-        radial-gradient(circle at top right, rgba(248, 200, 50, 0.30), transparent 34%),
-        #fff;
-      border: 1px solid var(--line);
-      padding: 34px;
-      box-shadow: var(--shadow-soft);
-    }
-
-    .area-content {
-      display: grid;
-      grid-template-columns: 0.9fr 1.1fr;
-      gap: 24px;
-      align-items: center;
-    }
-
-    .area-map {
-      min-height: 300px;
-      border-radius: 28px;
-      background:
-        linear-gradient(135deg, rgba(16, 16, 16, 0.94), rgba(16, 16, 16, 0.82)),
-        radial-gradient(circle at 30% 35%, rgba(248, 200, 50, 0.55), transparent 22%);
-      position: relative;
-      overflow: hidden;
-      color: #fff;
-      padding: 26px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .area-map::before,
-    .area-map::after {
-      content: "";
-      position: absolute;
-      border-radius: 999px;
-      border: 1px solid rgba(248, 200, 50, 0.22);
-    }
-
-    .area-map::before {
-      width: 280px;
-      height: 280px;
-      left: -90px;
-      top: -80px;
-    }
-
-    .area-map::after {
-      width: 340px;
-      height: 340px;
-      right: -110px;
-      bottom: -160px;
-    }
-
-    .area-map-title {
-      position: relative;
-      z-index: 2;
-      font-size: 24px;
-      font-weight: 1000;
-    }
-
-    .area-map-sub {
-      position: relative;
-      z-index: 2;
-      color: rgba(255, 255, 255, 0.68);
-      margin-top: 6px;
-    }
-
-    .area-pin {
-      position: absolute;
-      z-index: 3;
-      background: var(--yellow);
-      color: #111;
-      border-radius: 999px;
-      padding: 8px 12px;
-      font-size: 13px;
-      font-weight: 1000;
-      box-shadow: 0 12px 26px rgba(248, 200, 50, 0.26);
-    }
-
-    .pin-1 { left: 36%; top: 36%; }
-    .pin-2 { left: 55%; top: 46%; }
-    .pin-3 { left: 24%; top: 58%; }
-    .pin-4 { right: 15%; top: 30%; }
-    .pin-5 { right: 24%; bottom: 18%; }
-
-    .area-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .tag {
-      background: #f4f4f4;
-      border: 1px solid #e8e8e8;
-      border-radius: 999px;
-      padding: 9px 14px;
-      font-size: 14px;
-      font-weight: 950;
-    }
-
-    .partner {
-      background:
-        linear-gradient(135deg, #fff 0%, #fff8df 100%);
-      border: 1px solid rgba(248, 200, 50, 0.34);
-      border-radius: var(--radius-lg);
-      padding: 34px;
-      box-shadow: var(--shadow-soft);
-      display: grid;
-      grid-template-columns: 0.95fr 1.05fr;
-      gap: 24px;
-      align-items: center;
-    }
-
-    .partner-points {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .partner-point {
-      background: #fff;
-      border: 1px solid #f0e0a4;
-      border-radius: 20px;
-      padding: 18px;
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
-    }
-
-    .partner-point strong {
-      display: block;
-      font-size: 18px;
-      font-weight: 1000;
-      margin-bottom: 4px;
-    }
-
-    .partner-point span {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .faq-intro {
-      display: grid;
-      grid-template-columns: 0.9fr 1.1fr;
-      gap: 18px;
-      align-items: stretch;
-      margin-bottom: 20px;
-    }
-
-    .faq-highlight {
-      border-radius: 30px;
-      background:
-        radial-gradient(circle at top right, rgba(248, 200, 50, 0.30), transparent 34%),
-        #111;
-      color: #fff;
-      padding: 28px;
-      box-shadow: var(--shadow);
-    }
-
-    .faq-highlight .kicker {
-      color: var(--yellow);
-    }
-
-    .faq-highlight h2 {
-      color: #fff;
-      margin: 0;
-      font-size: clamp(28px, 3vw, 42px);
-      line-height: 1.18;
-      letter-spacing: -1px;
-      font-weight: 1000;
-    }
-
-    .faq-highlight p {
-      color: rgba(255, 255, 255, 0.66);
-      margin: 12px 0 0;
-    }
-
-    .faq-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .faq-stat {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      padding: 22px;
-      box-shadow: var(--shadow-soft);
-    }
-
-    .faq-stat strong {
-      display: block;
-      font-size: 24px;
-      font-weight: 1000;
-      line-height: 1.1;
-    }
-
-    .faq-stat span {
-      display: block;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 850;
-      margin-top: 8px;
-    }
-
-    .faq-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    details {
-      position: relative;
-      overflow: hidden;
-      border-radius: 24px;
-      padding: 0;
-      background: #fff;
-      border: 1px solid rgba(16, 16, 16, 0.08);
-      box-shadow: var(--shadow-soft);
-    }
-
-    details::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 5px;
-      background: var(--yellow);
-      opacity: 0;
-      transition: 0.2s ease;
-    }
-
-    details[open]::before {
-      opacity: 1;
-    }
-
-    summary {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 20px 54px 20px 22px;
-      cursor: pointer;
-      font-weight: 1000;
-      list-style: none;
-    }
-
-    summary::-webkit-details-marker {
-      display: none;
-    }
-
-    summary::after {
-      content: "+";
-      position: absolute;
-      right: 20px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      background: #111;
-      color: var(--yellow);
-      font-size: 18px;
-      line-height: 1;
-      transition: 0.2s ease;
-    }
-
-    details[open] summary::after {
-      content: "–";
-      background: var(--yellow);
-      color: #111;
-    }
-
-    .faq-icon {
-      flex: 0 0 auto;
-      width: 34px;
-      height: 34px;
-      border-radius: 13px;
-      display: grid;
-      place-items: center;
-      background: var(--yellow-soft);
-      font-size: 18px;
-    }
-
-    details p {
-      margin: 0;
-      padding: 0 22px 20px 68px;
-      color: var(--muted);
-      font-size: 15px;
-    }
-
-    .faq-category {
-      grid-column: 1 / -1;
-      margin: 10px 0 2px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .faq-category span {
-      display: inline-flex;
-      align-items: center;
-      min-height: 32px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: #111;
-      color: var(--yellow);
-      font-size: 13px;
-      font-weight: 1000;
-    }
-
-    .faq-category::after {
-      content: "";
-      height: 1px;
-      flex: 1;
-      background: var(--line);
-    }
-
-    .contact-panel {
-      background: #111;
-      color: #fff;
-      border-radius: var(--radius-lg);
-      padding: 34px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      align-items: stretch;
-      box-shadow: var(--shadow);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .contact-panel::after {
-      content: "";
-      position: absolute;
-      width: 260px;
-      height: 260px;
-      border-radius: 999px;
-      right: -100px;
-      top: -110px;
-      background: rgba(248, 200, 50, 0.18);
-    }
-
-    .contact-panel h2 {
-      color: #fff;
-    }
-
-    .contact-panel p {
-      color: rgba(255, 255, 255, 0.66);
-    }
-
-    .contact-card {
-      position: relative;
-      z-index: 2;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.13);
-      border-radius: 24px;
-      padding: 24px;
-    }
-
-    .info-list {
-      display: grid;
-      gap: 12px;
-      margin-top: 18px;
-    }
-
-    .info-row {
-      display: grid;
-      grid-template-columns: 110px 1fr;
-      gap: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-      font-size: 15px;
-    }
-
-    .info-row:last-child {
-      border-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    .info-label {
-      color: rgba(255, 255, 255, 0.52);
-      font-weight: 850;
-    }
-
-    .info-value {
-      color: #fff;
-      font-weight: 850;
-      word-break: break-word;
-    }
-
-    .notice {
-      margin-top: 18px;
-      background: rgba(248, 200, 50, 0.12);
-      border: 1px solid rgba(248, 200, 50, 0.26);
-      color: rgba(255, 255, 255, 0.78);
-      border-radius: 18px;
-      padding: 14px 16px;
-      font-size: 14px;
-    }
-
-    .footer {
-      background: #0d0d0d;
-      color: #fff;
-      margin-top: 70px;
-    }
-
-    .footer-inner {
-      max-width: var(--max);
-      margin: 0 auto;
-      padding: 34px 22px;
-      display: flex;
-      justify-content: space-between;
-      gap: 18px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .footer-brand {
-      font-weight: 1000;
-      font-size: 18px;
-    }
-
-    .footer-small {
-      color: rgba(255, 255, 255, 0.54);
-      font-size: 13px;
-      margin-top: 4px;
-    }
-
-    .floating-order {
-      display: none;
-      position: fixed;
-      left: 14px;
-      right: 14px;
-      bottom: calc(14px + env(safe-area-inset-bottom));
-      z-index: 120;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px;
-      padding: 8px;
-      border: 1px solid rgba(17, 24, 39, 0.10);
-      border-radius: 22px;
-      background: rgba(255, 255, 255, 0.96);
-      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18);
-      backdrop-filter: blur(16px);
-    }
-
-    .floating-order a {
-      width: 100%;
-      min-height: 52px;
-      padding: 10px 8px;
-      border-radius: 16px;
-      font-size: 14px;
-      text-align: center;
-    }
-
-    @media (max-width: 980px) {
-      .hero {
-        grid-template-columns: 1fr;
-        padding-top: 52px;
-      }
-
-      .phone-shell {
-        order: -1;
-        width: min(340px, 100%);
-      }
-
-      .phone-screen {
-        min-height: 560px;
-      }
-
-      .service-grid,
-      .flow {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .why-wrap,
-      .area-content,
-      .partner,
-      .contact-panel,
-      .faq-intro {
-        grid-template-columns: 1fr;
-      }
-
-      .nav {
-        display: none;
-      }
-    }
-
-    @media (max-width: 680px) {
-      .container {
-        padding: 0 16px;
-      }
-
-      .topbar-inner {
-        padding: 12px 16px;
-      }
-
-      .brand-mark {
-        width: 38px;
-        height: 38px;
-        border-radius: 14px;
-      }
-
-      .brand-sub {
-        display: none;
-      }
-
-      .hero {
-        padding: 30px 16px 44px;
-      }
-
-      .hero h1 {
-        font-size: 42px;
-        letter-spacing: -1.5px;
-      }
-
-      .hero-desc {
-        font-size: 16px;
-      }
-
-      .hero-actions .btn {
-        width: 100%;
-      }
-
-      .trust-row {
-        grid-template-columns: 1fr;
-      }
-
-      .phone-shell {
-        width: 100%;
-        max-width: 350px;
-      }
-
-      .phone-screen {
-        min-height: auto;
-      }
-
-      .mini-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .section {
-        padding: 46px 0;
-      }
-
-      .section-head {
-        display: block;
-      }
-
-      .service-grid,
-      .why-list,
-      .flow,
-      .partner-points,
-      .faq-grid,
-      .faq-stats,
-      .platform-entry-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .platform-entry-section {
-        margin-top: -8px;
-        padding-top: 18px;
-      }
-
-      .platform-entry-card {
-        min-height: 0;
-        padding: 23px;
-        border-radius: 26px;
-      }
-
-      .service-visual {
-        height: 220px;
-      }
-
-      .service-section-note {
-        display: block;
-        padding: 22px;
-      }
-
-      .service-section-note .btn {
-        width: 100%;
-        margin-top: 16px;
-      }
-
-      .visual-main {
-        width: 104px;
-        height: 104px;
-        font-size: 48px;
-      }
-
-      .visual-note {
-        display: none;
-      }
-
-      .area-box,
-      .partner,
-      .contact-panel,
-      .why-main,
-      .faq-highlight {
-        padding: 24px;
-        border-radius: 28px;
-      }
-
-      .area-map {
-        min-height: 260px;
-      }
-
-      .area-pin {
-        font-size: 12px;
-        padding: 7px 10px;
-      }
-
-      .info-row {
-        grid-template-columns: 1fr;
-        gap: 2px;
-      }
-
-      details p {
-        padding-left: 22px;
-      }
-
-      summary {
-        padding: 18px 50px 18px 18px;
-      }
-
-      .floating-order {
-        display: grid;
-      }
-
-      .footer-inner {
-        padding-bottom: 92px;
-      }
-    }
-
-    /* ==============================
-       UBee APP 官方安裝入口
-       ============================== */
-
-    .install-section {
-      position: relative;
-      z-index: 8;
-      margin-top: -22px;
-      padding: 0 0 28px;
-    }
-
-    .install-panel {
-      position: relative;
-      overflow: hidden;
-      display: grid;
-      grid-template-columns: 0.82fr 1.18fr;
-      gap: 28px;
-      align-items: stretch;
-      padding: 28px;
-      border: 1px solid rgba(17, 17, 17, 0.08);
-      border-radius: 34px;
-      background: #fff;
-      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.14);
-    }
-
-    .install-panel::after {
-      content: "";
-      position: absolute;
-      width: 280px;
-      height: 280px;
-      right: -120px;
-      top: -130px;
-      border-radius: 50%;
-      background: rgba(248, 200, 50, 0.22);
-      pointer-events: none;
-    }
-
-    .install-app-card {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-height: 330px;
-      padding: 26px;
-      border-radius: 28px;
-      background:
-        radial-gradient(circle at top right, rgba(248, 200, 50, 0.28), transparent 36%),
-        linear-gradient(145deg, #101010, #24200d);
-      color: #fff;
-    }
-
-    .install-app-icon {
-      width: 92px;
-      height: 92px;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      border-radius: 25px;
-      background: #fff;
-      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
-    }
-
-    .install-app-icon img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .install-app-name {
-      margin-top: 22px;
-      font-size: 30px;
-      font-weight: 1000;
-      line-height: 1.16;
-      letter-spacing: -0.8px;
-    }
-
-    .install-app-sub {
-      margin-top: 8px;
-      color: rgba(255, 255, 255, 0.66);
-      font-size: 14px;
-      font-weight: 800;
-    }
-
-    .install-app-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 22px;
-    }
-
-    .install-app-badges span {
-      display: inline-flex;
-      align-items: center;
-      min-height: 30px;
-      padding: 6px 10px;
-      border: 1px solid rgba(255, 255, 255, 0.13);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.78);
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .install-content {
-      position: relative;
-      z-index: 2;
-      padding: 8px 4px;
-    }
-
-    .install-kicker {
-      color: #8b6800;
-      font-size: 13px;
-      font-weight: 1000;
-      letter-spacing: 1.1px;
-      text-transform: uppercase;
-    }
-
-    .install-content h2 {
-      margin: 8px 0 0;
-      font-size: clamp(32px, 4vw, 52px);
-      line-height: 1.1;
-      letter-spacing: -1.4px;
-      font-weight: 1000;
-    }
-
-    .install-content > p {
-      margin: 14px 0 0;
-      color: var(--muted);
-      font-size: 16px;
-    }
-
-    .install-main-action {
-      width: 100%;
-      min-height: 58px;
-      margin-top: 22px;
-      border: 0;
-      border-radius: 18px;
-      background: linear-gradient(135deg, var(--yellow), #ffe28a);
-      color: #111;
-      box-shadow: 0 16px 34px rgba(248, 200, 50, 0.28);
-      font: inherit;
-      font-size: 17px;
-      font-weight: 1000;
-      cursor: pointer;
-      transition: 0.18s ease;
-    }
-
-    .install-main-action:hover {
-      transform: translateY(-2px);
-    }
-
-    .install-main-action:active {
-      transform: scale(0.985);
-    }
-
-    .install-secondary-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .install-secondary-actions .btn {
-      border-radius: 18px;
-    }
-
-    .install-status {
-      min-height: 22px;
-      margin-top: 12px;
-      color: #777;
-      font-size: 13px;
-      font-weight: 850;
-    }
-
-    .install-benefits {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 18px;
-    }
-
-    .install-benefit {
-      padding: 13px;
-      border: 1px solid #ececec;
-      border-radius: 17px;
-      background: #f8f8f8;
-    }
-
-    .install-benefit strong {
-      display: block;
-      color: #111;
-      font-size: 14px;
-      font-weight: 1000;
-    }
-
-    .install-benefit span {
-      display: block;
-      margin-top: 3px;
-      color: #777;
-      font-size: 12px;
-      font-weight: 800;
-      line-height: 1.5;
-    }
-
-    .line-browser-alert {
-      display: none;
-      margin-top: 16px;
-      padding: 14px 15px;
-      border: 1px solid #f0d66c;
-      border-radius: 17px;
-      background: #fff8d9;
-      color: #5f4a00;
-      font-size: 13px;
-      font-weight: 850;
-      line-height: 1.65;
-    }
-
-    .line-browser-alert.show {
-      display: block;
-    }
-
-    .install-guide {
-      margin-top: 18px;
-      padding: 18px;
-      border: 1px solid #e8e8e8;
-      border-radius: 22px;
-      background: #fff;
-    }
-
-    .install-guide-title {
-      font-size: 16px;
-      font-weight: 1000;
-    }
-
-    .install-guide-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .install-guide-item {
-      padding: 14px;
-      border-radius: 17px;
-      background: #f6f6f6;
-      border: 1px solid #ededed;
-    }
-
-    .install-guide-item strong {
-      display: block;
-      font-size: 14px;
-      font-weight: 1000;
-    }
-
-    .install-guide-item span {
-      display: block;
-      margin-top: 5px;
-      color: #666;
-      font-size: 12px;
-      font-weight: 800;
-      line-height: 1.6;
-    }
-
-    .install-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
-      display: none;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 18px;
-      background: rgba(0, 0, 0, 0.58);
-      backdrop-filter: blur(8px);
-    }
-
-    .install-modal.show {
-      display: flex;
-    }
-
-    .install-modal-card {
-      width: min(520px, 100%);
-      max-height: min(720px, calc(100dvh - 36px));
-      overflow: auto;
-      padding: 24px;
-      border-radius: 28px;
-      background: #fff;
-      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.32);
-    }
-
-    .install-modal-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .install-modal-title {
-      font-size: 24px;
-      font-weight: 1000;
-      line-height: 1.2;
-    }
-
-    .install-modal-close {
-      flex: 0 0 38px;
-      width: 38px;
-      height: 38px;
-      border: 0;
-      border-radius: 50%;
-      background: #f1f1f1;
-      color: #111;
-      font-size: 22px;
-      cursor: pointer;
-    }
-
-    .install-steps {
-      display: grid;
-      gap: 10px;
-      margin-top: 18px;
-    }
-
-    .install-step {
-      display: grid;
-      grid-template-columns: 36px 1fr;
-      gap: 12px;
-      align-items: start;
-      padding: 14px;
-      border: 1px solid #ececec;
-      border-radius: 18px;
-      background: #fafafa;
-    }
-
-    .install-step-num {
-      width: 36px;
-      height: 36px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      background: #111;
-      color: var(--yellow);
-      font-weight: 1000;
-    }
-
-    .install-step strong {
-      display: block;
-      font-size: 14px;
-      font-weight: 1000;
-    }
-
-    .install-step span {
-      display: block;
-      margin-top: 3px;
-      color: #666;
-      font-size: 13px;
-      font-weight: 800;
-      line-height: 1.55;
-    }
-
-    @media (max-width: 860px) {
-      .install-panel {
-        grid-template-columns: 1fr;
-      }
-
-      .install-app-card {
-        min-height: 280px;
-      }
-    }
-
-    @media (max-width: 680px) {
-      .install-section {
-        margin-top: -10px;
-        padding-top: 16px;
-      }
-
-      .install-panel {
-        gap: 18px;
-        padding: 16px;
-        border-radius: 27px;
-      }
-
-      .install-app-card {
-        min-height: 245px;
-        padding: 21px;
-        border-radius: 23px;
-      }
-
-      .install-app-icon {
-        width: 76px;
-        height: 76px;
-        border-radius: 22px;
-      }
-
-      .install-app-name {
-        font-size: 26px;
-      }
-
-      .install-content {
-        padding: 4px 2px;
-      }
-
-      .install-content h2 {
-        font-size: 34px;
-      }
-
-      .install-secondary-actions,
-      .install-benefits,
-      .install-guide-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .install-modal {
-        align-items: flex-end;
-        padding: 10px;
-      }
-
-      .install-modal-card {
-        border-radius: 25px;
-      }
-    }
-
+    :root{--yellow:#f8c832;--yellow-light:#fff1bb;--ink:#151515;--ink-2:#2a2a2a;--muted:#65686c;--line:#e9e9e6;--paper:#f7f7f5;--white:#fff;--max:1192px;--shadow:0 18px 55px rgba(17,17,17,.075);--radius:24px}
+    *,*::before,*::after{box-sizing:border-box}
+    html{scroll-behavior:smooth;scroll-padding-top:90px}
+    body{margin:0;background:#fff;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;line-height:1.65;-webkit-font-smoothing:antialiased}
+    body.dialog-open{overflow:hidden}
+    a{color:inherit;text-decoration:none}
+    button{font:inherit}
+    button,a{-webkit-tap-highlight-color:transparent}
+    button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #cc8500;outline-offset:4px}
+    svg{display:block}
+    .sprite{position:absolute;width:0;height:0;overflow:hidden}
+    .icon{width:23px;height:23px;stroke:currentColor;stroke-width:1.85;stroke-linecap:round;stroke-linejoin:round;fill:none;flex:none}
+    .container{width:min(var(--max),calc(100% - 48px));margin-inline:auto}
+    .eyebrow{font-size:12px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .eyebrow.yellow{color:#9b7100}
+    .section{padding:105px 0}
+    .section-heading{max-width:690px;margin-bottom:38px}
+    .section-heading h2,.big-heading{font-size:clamp(32px,4vw,48px);letter-spacing:-.065em;line-height:1.2;margin:11px 0 14px;font-weight:900}
+    .section-heading p{margin:0;color:var(--muted);font-size:16px;max-width:640px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:51px;padding:12px 20px;border-radius:14px;border:1px solid transparent;font-size:14px;font-weight:850;cursor:pointer;transition:transform .18s,background .18s,border-color .18s;text-align:center;white-space:nowrap}
+    .btn:hover{transform:translateY(-2px)}
+    .btn svg{width:18px;height:18px}
+    .btn-yellow{background:var(--yellow);color:var(--ink)}
+    .btn-yellow:hover{background:#ffda5d}
+    .btn-dark{background:var(--ink);color:#fff}
+    .btn-dark:hover{background:#363636}
+    .btn-white{background:#fff;color:var(--ink)}
+    .btn-outline-light{border-color:rgba(255,255,255,.28);color:#fff;background:transparent}
+    .btn-outline-dark{border-color:#d5d5d2;color:var(--ink);background:#fff}
+    .btn-text{background:transparent;color:var(--ink);padding-inline:7px;min-height:40px}
+    .topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.96);border-bottom:1px solid #ededeb;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+    .topbar-inner{height:76px;display:flex;align-items:center;gap:34px}
+    .brand{display:inline-flex;align-items:center;gap:9px;flex:none}
+    .brand-word{font-size:31px;letter-spacing:-.085em;font-weight:950;line-height:1;color:#111;font-family:"Arial Rounded MT Bold",Inter,-apple-system,sans-serif}
+    .brand-word .dot{color:#e8b823}
+    .brand-caption{border-left:1px solid #d9d9d4;padding-left:10px;margin-left:4px;font-size:11px;line-height:1.45;font-weight:800;color:#606060;letter-spacing:.025em}
+    .nav-links{display:flex;align-items:center;gap:23px;margin-left:auto}
+    .nav-links a{font-size:13px;font-weight:800;color:#4d4f51;white-space:nowrap}
+    .nav-links a:hover{color:#070707}
+    .nav-action{margin-left:0}
+    .menu-toggle{border:1px solid #deded9;border-radius:11px;background:#fff;display:none;align-items:center;justify-content:center;width:45px;height:45px;margin-left:auto;cursor:pointer}
+    .mobile-menu{display:none;border-top:1px solid #eee;background:#fff;padding:12px 24px 20px}
+    .mobile-menu a{display:block;padding:11px 4px;font-weight:800;font-size:14px}
+    .mobile-menu .btn{margin-top:8px}
+    .skip{position:absolute;left:10px;top:-100px;z-index:99;background:var(--yellow);padding:10px}
+    .skip:focus{top:10px}
+    .hero{background:#121212;color:#fff;position:relative;overflow:hidden}
+    .hero:before{content:"";position:absolute;width:740px;height:740px;border-radius:50%;right:-240px;top:-260px;background:radial-gradient(circle,rgba(248,200,50,.17) 0,rgba(248,200,50,.07) 40%,transparent 70%);pointer-events:none}
+    .hero:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(110deg,transparent 0 130px,rgba(255,255,255,.014) 131px 132px);pointer-events:none}
+    .hero-inner{min-height:665px;padding-top:74px;padding-bottom:82px;display:grid;grid-template-columns:1.03fr .97fr;align-items:center;gap:38px;position:relative;z-index:1}
+    .hero-kicker{display:inline-flex;align-items:center;gap:9px;padding:7px 12px;border:1px solid rgba(248,200,50,.36);border-radius:100px;color:#f8d56e;background:rgba(248,200,50,.08);font-size:12px;font-weight:800}
+    .hero-kicker .pulse{width:7px;height:7px;background:var(--yellow);border-radius:50%}
+    .hero h1{margin:27px 0 24px;font-size:clamp(45px,5.9vw,74px);line-height:1.11;letter-spacing:-.077em;font-weight:950;max-width:710px}
+    .hero h1 .accent{color:var(--yellow)}
+    .hero-sub{max-width:530px;font-size:17px;color:rgba(255,255,255,.68);margin:0;line-height:1.9}
+    .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin:32px 0 0}
+    .hero-actions .btn{min-height:56px;padding:13px 23px}
+    .hero-highlights{display:flex;flex-wrap:wrap;gap:14px 26px;margin-top:34px}
+    .hero-highlights span{font-size:13px;color:rgba(255,255,255,.75);display:inline-flex;align-items:center;gap:8px;font-weight:700}
+    .hero-highlights svg{color:var(--yellow);width:17px;height:17px}
+    .showcase{position:relative;display:flex;align-items:center;justify-content:center;min-width:0}
+    .showcase:before{content:"";position:absolute;width:425px;height:425px;border:1px solid rgba(248,200,50,.19);border-radius:50%;box-shadow:0 0 0 54px rgba(248,200,50,.045),0 0 0 110px rgba(248,200,50,.022)}
+    .phone{width:min(355px,100%);border:9px solid #272727;border-radius:39px;background:#fafaf9;color:#161616;box-shadow:0 35px 70px rgba(0,0,0,.43);padding:21px 17px 15px;position:relative;transform:rotate(2deg);z-index:1}
+    .phone:before{content:"";position:absolute;top:8px;left:50%;transform:translateX(-50%);width:82px;height:18px;background:#252525;border-radius:0 0 14px 14px}
+    .phone-bar{display:flex;align-items:center;justify-content:space-between;margin:15px 0 23px}
+    .phone-logo{font-weight:950;letter-spacing:-.075em;font-size:25px}
+    .phone-avatar{width:32px;height:32px;background:#f0f0eb;border-radius:50%;display:grid;place-items:center}
+    .phone-small{font-size:11px;font-weight:800;color:#999}
+    .phone-title{font-weight:900;font-size:20px;line-height:1.4;margin:4px 0 18px;letter-spacing:-.035em}
+    .phone-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    .phone-tile{border:1px solid #eee;background:#fff;border-radius:15px;padding:12px 4px;text-align:center;min-height:83px}
+    .phone-tile .mini-icon{width:35px;height:35px;border-radius:12px;background:#fff3c9;display:grid;place-items:center;margin:0 auto 6px;color:#35302a}
+    .phone-tile .mini-icon .icon{width:19px;height:19px}
+    .phone-tile span:last-child{font-weight:850;font-size:11px}
+    .phone-track{margin-top:17px;padding:16px;border-radius:17px;background:#171717;color:white}
+    .phone-track .label{color:#f8d56e;font-weight:800;font-size:10px;letter-spacing:.08em}
+    .phone-track .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0 13px}
+    .phone-track .top strong{font-size:13px}.phone-track .top span{font-size:10px;color:#aaa}
+    .phone-progress{height:5px;background:#4a4a4a;border-radius:50px;overflow:hidden}.phone-progress span{display:block;width:62%;height:100%;background:var(--yellow);border-radius:50px}
+    .phone-note{text-align:center;color:#929292;font-size:10px;margin:14px 0 3px}
+    .float-card{position:absolute;z-index:2;background:#fff;color:#171717;border-radius:15px;box-shadow:0 16px 35px rgba(0,0,0,.18);padding:13px 16px;transform:rotate(-4deg);display:flex;align-items:center;gap:10px;bottom:65px;left:0}
+    .float-card svg{color:#9a7400}.float-card strong{display:block;font-size:12px}.float-card small{font-size:11px;color:#777}
+    .benefit-strip{background:#fff;position:relative;z-index:2;box-shadow:0 8px 28px rgba(0,0,0,.035)}
+    .benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:29px 0}
+    .benefit{display:flex;align-items:center;gap:14px;padding:0 18px;border-right:1px solid #e8e8e4}
+    .benefit:first-child{padding-left:0}.benefit:last-child{border:0}
+    .benefit-icon{width:43px;height:43px;background:#fff4d0;border-radius:12px;display:grid;place-items:center;flex:none}
+    .benefit-icon .icon{width:21px;height:21px}
+    .benefit strong{display:block;font-size:15px}.benefit span{color:#727272;font-size:12px;display:block;line-height:1.6}
+    .services{background:var(--paper)}
+    .section-heading-flex{display:flex;justify-content:space-between;align-items:end;gap:24px}
+    .section-heading-flex .section-heading{margin-bottom:40px}
+    .service-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+    .service-card{background:#fff;border:1px solid #ededeb;border-radius:23px;padding:26px;position:relative;min-height:266px;display:flex;flex-direction:column;box-shadow:0 5px 21px rgba(0,0,0,.025);transition:transform .18s,box-shadow .18s}
+    .service-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+    .service-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:23px}
+    .service-icon{width:59px;height:59px;display:grid;place-items:center;border-radius:18px;background:#fff0c2}
+    .service-icon .icon{width:29px;height:29px;stroke-width:1.7}
+    .service-num{font-size:12px;font-weight:900;color:#c5c5c5}
+    .service-card h3{font-size:22px;letter-spacing:-.04em;font-weight:900;line-height:1.3;margin:0 0 9px}
+    .service-card p{font-size:14px;color:#696b6f;line-height:1.85;margin:0 0 19px;flex:1}
+    .service-bottom{display:flex;align-items:center;justify-content:space-between;gap:7px;padding-top:16px;border-top:1px solid #f0f0ef}
+    .service-bottom span{font-size:11px;font-weight:750;color:#777}
+    .service-bottom a{font-size:12px;font-weight:900;display:flex;align-items:center;gap:4px}
+    .service-bottom a .icon{width:15px;height:15px}
+    .service-footnote{font-size:12px;color:#818181;margin:21px 0 0}
+    .how{background:#fff}
+    .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:19px}
+    .step{position:relative;padding:25px 21px 26px;background:#f7f7f5;border:1px solid #eeeeea;border-radius:19px}
+    .step:not(:last-child):after{content:"→";font-size:21px;position:absolute;right:-17px;top:35px;z-index:1;color:#b6a266}
+    .step-number{width:37px;height:37px;display:grid;place-items:center;background:var(--yellow);border-radius:11px;font-size:13px;font-weight:950;margin-bottom:20px}
+    .step h3{font-size:16px;margin:0 0 8px}.step p{margin:0;color:#6a6a6a;font-size:13px;line-height:1.8}
+    .systems{background:#1b1b1b;color:white;overflow:hidden}
+    .systems-inner{display:grid;grid-template-columns:1fr .92fr;align-items:center;gap:65px}
+    .systems h2{font-size:clamp(32px,4vw,48px);letter-spacing:-.063em;line-height:1.24;margin:13px 0 20px}
+    .systems p{color:#bbb;line-height:1.9;max-width:590px}
+    .systems-checks{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin-top:32px}
+    .systems-check{border:1px solid #3b3b3b;border-radius:13px;padding:16px;background:#252525;font-size:13px;font-weight:800;display:flex;align-items:center;gap:10px}
+    .systems-check svg{color:var(--yellow);width:19px;height:19px}
+    .tracker{border:1px solid #3d3d3d;background:#272727;border-radius:25px;padding:24px;box-shadow:0 30px 70px rgba(0,0,0,.2)}
+    .tracker-title{display:flex;align-items:center;justify-content:space-between;padding-bottom:19px;border-bottom:1px solid #3e3e3e;gap:10px}
+    .tracker-title strong{font-size:17px}.tracker-title span{font-size:11px;background:#424028;color:#f8dc76;border-radius:100px;padding:5px 11px}
+    .timeline{padding:24px 0 2px 16px}
+    .timeline-item{position:relative;border-left:2px solid #525252;padding:0 0 24px 26px}
+    .timeline-item:last-child{border-color:transparent;padding-bottom:0}
+    .timeline-item:before{content:"";position:absolute;left:-8px;top:2px;width:14px;height:14px;border-radius:50%;background:#606060;border:3px solid #272727;box-shadow:0 0 0 2px #606060}
+    .timeline-item.done:before{background:var(--yellow);box-shadow:0 0 0 2px var(--yellow)}
+    .timeline-item b{display:block;font-size:14px}.timeline-item small{font-size:12px;color:#999}
+    .tracker-disclaimer{color:#8c8c8c;font-size:10px;margin-top:16px}
+    .coin-band{background:var(--yellow);padding:67px 0}
+    .coin-grid{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:60px}
+    .coin-grid h2{font-size:clamp(31px,3.8vw,46px);letter-spacing:-.07em;line-height:1.19;margin:9px 0 14px}
+    .coin-grid p{margin:0;max-width:620px;color:#4e421d;font-size:14px;line-height:1.9}
+    .coin-box{background:#171717;color:white;border-radius:24px;padding:25px 28px;display:flex;align-items:center;gap:18px;box-shadow:0 15px 32px rgba(25,20,0,.13)}
+    .coin-mark{width:69px;height:69px;background:#f7c73f;color:#111;border:5px solid #ffdc75;border-radius:50%;display:grid;place-items:center;font-weight:950;font-size:32px;flex:none}
+    .coin-box strong{font-size:18px}.coin-box span{display:block;color:#c6c6c6;font-size:12px;margin-top:7px;line-height:1.75}
+    .install{background:#fff}
+    .install-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+    .install-card{border:1px solid #eaeae6;border-radius:24px;padding:30px;background:#fafaf8;display:flex;flex-direction:column;min-height:290px}
+    .install-card.ios{background:#f2f2ef}.install-card.android{background:#fff6dc}
+    .install-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .install-device-icon{width:54px;height:54px;border-radius:16px;background:#fff;display:grid;place-items:center}
+    .install-device-icon .icon{width:27px;height:27px}
+    .install-device-badge{font-size:11px;font-weight:900;color:#696969;border:1px solid #d8d8d3;border-radius:100px;padding:5px 10px}
+    .install-card h3{font-size:22px;letter-spacing:-.04em;margin:21px 0 9px}.install-card p{font-size:13px;color:#646464;line-height:1.85;margin:0;flex:1}
+    .install-card .btn{align-self:flex-start;margin-top:23px}
+    .ios-install-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:23px}
+    .ios-install-actions .btn{margin-top:0}
+    .install-footer{display:flex;align-items:center;gap:13px;flex-wrap:wrap;border:1px dashed #d8d8d3;background:#fff;padding:16px 20px;border-radius:14px;margin-top:18px}
+    .install-footer span{color:#666;font-size:13px}.install-footer .btn{min-height:38px;padding:7px 12px;font-size:12px}
+    .inline-notice{display:none;background:#fff6da;border:1px solid #f0d681;color:#795100;font-size:12px;padding:12px 15px;border-radius:11px;margin-bottom:16px}
+    .inline-notice.is-visible{display:block}
+    .region{background:#f7f7f5}
+    .region-inner{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:70px}
+    .region-panel{background:white;border:1px solid #ecece8;padding:30px;border-radius:24px;box-shadow:var(--shadow)}
+    .region-panel .region-row{display:flex;align-items:center;gap:11px;padding:17px 0;border-top:1px solid #eee}
+    .region-row:first-child{border-top:0;padding-top:3px}
+    .region-dot{width:11px;height:11px;border-radius:50%;background:var(--yellow);flex:none}
+    .region-row strong{font-size:14px;display:block}.region-row small{font-size:12px;color:#777}
+    .region-tags{display:flex;flex-wrap:wrap;gap:9px;margin-top:25px}
+    .region-tags span{background:#fff;padding:7px 12px;border-radius:100px;border:1px solid #e7e7e4;font-weight:800;font-size:12px}
+    .partner{background:#fff}
+    .partner-panel{background:#f8c832;border-radius:28px;padding:52px 58px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:38px}
+    .partner-panel h2{font-size:clamp(30px,3.8vw,43px);letter-spacing:-.058em;line-height:1.22;margin:7px 0 14px}
+    .partner-panel p{font-size:14px;color:#584b20;max-width:655px;margin:0;line-height:1.9}
+    .partner-actions{display:flex;flex-direction:column;gap:11px;min-width:190px}
+    .faq{background:#f7f7f5}
+    .faq-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+    .faq-item{border:1px solid #eaeae6;background:#fff;border-radius:15px;padding:0 21px}
+    .faq-item summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:15px;cursor:pointer;font-size:14px;font-weight:850;padding:20px 0}
+    .faq-item summary::-webkit-details-marker{display:none}
+    .faq-item summary:after{content:"+";font-weight:600;color:#777;font-size:21px;line-height:1}
+    .faq-item[open] summary:after{content:"−"}
+    .faq-item p{font-size:13px;color:#686868;line-height:1.85;margin:0;border-top:1px solid #eee;padding:14px 0 20px}
+    .last-cta{background:#1b1b1b;color:#fff;padding:70px 0}
+    .last-cta-inner{display:flex;align-items:center;justify-content:space-between;gap:26px}
+    .last-cta h2{font-size:clamp(29px,3.8vw,43px);letter-spacing:-.063em;line-height:1.2;margin:0 0 10px}
+    .last-cta p{margin:0;color:#b1b1b1;font-size:14px}
+    .last-cta-actions{display:flex;gap:12px;flex-wrap:wrap}
+    .footer{background:#121212;border-top:1px solid #363636;color:#9e9e9e;padding:39px 0 30px}
+    .footer-top{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:34px}
+    .footer .brand-word{color:#fff}.footer .brand-caption{color:#9e9e9e;border-color:#4d4d4d}
+    .footer p{font-size:12px;max-width:270px;line-height:1.9}
+    .footer h4{font-size:12px;color:#fff;margin:0 0 14px}
+    .footer a,.footer .footer-text{display:block;font-size:12px;margin-bottom:9px;overflow-wrap:anywhere}
+    .footer a:hover{color:white}
+    .copyright{border-top:1px solid #313131;font-size:11px;padding-top:22px;margin-top:29px}
+    .mobile-actions{display:none;position:fixed;left:0;right:0;bottom:0;z-index:45;background:rgba(255,255,255,.97);backdrop-filter:blur(16px);border-top:1px solid #e7e7e5;padding:10px 16px calc(10px + env(safe-area-inset-bottom));gap:10px}
+    .mobile-actions .btn{flex:1;min-height:47px;padding-inline:10px}
+    .modal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.65);display:none;justify-content:center;align-items:center;padding:18px}
+    .modal.open{display:flex}
+    .modal-box{width:min(480px,100%);max-height:min(86vh,760px);overflow:auto;background:#fff;border-radius:23px;padding:27px;color:#111;box-shadow:0 35px 90px rgba(0,0,0,.25)}
+    .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+    .modal-head h2{font-size:24px;letter-spacing:-.04em;line-height:1.25;margin:0}
+    .modal-close{width:34px;height:34px;border:1px solid #e3e3e0;background:#f7f7f5;border-radius:10px;cursor:pointer;font-size:22px;line-height:1}
+    .modal-sub{font-size:13px;color:#777;margin:12px 0 22px;line-height:1.8}
+    .modal-steps{display:grid;gap:11px}
+    .modal-step{display:flex;gap:13px;background:#f8f8f5;border-radius:12px;padding:14px}
+    .modal-step-number{width:28px;height:28px;flex:none;border-radius:9px;background:#f8c832;display:grid;place-items:center;font-size:12px;font-weight:900}
+    .modal-step strong{display:block;font-size:13px}.modal-step span{display:block;font-size:12px;color:#727272;margin-top:4px;line-height:1.7}
+    .modal-note{font-size:12px;color:#777;margin-top:19px;line-height:1.8}
+    .modal-box .btn{width:100%;margin-top:15px}
+    @media(max-width:1080px){.nav-links{gap:13px}.nav-links a{font-size:12px}.hero-inner{gap:20px}.hero h1{font-size:60px}.systems-inner{gap:30px}.float-card{left:-25px}}
+    @media(max-width:900px){.topbar-inner{height:69px}.nav-links,.nav-action{display:none}.menu-toggle{display:flex}.mobile-menu.open{display:block}.hero-inner{grid-template-columns:1fr;padding-top:66px;padding-bottom:70px;gap:55px}.hero h1{font-size:clamp(44px,7vw,64px)}.showcase{max-width:450px;margin-inline:auto}.float-card{left:-25px}.benefit{padding:0 5px}.service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.steps{grid-template-columns:repeat(2,1fr)}.step:nth-child(2):after{display:none}.systems-inner,.region-inner{grid-template-columns:1fr}.region-inner{gap:25px}.coin-grid{gap:25px}.partner-panel{padding:40px;grid-template-columns:1fr}.partner-actions{flex-direction:row}.partner-actions .btn{flex:1}}
+    @media(max-width:620px){.container{width:calc(100% - 34px)}.section{padding:70px 0}.section-heading h2,.big-heading{font-size:34px}.topbar-inner{height:64px}.brand-word{font-size:29px}.brand-caption{font-size:10px}.hero-inner{min-height:auto;padding:50px 0 58px;gap:52px}.hero h1{font-size:clamp(41px,10.1vw,57px);margin:24px 0 18px}.hero-sub{font-size:14px}.hero-actions{margin-top:24px}.hero-actions .btn{flex:1;min-height:52px;padding-inline:12px}.hero-highlights{gap:11px 18px;margin-top:26px}.hero-highlights span{font-size:11px}.showcase{display:none}.phone{width:min(325px,89%);padding:18px 14px 14px;transform:rotate(0)}.showcase:before{width:330px;height:330px}.float-card{left:0;bottom:37px;padding:10px 11px;transform:rotate(-4deg)}.benefits{grid-template-columns:1fr;gap:0;padding:13px 0}.benefit{border:0;border-bottom:1px solid #ecece8;padding:13px 0}.benefit:last-child{border:0}.service-grid,.install-grid,.faq-grid{grid-template-columns:1fr}.service-card{min-height:230px;padding:23px}.steps{grid-template-columns:1fr;gap:11px}.step:not(:last-child):after{display:none}.systems-inner{gap:25px}.systems-checks{gap:9px}.systems-check{font-size:12px;padding:13px}.tracker{padding:20px}.coin-grid{grid-template-columns:1fr;gap:25px}.coin-band{padding:53px 0}.coin-box{padding:22px}.install-card{min-height:0}.region-panel{padding:22px}.partner-panel{padding:31px 24px;border-radius:22px}.partner-actions{flex-direction:column}.last-cta-inner{flex-direction:column;align-items:flex-start}.last-cta-actions{width:100%}.last-cta-actions .btn{flex:1;padding-inline:12px}.footer-top{grid-template-columns:1fr;gap:25px}.footer{padding-bottom:95px}.mobile-actions{display:flex}.section-heading-flex{display:block}.section-heading-flex .section-heading{margin-bottom:30px}.service-card h3{font-size:21px}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
   </style>
 </head>
-
 <body>
-  <div class="page">
-
-    <header class="topbar">
-      <div class="topbar-inner">
-        <a class="brand" href="#top" aria-label="UBee 跑腿首頁">
-          <div class="brand-mark">🐝</div>
-          <div class="brand-text">
-            <div class="brand-name">UBee 跑腿</div>
-            <div class="brand-sub">系統化跑腿｜即時任務</div>
-          </div>
-        </a>
-
-        <nav class="nav" aria-label="網站導覽">
-          <a href="#services">服務項目</a>
-          <a href="#why">平台特色</a>
-          <a href="#flow">使用流程</a>
-          <a href="#partner">店家使用</a>
-          <a href="#faq">常見問題</a>
-          <a href="#contact">聯絡我們</a>
-          <a class="nav-cta user-entry" href="#install-app">安裝 UBee APP</a>
-          <a class="nav-cta rider-entry" href="https://ubee-rider-web.vercel.app/rider.html">加入 UBee 騎士</a>
-        </nav>
-      </div>
-    </header>
-
-    <main id="top">
-
-      <section class="hero-wrap">
-        <div class="hero">
-          <div>
-            <div class="eyebrow">UBee APP 官方安裝入口</div>
-
-            <h1>
-              把 UBee 裝進手機，<br />
-              <span class="highlight">需要時直接打開。</span>
-            </h1>
-
-            <p class="hero-desc">
-              不必再把 LINE 官方帳號當成唯一入口。將 UBee APP 安裝到手機主畫面，
-              之後直接開啟即可快速估價、下單、查看任務進度與管理會員資料。
-            </p>
-
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="#install-app">
-                立即安裝 UBee APP
-              </a>
-              <a class="btn btn-ghost" href="/order.html">
-                先開啟網頁版
-              </a>
-              <a class="btn btn-ghost" href="#services">
-                查看服務項目
-              </a>
-            </div>
-
-            <div class="trust-row">
-              <div class="trust-item">
-                <div class="trust-value">5 大服務</div>
-                <div class="trust-label">幫我送、幫我取、幫我買、幫排隊、全能跑腿</div>
-              </div>
-              <div class="trust-item">
-                <div class="trust-value">會員帳號</div>
-                <div class="trust-label">手機號碼＋密碼，登入後安全使用</div>
-              </div>
-              <div class="trust-item">
-                <div class="trust-value">像 APP 一樣</div>
-                <div class="trust-label">安裝到手機桌面，不必每次回 LINE 找入口</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="phone-shell" aria-label="UBee 跑腿下單介面示意">
-            <div class="phone-screen">
-              <div class="app-head">
-                <div class="app-title">UBee 跑腿</div>
-                <div class="app-pill">PWA 用戶端</div>
-              </div>
-
-              <div class="app-card yellow">
-                <div class="app-mini-title">UBee 會員</div>
-                <div style="font-size: 24px; font-weight: 1000; line-height: 1.22;">
-                  註冊或登入後，開始你的任務。
-                </div>
-              </div>
-
-              <div class="app-card">
-                <div class="app-mini-title">服務項目</div>
-                <div class="mini-grid">
-                  <div class="mini-service">幫我送</div>
-                  <div class="mini-service">幫我取</div>
-                  <div class="mini-service">幫我買</div>
-                  <div class="mini-service">幫排隊</div>
-                  <div class="mini-service">全能跑腿</div>
-                </div>
-              </div>
-
-              <div class="app-card">
-                <div class="app-mini-title">任務路線</div>
-                <div class="app-route">
-                  <div class="route">
-                    <div class="route-dot"></div>
-                    <div>
-                      <div class="route-label">取件地點</div>
-                      <div class="route-place">台中市豐原區</div>
-                    </div>
-                  </div>
-                  <div class="route">
-                    <div class="route-dot end"></div>
-                    <div>
-                      <div class="route-label">送達地點</div>
-                      <div class="route-place">台中市潭子區</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="app-card dark">
-                <div class="app-status">
-                  <span>快速估價・下單・追蹤</span>
-                  <span>會員專屬</span>
-                </div>
-                <div class="progress">
-                  <span></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="install-section" id="install-app" aria-label="安裝 UBee APP">
-        <div class="container">
-          <div class="install-panel">
-
-            <div class="install-app-card">
-              <div>
-                <div class="install-app-icon">
-                  <img src="/ubee-customer-icon-512.png" alt="UBee 跑腿 APP 圖示" />
-                </div>
-                <div class="install-app-name">UBee 跑腿</div>
-                <div class="install-app-sub">官方用戶端｜快速估價・下單・任務追蹤</div>
-              </div>
-
-              <div class="install-app-badges">
-                <span>免應用程式商店</span>
-                <span>手機桌面直接開啟</span>
-                <span>Android・iPhone</span>
-              </div>
-            </div>
-
-            <div class="install-content">
-              <div class="install-kicker">Install UBee App</div>
-              <h2>立即安裝 UBee APP</h2>
-              <p>
-                UBee 採用 PWA 技術，不需要前往 App Store 或 Google Play。
-                完成安裝後，手機桌面會出現 UBee 圖示，以後直接點擊即可使用。
-              </p>
-
-              <div class="line-browser-alert" id="lineBrowserAlert">
-                你目前可能正在 LINE 內建瀏覽器中。請先點右上角選單，選擇「以預設瀏覽器開啟」，
-                再使用 Safari 或 Chrome 完成安裝。
-              </div>
-
-              <button class="install-main-action js-install-trigger" id="installAppButton" type="button">
-                安裝 UBee APP 到手機
-              </button>
-
-              <div class="install-secondary-actions">
-                <a class="btn btn-dark" href="/order.html">直接開啟 UBee</a>
-                <button class="btn btn-ghost js-install-guide" type="button" style="color:#111;border-color:#ddd;background:#fff;">
-                  查看安裝教學
-                </button>
-              </div>
-
-              <div class="install-status" id="installStatus" aria-live="polite">
-                正在確認你的裝置與安裝方式⋯
-              </div>
-
-              <div class="install-benefits">
-                <div class="install-benefit">
-                  <strong>入口獨立</strong>
-                  <span>不必透過 LINE 才能進入 UBee。</span>
-                </div>
-                <div class="install-benefit">
-                  <strong>快速開啟</strong>
-                  <span>從手機主畫面直接進入用戶端。</span>
-                </div>
-                <div class="install-benefit">
-                  <strong>完整功能</strong>
-                  <span>估價、下單、會員與任務進度集中管理。</span>
-                </div>
-              </div>
-
-              <div class="install-guide">
-                <div class="install-guide-title">不同手機的安裝方式</div>
-                <div class="install-guide-grid">
-                  <div class="install-guide-item">
-                    <strong>Android／Chrome</strong>
-                    <span>點擊上方「安裝 UBee APP」，依瀏覽器提示完成安裝。</span>
-                  </div>
-                  <div class="install-guide-item">
-                    <strong>iPhone／Safari</strong>
-                    <span>點 Safari 的分享按鈕，再選擇「加入主畫面」。</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      <section class="platform-entry-section" id="platform-entry" aria-label="UBee 平台入口">
-        <div class="container">
-          <div class="platform-entry-grid">
-            <article class="platform-entry-card user">
-              <div class="platform-entry-icon">📲</div>
-              <h2>安裝 UBee APP</h2>
-              <p>把 UBee 加入手機主畫面，之後直接從桌面開啟，不必再回到 LINE 官方帳號尋找入口。</p>
-              <button class="btn btn-dark js-install-trigger" type="button">安裝到手機主畫面</button>
-            </article>
-
-            <article class="platform-entry-card rider">
-              <div class="platform-entry-icon">🐝</div>
-              <h2>加入 UBee 騎士</h2>
-              <p>成為 UBee 配送夥伴，完成申請與審核後，即可透過騎士端查看及承接適合的跑腿任務。</p>
-              <a class="btn btn-primary" href="https://ubee-rider-web.vercel.app/rider.html">前往騎士端申請</a>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="services">
-        <div class="container">
-          <div class="section-head">
-            <div>
-              <div class="kicker">Services</div>
-              <h2>UBee 跑腿可以幫你完成什麼？</h2>
-              <p class="section-desc">
-                UBee 跑腿把常見生活需求整理成五個清楚的服務入口；文件急送、重要物品與特殊任務，也能依內容選擇幫我送或全能跑腿。
-              </p>
-            </div>
-          </div>
-
-          <div class="service-grid">
-            <article class="service-card">
-              <div class="service-visual visual-delivery">
-                <div class="visual-city"></div>
-                <div class="visual-bubble bubble-a">📄</div>
-                <div class="visual-bubble bubble-b">📦</div>
-                <div class="visual-bubble bubble-c">📍</div>
-                <div class="visual-main">🛵</div>
-                <div class="visual-tag">DELIVERY</div>
-                <div class="visual-note">物品・文件・包裹</div>
-              </div>
-
-              <div class="service-body">
-                <div class="service-topline">
-                  <h3>幫我送</h3>
-                  <span class="service-chip">日常代送</span>
-                </div>
-                <p>
-                  文件、物品、包裹、店家商品等代送任務，適合一般生活配送與臨時配送需求。
-                </p>
-                <div class="service-meta">
-                  <span>文件送達</span>
-                  <span>物品配送</span>
-                  <span>店家商品</span>
-                </div>
-                <div class="service-usecase">
-                  <strong>適合情境</strong>
-                  <span>東西忘了帶、文件需要送、店家商品需要交給客人。</span>
-                </div>
-              </div>
-            </article>
-
-            <article class="service-card">
-              <div class="service-visual visual-pickup">
-                <div class="visual-city"></div>
-                <div class="visual-bubble bubble-a">🏪</div>
-                <div class="visual-bubble bubble-b">📍</div>
-                <div class="visual-bubble bubble-c">📦</div>
-                <div class="visual-main">🤝</div>
-                <div class="visual-tag">PICK UP</div>
-                <div class="visual-note">指定取件・送達</div>
-              </div>
-
-              <div class="service-body">
-                <div class="service-topline">
-                  <h3>幫我取</h3>
-                  <span class="service-chip">取件任務</span>
-                </div>
-                <p>
-                  協助到指定地點取件，再送至指定位置，適合文件、商品、物品取送需求。
-                </p>
-                <div class="service-meta">
-                  <span>到店取件</span>
-                  <span>物品取送</span>
-                  <span>指定地點</span>
-                </div>
-                <div class="service-usecase">
-                  <strong>適合情境</strong>
-                  <span>商品已經準備好、文件在某處、需要有人到指定地點幫忙取回。</span>
-                </div>
-              </div>
-            </article>
-
-            <article class="service-card">
-              <div class="service-visual visual-buy">
-                <div class="visual-city"></div>
-                <div class="visual-bubble bubble-a">🥤</div>
-                <div class="visual-bubble bubble-b">🍱</div>
-                <div class="visual-bubble bubble-c">🧾</div>
-                <div class="visual-main">🛒</div>
-                <div class="visual-tag">BUY FOR ME</div>
-                <div class="visual-note">餐點・飲品・用品</div>
-              </div>
-
-              <div class="service-body">
-                <div class="service-topline">
-                  <h3>幫我買</h3>
-                  <span class="service-chip">生活代買</span>
-                </div>
-                <p>
-                  協助購買餐點、飲品、生活用品等，適合不方便出門或臨時需要代買的情境。
-                </p>
-                <div class="service-meta">
-                  <span>餐點代買</span>
-                  <span>飲料代買</span>
-                  <span>生活用品</span>
-                </div>
-                <div class="service-usecase">
-                  <strong>適合情境</strong>
-                  <span>想吃某家店、臨時需要飲料、人在忙但有東西要買。</span>
-                </div>
-              </div>
-            </article>
-
-            <article class="service-card">
-              <div class="service-visual visual-queue">
-                <div class="visual-city"></div>
-                <div class="visual-bubble bubble-a">🎟️</div>
-                <div class="visual-bubble bubble-b">☕</div>
-                <div class="visual-bubble bubble-c">⏱️</div>
-                <div class="visual-main wide">👥</div>
-                <div class="visual-tag">QUEUE</div>
-                <div class="visual-note">排隊・等候・領取</div>
-              </div>
-
-              <div class="service-body">
-                <div class="service-topline">
-                  <h3>幫排隊</h3>
-                  <span class="service-chip">現場等候</span>
-                </div>
-                <p>
-                  協助排隊、等候、現場領取等任務，適合熱門店家、活動現場或臨時等待需求。
-                </p>
-                <div class="service-meta">
-                  <span>熱門店家</span>
-                  <span>現場等候</span>
-                  <span>排隊領取</span>
-                </div>
-                <div class="service-usecase">
-                  <strong>適合情境</strong>
-                  <span>熱門店要排隊、活動現場要等、需要有人幫你先卡時間。</span>
-                </div>
-              </div>
-            </article>
-
-            <article class="service-card">
-              <div class="service-visual visual-anything">
-                <div class="visual-city"></div>
-                <div class="visual-bubble bubble-a">🧰</div>
-                <div class="visual-bubble bubble-b">📝</div>
-                <div class="visual-bubble bubble-c">✨</div>
-                <div class="visual-main">🐝</div>
-                <div class="visual-tag">ALL TASK</div>
-                <div class="visual-note">彈性任務・生活支援</div>
-              </div>
-
-              <div class="service-body">
-                <div class="service-topline">
-                  <h3>全能跑腿</h3>
-                  <span class="service-chip">彈性任務</span>
-                </div>
-                <p>
-                  無法歸類的生活任務，可透過平台送出需求，由客服或系統流程協助確認任務內容。
-                </p>
-                <div class="service-meta">
-                  <span>臨時任務</span>
-                  <span>生活支援</span>
-                  <span>彈性需求</span>
-                </div>
-                <div class="service-usecase">
-                  <strong>適合情境</strong>
-                  <span>不知道該選哪一類，但確實需要有人幫你完成一件事。</span>
-                </div>
-              </div>
-            </article>
-          </div>
-
-          <div class="service-section-note">
-            <div>
-              <strong>不知道該選哪一項？</strong>
-              <span>先依照最接近的任務類型送出需求，UBee 跑腿會依任務內容協助確認服務方式。</span>
-            </div>
-            <a class="btn btn-primary" href="/order.html">
-              註冊／登入開始下單
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="why">
-        <div class="container">
-          <div class="why-wrap">
-            <div class="why-main">
-              <div class="kicker">Why UBee</div>
-              <h2>從會員登入、快速估價到任務追蹤，UBee 把跑腿流程系統化。</h2>
-              <p>
-                UBee 跑腿使用會員帳號、安全 Session 與系統化下單流程，讓任務內容、地點、估價、聯絡方式及進度紀錄更清楚。
-                一般使用者與有配送需求的店家，都使用同一個正式用戶端直接下單。
-              </p>
-            </div>
-
-            <div class="why-list">
-              <div class="why-item">
-                <div class="why-num">1</div>
-                <div class="why-title">會員帳號登入</div>
-                <div class="why-text">使用手機號碼與密碼登入，保留任務、地址與會員資料。</div>
-              </div>
-
-              <div class="why-item">
-                <div class="why-num">2</div>
-                <div class="why-title">五大任務分類</div>
-                <div class="why-text">幫我送、幫我取、幫我買、幫排隊、全能跑腿，快速找到正確入口。</div>
-              </div>
-
-              <div class="why-item">
-                <div class="why-num">3</div>
-                <div class="why-title">快速估價與追蹤</div>
-                <div class="why-text">先查看預估費用，任務建立後可持續掌握處理進度。</div>
-              </div>
-
-              <div class="why-item">
-                <div class="why-num">4</div>
-                <div class="why-title">店家也能直接下單</div>
-                <div class="why-text">有配送、取件或代買需求時，直接使用 UBee 用戶端，不必加入另一套派單中心。</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="flow">
-        <div class="container">
-          <div class="section-head">
-            <div>
-              <div class="kicker">How It Works</div>
-              <h2>註冊一次，之後登入就能快速下單</h2>
-              <p class="section-desc">
-                UBee 跑腿採用 PWA 用戶端，可直接從瀏覽器開啟，也能加入手機主畫面；登入後即可使用完整估價與下單功能。
-              </p>
-            </div>
-          </div>
-
-          <div class="flow">
-            <div class="flow-step">
-              <div class="flow-badge">1</div>
-              <h3>註冊或登入</h3>
-              <p>使用手機號碼與密碼建立 UBee 帳號，之後可直接登入使用。</p>
-            </div>
-
-            <div class="flow-step">
-              <div class="flow-badge">2</div>
-              <h3>選擇服務與地點</h3>
-              <p>選擇五大服務之一，填寫取件地點、送達地點與任務內容。</p>
-            </div>
-
-            <div class="flow-step">
-              <div class="flow-badge">3</div>
-              <h3>確認估價並送出</h3>
-              <p>查看系統預估費用與任務摘要，確認後建立正式任務。</p>
-            </div>
-
-            <div class="flow-step">
-              <div class="flow-badge">4</div>
-              <h3>追蹤任務進度</h3>
-              <p>登入帳號即可查看進行中任務、歷史紀錄與後續狀態。</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="area">
-        <div class="container">
-          <div class="area-box">
-            <div class="area-content">
-              <div>
-                <div class="kicker">Service Area</div>
-                <h2>以台中為核心，依服務城市逐步開放。</h2>
-                <p class="section-desc">
-                  下單頁可切換服務城市。實際能否承接，會依當地小U運力、距離、時間、天候與任務內容進行確認。
-                </p>
-
-                <div class="area-tags">
-                  <span class="tag">臺中市核心營運</span>
-                  <span class="tag">服務城市可切換</span>
-                  <span class="tag">依當地運力承接</span>
-                  <span class="tag">跨區任務另行確認</span>
-                  <span class="tag">其他城市逐步開放</span>
-                </div>
-              </div>
-
-              <div class="area-map" aria-label="UBee 服務範圍示意">
-                <div>
-                  <div class="area-map-title">UBee 城市服務網路</div>
-                  <div class="area-map-sub">以台中為核心，透過小U密度與系統化流程逐步擴展。</div>
-                </div>
-
-                <div class="area-pin pin-1">台中核心</div>
-                <div class="area-pin pin-2">城市切換</div>
-                <div class="area-pin pin-3">在地小U</div>
-                <div class="area-pin pin-4">跨區確認</div>
-                <div class="area-pin pin-5">逐步擴展</div>
-
-                <div style="position: relative; z-index: 2; color: rgba(255,255,255,.68); font-size: 13px;">
-                  實際可服務範圍依當地小U、距離、時間、天候與任務內容確認。
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="partner">
-        <div class="container">
-          <div class="partner">
-            <div>
-              <div class="kicker">For Local Businesses</div>
-              <h2>店家有配送需求，也直接使用 UBee 用戶端下單。</h2>
-              <p class="section-desc">
-                不需要加入店家派單中心，也不必先談合作或上架商品。店家有配送、取件、代買或急送需求時，
-                直接註冊 UBee 帳號，依照一般用戶流程建立任務即可。
-              </p>
-
-              <div class="hero-actions">
-                <a class="btn btn-dark" href="/order.html">
-                  店家直接下單
-                </a>
-                <a class="btn btn-dark" href="https://lin.ee/pKZCR9r">
-                  聯絡客服
-                </a>
-              </div>
-            </div>
-
-            <div class="partner-points">
-              <div class="partner-point">
-                <strong>直接下單</strong>
-                <span>店家與一般用戶使用同一個正式 UBee 用戶端。</span>
-              </div>
-
-              <div class="partner-point">
-                <strong>商品店內價</strong>
-                <span>商品費用依店內實際售價，UBee 不替店家加價上架。</span>
-              </div>
-
-              <div class="partner-point">
-                <strong>跑腿費另計</strong>
-                <span>配送與跑腿服務費依距離、時間及任務內容計算。</span>
-              </div>
-
-              <div class="partner-point">
-                <strong>不抽成、不綁約</strong>
-                <span>店家不必簽約加入平台，有需求就直接建立任務。</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="faq">
-        <div class="container">
-          <div class="faq-intro">
-            <div class="faq-highlight">
-              <div class="kicker">FAQ</div>
-              <h2>常見問題</h2>
-              <p>
-                註冊登入前、建立任務前或任務進行中，都可以先了解 UBee 的帳號、下單、付款、服務城市與任務限制。
-              </p>
-            </div>
-
-            <div class="faq-stats">
-              <div class="faq-stat">
-                <strong>手機號碼＋密碼</strong>
-                <span>建立 UBee 會員帳號後，登入即可使用完整功能。</span>
-              </div>
-
-              <div class="faq-stat">
-                <strong>5 大任務</strong>
-                <span>幫我送、幫我取、幫我買、幫排隊、全能跑腿。</span>
-              </div>
-
-              <div class="faq-stat">
-                <strong>PWA 用戶端</strong>
-                <span>可從瀏覽器開啟，也可加入手機主畫面。</span>
-              </div>
-
-              <div class="faq-stat">
-                <strong>店家直接使用</strong>
-                <span>不必加入另一套系統，有配送需求就從用戶端下單。</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="faq-grid">
-            <div class="faq-category">
-              <span>一般使用問題</span>
-            </div>
-
-            <details>
-              <summary><span class="faq-icon">📱</span>UBee APP 要去哪裡下載？</summary>
-              <p>UBee 採用 PWA，不需要前往 App Store 或 Google Play。請在本頁點擊「安裝 UBee APP」；Android 可依瀏覽器提示安裝，iPhone 請使用 Safari 的分享功能選擇「加入主畫面」。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🔐</span>使用 UBee 一定要註冊嗎？</summary>
-              <p>需要。快速估價、建立任務、常用地址、任務紀錄與進度追蹤都屬於會員功能。第一次使用請以手機號碼與密碼註冊，之後直接登入即可。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">📍</span>目前服務哪些地區？</summary>
-              <p>UBee 以臺中市為核心營運，下單頁可切換服務城市。實際是否能承接，會依當地小U、距離、時間、天候與任務內容確認。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🧾</span>UBee 可以處理哪些任務？</summary>
-              <p>UBee 提供幫我送、幫我取、幫我買、幫排隊與全能跑腿。文件急送、重要物品、餐點用品、現場等候與特殊生活任務，都能依內容選擇適合的服務。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🐝</span>不知道該選哪一種服務怎麼辦？</summary>
-              <p>可以先選擇最接近的服務類型。如果任務比較特殊，可以使用「全能跑腿」，由 UBee 依照任務內容協助確認是否適合承接。</p>
-            </details>
-
-            <div class="faq-category">
-              <span>下單與付款問題</span>
-            </div>
-
-            <details>
-              <summary><span class="faq-icon">📝</span>下單時需要填寫什麼資料？</summary>
-              <p>通常需要填寫服務項目、取件地點、送達地點、任務內容、聯絡資訊與付款方式。資料越清楚，越能降低後續確認時間。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">💰</span>費用怎麼計算？</summary>
-              <p>UBee 會依任務距離、時間、服務內容與實際情況計算費用。若任務內容較特殊，會依照實際需求進行確認。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">💳</span>目前支援哪些付款方式？</summary>
-              <p>目前以現金與街口支付為主要付款方式。實際可用付款方式會依下單頁面與任務內容顯示為準。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🛒</span>幫我買需要先付商品費用嗎？</summary>
-              <p>代買任務通常會涉及商品費用與跑腿服務費。實際付款方式會依任務內容與客服確認流程為準。</p>
-            </details>
-
-            <div class="faq-category">
-              <span>配送與任務限制</span>
-            </div>
-
-            <details>
-              <summary><span class="faq-icon">⚡</span>可以幫忙送文件或急件嗎？</summary>
-              <p>可以。文件、重要物品與急件可選擇「幫我送」，並依任務內容選擇合適的時效方案。實際承接會依距離、時間、內容與當下小U狀況確認。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">📦</span>可以送包裹、商品或店家餐點嗎？</summary>
-              <p>可以。一般物品、店家商品、餐點飲品都可以依任務內容送出需求。若物品尺寸、重量或保存條件特殊，需事先說明。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🚫</span>有哪些東西不能配送？</summary>
-              <p>違法物品、危險物品、來源不明物品、需要特殊執照或不適合一般跑腿承接的任務，UBee 有權拒絕承接。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🌧️</span>下雨天或尖峰時段會影響服務嗎？</summary>
-              <p>會。天候、路況、尖峰時段、距離與當下騎士量都可能影響承接速度與完成時間，實際狀況會依當下任務安排為準。</p>
-            </details>
-
-            <div class="faq-category">
-              <span>店家使用問題</span>
-            </div>
-
-            <details>
-              <summary><span class="faq-icon">🏪</span>店家可以直接使用 UBee 嗎？</summary>
-              <p>可以。店家不必先申請或簽約；有配送、取件、代買或急送需求時，直接使用 UBee 用戶端註冊、登入並建立任務即可。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🤝</span>店家需要簽約或加入派單中心嗎？</summary>
-              <p>不需要。現階段店家統一透過 UBee 客戶端直接下單，店家派單中心暫不對外推廣或開放。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">📉</span>UBee 會向店家抽成或提高商品價格嗎？</summary>
-              <p>UBee 不向店家抽商品平台抽成，也不替店家把商品上架加價。商品依店內實際價格，跑腿與配送費用另外計算。</p>
-            </details>
-
-            <details>
-              <summary><span class="faq-icon">🚚</span>高頻配送需求怎麼處理？</summary>
-              <p>一般需求可直接從用戶端逐筆下單。連鎖店、企業或固定高頻任務，可再聯絡 UBee 客服評估服務範圍、任務量與流程。</p>
-            </details>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="contact">
-        <div class="container">
-          <div class="contact-panel">
-            <div class="contact-card">
-              <div class="kicker">Contact</div>
-              <h2>立即使用 UBee 跑腿</h2>
-              <p>
-                一般使用者與店家都能直接從 UBee 用戶端註冊、登入及下單；帳號、任務或商務配送問題可透過官方客服聯繫。
-              </p>
-
-              <div class="hero-actions">
-                <button class="btn btn-primary js-install-trigger" type="button">
-                  安裝 UBee APP
-                </button>
-                <a class="btn btn-ghost" href="/order.html">
-                  直接開啟 UBee
-                </a>
-              </div>
-
-              <div class="notice">
-                LINE 官方帳號主要負責通知、公告與客服；UBee APP 才是快速估價、下單與查看任務的主要入口。
-              </div>
-            </div>
-
-            <div class="contact-card">
-              <h2>品牌資訊</h2>
-
-              <div class="info-list">
-                <div class="info-row">
-                  <div class="info-label">品牌名稱</div>
-                  <div class="info-value">UBee 跑腿</div>
-                </div>
-
-                <div class="info-row">
-                  <div class="info-label">官方帳號</div>
-                  <div class="info-value">@686rvnvn</div>
-                </div>
-
-                <div class="info-row">
-                  <div class="info-label">服務地區</div>
-                  <div class="info-value">以臺中市為核心，其他服務城市依當地運力逐步開放</div>
-                </div>
-
-                <div class="info-row">
-                  <div class="info-label">客服信箱</div>
-                  <div class="info-value">as25252159@yahoo.com.tw</div>
-                </div>
-
-                <div class="info-row">
-                  <div class="info-label">服務型態</div>
-                  <div class="info-value">幫我送、幫我取、幫我買、幫排隊、全能跑腿</div>
-                </div>
-
-                <div class="info-row">
-                  <div class="info-label">UBee 用戶端</div>
-                  <div class="info-value">https://ubee-line-bot-2-zezw.onrender.com/order.html</div>
-                </div>
-
-                <div class="info-row">
-                  <div class="info-label">加入 UBee 騎士</div>
-                  <div class="info-value">https://ubee-rider-web.vercel.app/rider.html</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    </main>
-
-    <footer class="footer">
-      <div class="footer-inner">
+  <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+    <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 13H6L5 8ZM9 9V6a3 3 0 0 1 6 0v3"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4m-9 4v10"/></symbol>
+    <symbol id="i-pickup" viewBox="0 0 24 24"><path d="M3 12h6l2 3h4l2-3h4v8H3v-8ZM5 7V4h14v3M12 4v8m-3-3 3 3 3-3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><path d="M10 7a3 3 0 0 1 5 2c0 2-3 2-3 5m0 3h.01"/><circle cx="12" cy="12" r="9"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 11 7 5h10l2 6M4 11h16v7H4v-7Zm2 7v2m12-2v2M7 14h2m6 0h2"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 8 4v6c0 5-3.4 8-8 10-4.6-2-8-5-8-10V6l8-4Z"/><path d="m8 12 3 3 5-5"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><path d="M6 7v5c0 4 12-1 12 3v2"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 8H9l-1 4 7 0-1 4H8m4-10v12"/></symbol>
+    <symbol id="i-store" viewBox="0 0 24 24"><path d="M3 10 5 4h14l2 6m-18 0h18v10H3V10Zm0 0c0 3 4 3 5 0 1 3 7 3 8 0 1 3 5 3 5 0"/><path d="M10 20v-6h4v6"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 22s8-8 8-13a8 8 0 1 0-16 0c0 5 8 13 8 13Z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M4 5h16v13H9l-5 4V5Z"/><path d="M8 10h8m-8 4h6"/></symbol>
+  </svg>
+  <a class="skip" href="#main">跳至主要內容</a>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="#top" class="brand" aria-label="UBee 跑腿，返回首頁"><span class="brand-word">UBee<span class="dot">.</span></span><span class="brand-caption">跑腿服務<br>官方網站</span></a>
+      <nav class="nav-links" aria-label="主要導覽">
+        <a href="#services">服務項目</a><a href="#how">使用流程</a><a href="#why">平台特色</a><a href="#install">安裝 APP</a><a href="#partner">商家合作</a><a href="#faq">常見問題</a>
+      </nav>
+      <a class="btn btn-yellow nav-action" href="/order.html">立即下單 <svg class="icon"><use href="#i-arrow"/></svg></a>
+      <button class="menu-toggle" id="menuToggle" type="button" aria-controls="mobileMenu" aria-expanded="false" aria-label="開啟導覽選單"><svg class="icon"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+    <nav class="mobile-menu" id="mobileMenu" aria-label="手機導覽">
+      <a href="#services">六大服務</a><a href="#how">使用流程</a><a href="#why">平台特色</a><a href="#install">安裝 UBee</a><a href="#partner">商家合作</a><a href="#faq">常見問題</a><a class="btn btn-yellow" href="/order.html">立即下單</a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="container hero-inner">
         <div>
-          <div class="footer-brand">UBee 跑腿</div>
-          <div class="footer-small">系統化跑腿服務平台｜生活中的大小事，交給 UBee</div>
+          <div class="hero-kicker"><span class="pulse"></span> UBee · 系統化生活跑腿</div>
+          <h1>生活大小事，<br><span class="accent">交給 UBee</span><br>就對了。</h1>
+          <p class="hero-sub">不管是想買、想取、想送，還是需要有人幫你跑一趟。透過 UBee，從估價、建立任務到查看進度，都可以輕鬆完成。</p>
+          <div class="hero-actions"><a href="/order.html" class="btn btn-yellow">立即開始下單 <svg class="icon"><use href="#i-arrow"/></svg></a><a href="#services" class="btn btn-outline-light">探索服務項目</a><a href="https://ubee-line-bot-2-zezw.onrender.com/install.html" class="btn btn-outline-light">安裝 UBee APP</a></div>
+          <div class="hero-highlights"><span><svg class="icon"><use href="#i-check"/></svg> 免事先註冊</span><span><svg class="icon"><use href="#i-check"/></svg> 線上預估費用</span><span><svg class="icon"><use href="#i-check"/></svg> 訂單進度追蹤</span></div>
         </div>
-
-        <div class="footer-small">
-          © 2026 UBee 跑腿. All rights reserved.
-        </div>
-      </div>
-    </footer>
-
-    <div class="floating-order" aria-label="UBee APP 快速入口">
-      <button class="btn btn-primary js-install-trigger" type="button">安裝 UBee APP</button>
-      <a class="btn btn-dark" href="/order.html">直接開啟</a>
-    </div>
-
-
-    <div class="install-modal" id="installModal" role="dialog" aria-modal="true" aria-labelledby="installModalTitle">
-      <div class="install-modal-card">
-        <div class="install-modal-head">
-          <div>
-            <div class="install-modal-title" id="installModalTitle">安裝 UBee APP</div>
-            <div class="install-status" id="installModalSubtitle">請依照你的手機完成以下步驟。</div>
+        <div class="showcase">
+          <div class="phone" aria-label="UBee 用戶端功能示意畫面">
+            <div class="phone-bar"><span class="phone-logo">UBee<span style="color:#e7b71f">.</span></span><span class="phone-avatar"><svg class="icon" style="width:16px;height:16px"><use href="#i-user"/></svg></span></div>
+            <div class="phone-small">歡迎使用 UBee</div><div class="phone-title">今天需要我們幫你<br>完成什麼事？</div>
+            <div class="phone-grid">
+              <div class="phone-tile"><span class="mini-icon"><svg class="icon"><use href="#i-box"/></svg></span><span>幫我送</span></div>
+              <div class="phone-tile"><span class="mini-icon"><svg class="icon"><use href="#i-pickup"/></svg></span><span>幫我取</span></div>
+              <div class="phone-tile"><span class="mini-icon"><svg class="icon"><use href="#i-bag"/></svg></span><span>幫我買</span></div>
+              <div class="phone-tile"><span class="mini-icon"><svg class="icon"><use href="#i-clock"/></svg></span><span>幫排隊</span></div>
+              <div class="phone-tile"><span class="mini-icon"><svg class="icon"><use href="#i-help"/></svg></span><span>全能跑腿</span></div>
+              <div class="phone-tile"><span class="mini-icon"><svg class="icon"><use href="#i-car"/></svg></span><span>代駕服務</span></div>
+            </div>
+            <div class="phone-track"><span class="label">SERVICE EXPERIENCE</span><div class="top"><strong>下單 · 派單 · 追蹤</strong><span>流程示意</span></div><div class="phone-progress"><span></span></div></div>
+            <div class="phone-note">此處為功能概念示意，非即時訂單畫面</div>
           </div>
-          <button class="install-modal-close" id="installModalClose" type="button" aria-label="關閉">×</button>
+          <div class="float-card"><svg class="icon"><use href="#i-shield"/></svg><div><strong>系統化任務管理</strong><small>每一步，都有紀錄</small></div></div>
         </div>
-
-        <div class="install-steps" id="installSteps"></div>
-
-        <a class="btn btn-dark" href="/order.html" style="width:100%;margin-top:16px;border-radius:18px;">
-          暫時直接開啟 UBee
-        </a>
       </div>
-    </div>
+    </section>
+    <div class="benefit-strip"><div class="container benefits">
+      <div class="benefit"><div class="benefit-icon"><svg class="icon"><use href="#i-phone"/></svg></div><div><strong>隨開隨用</strong><span>不用先完成傳統註冊流程</span></div></div>
+      <div class="benefit"><div class="benefit-icon"><svg class="icon"><use href="#i-route"/></svg></div><div><strong>系統估價</strong><span>依距離與任務條件確認費用</span></div></div>
+      <div class="benefit"><div class="benefit-icon"><svg class="icon"><use href="#i-shield"/></svg></div><div><strong>進度清楚</strong><span>在用戶端掌握任務處理狀態</span></div></div>
+    </div></div>
+    <section class="section services" id="services"><div class="container">
+      <div class="section-heading-flex"><div class="section-heading"><div class="eyebrow yellow">WHAT WE DO / 六大服務</div><h2>你有需求，UBee 有辦法。</h2><p>從日常小事到特殊任務，找到對應的服務，再交給平台確認與安排。</p></div><a class="btn btn-text" href="/order.html">前往用戶端 <svg class="icon"><use href="#i-arrow"/></svg></a></div>
+      <div class="service-grid">
+        <article class="service-card"><div class="service-top"><div class="service-icon"><svg class="icon"><use href="#i-box"/></svg></div><span class="service-num">01 / DELIVERY</span></div><h3>幫我送</h3><p>文件、包裹、個人物品與店家商品，從指定地點送到指定目的地。</p><div class="service-bottom"><span>文件 · 物品 · 店家配送</span><a href="/order.html">開始下單 <svg class="icon"><use href="#i-arrow"/></svg></a></div></article>
+        <article class="service-card"><div class="service-top"><div class="service-icon"><svg class="icon"><use href="#i-pickup"/></svg></div><span class="service-num">02 / PICKUP</span></div><h3>幫我取</h3><p>商品已經準備好、忘記帶東西或需要取回文件？協助前往指定地點取件。</p><div class="service-bottom"><span>指定取件 · 到店領取</span><a href="/order.html">開始下單 <svg class="icon"><use href="#i-arrow"/></svg></a></div></article>
+        <article class="service-card"><div class="service-top"><div class="service-icon"><svg class="icon"><use href="#i-bag"/></svg></div><span class="service-num">03 / SHOPPING</span></div><h3>幫我買</h3><p>想買餐點、飲料或生活用品？由小U協助代買，商品價格依店家實際售價。</p><div class="service-bottom"><span>餐點 · 飲品 · 生活用品</span><a href="/order.html">開始下單 <svg class="icon"><use href="#i-arrow"/></svg></a></div></article>
+        <article class="service-card"><div class="service-top"><div class="service-icon"><svg class="icon"><use href="#i-clock"/></svg></div><span class="service-num">04 / QUEUE</span></div><h3>幫排隊</h3><p>熱門店家、現場等候或領取需求，協助你節省等待時間，依現場規定承接。</p><div class="service-bottom"><span>代排隊 · 現場等候</span><a href="/order.html">開始下單 <svg class="icon"><use href="#i-arrow"/></svg></a></div></article>
+        <article class="service-card"><div class="service-top"><div class="service-icon"><svg class="icon"><use href="#i-help"/></svg></div><span class="service-num">05 / ALL TASKS</span></div><h3>全能跑腿</h3><p>找不到適合的分類？描述你的生活任務，讓 UBee 依服務規範協助確認。</p><div class="service-bottom"><span>彈性任務 · 生活支援</span><a href="/order.html">開始下單 <svg class="icon"><use href="#i-arrow"/></svg></a></div></article>
+        <article class="service-card"><div class="service-top"><div class="service-icon"><svg class="icon"><use href="#i-car"/></svg></div><span class="service-num">06 / DRIVE</span></div><h3>代駕服務</h3><p>有車輛代駕需求時，依服務城市、合格人員與實際開放條件確認是否承接。</p><div class="service-bottom"><span>依營運資格及地區開放</span><a href="/order.html">查看服務 <svg class="icon"><use href="#i-arrow"/></svg></a></div></article>
+      </div><p class="service-footnote">※ 各項服務是否開放、費用、時效與可承接條件，皆以正式用戶端及平台確認結果為準。</p>
+    </div></section>
+    <section class="section how" id="how"><div class="container"><div class="section-heading"><div class="eyebrow yellow">HOW IT WORKS / 使用流程</div><h2>不用先註冊，<br>有需求再開始。</h2><p>新用戶可先選擇服務並填寫任務需求；第一次正式下單時，依流程提供必要資料並建立安全使用身分。</p></div><div class="steps">
+      <div class="step"><span class="step-number">01</span><h3>選擇需要的服務</h3><p>依照你的需求，選擇代買、取件、配送或其他服務。</p></div>
+      <div class="step"><span class="step-number">02</span><h3>填寫地點與內容</h3><p>輸入取送地址、聯絡資訊及必要的任務說明。</p></div>
+      <div class="step"><span class="step-number">03</span><h3>確認估價後下單</h3><p>查看預估費用，完成必要的身分資訊及條款確認後送出。</p></div>
+      <div class="step"><span class="step-number">04</span><h3>查看任務進度</h3><p>在用戶端掌握處理狀態與後續訂單紀錄。</p></div>
+    </div></div></section>
+    <section class="section systems" id="why"><div class="container systems-inner"><div><div class="eyebrow" style="color:#f8cf55">THE UBEE EXPERIENCE / 平台特色</div><h2>不只是找人跑腿，<br>而是有流程的服務。</h2><p>UBee 將估價、建立任務、騎士承接、處理進度與通知整合在同一套服務流程中，減少資訊散落在訊息群組的困擾。</p><div class="systems-checks"><div class="systems-check"><svg class="icon"><use href="#i-check"/></svg> 系統化建立任務</div><div class="systems-check"><svg class="icon"><use href="#i-check"/></svg> 服務費用先預估</div><div class="systems-check"><svg class="icon"><use href="#i-check"/></svg> 訂單狀態可追蹤</div><div class="systems-check"><svg class="icon"><use href="#i-check"/></svg> 通知與歷史紀錄</div></div></div><div class="tracker"><div class="tracker-title"><strong>任務進度追蹤</strong><span>流程示意</span></div><div class="timeline"><div class="timeline-item done"><b>建立任務</b><small>確認服務、地點及費用</small></div><div class="timeline-item done"><b>等待承接 / 派單</b><small>依所在地區及當下運力安排</small></div><div class="timeline-item"><b>任務執行中</b><small>依實際狀態更新進度</small></div><div class="timeline-item"><b>完成任務</b><small>保留任務歷程</small></div></div><div class="tracker-disclaimer">示意畫面，並非實際訂單或即時承接保證。</div></div></div></section>
+    <section class="coin-band"><div class="container coin-grid"><div><div class="eyebrow">UBee REWARDS / U 幣回饋</div><h2>每一趟生活跑腿，<br>都值得累積一點回饋。</h2><p>依活動與平台規則，符合資格的用戶可獲得 U 幣，並於訂單結帳時依折抵上限使用。實際取得與折抵金額，以用戶端顯示為準。</p></div><div class="coin-box"><div class="coin-mark">U</div><div><strong>U 幣累積 × 服務費折抵</strong><span>單筆折抵最高 NT$20，另受服務費 20% 等上限限制；詳情依系統規則。</span></div></div></div></section>
+    <section class="section install" id="install"><div class="container"><div class="section-heading"><div class="eyebrow yellow">UBee ON YOUR PHONE / APP 安裝</div><h2>把 UBee 放進手機，<br>需要時一開就用。</h2><p>不必每次回 LINE 尋找連結。選擇適合你裝置的方式，將 UBee 加入手機主畫面；也可以直接使用網頁版。</p></div><div class="inline-notice" id="lineAlert" role="status">目前可能是 LINE 內建瀏覽器。安裝時請從選單選擇「以外部瀏覽器開啟」，iPhone 建議 Safari、Android 建議 Chrome。</div><div class="install-grid">
+      <article class="install-card ios"><div class="install-card-top"><span class="install-device-icon"><svg class="icon"><use href="#i-phone"/></svg></span><span class="install-device-badge">iPhone / iOS</span></div><h3>iPhone 安裝 UBee</h3><p>iPhone 可透過 UBee 官方 Web Clip 描述檔安裝。請使用 Safari 下載，依「設定」內的描述檔安裝提示完成操作；也可以先閱讀官方安裝教學。</p><div class="ios-install-actions"><a class="btn btn-dark" id="iosInstallBtn" href="https://ubee-line-bot-2-zezw.onrender.com/profiles/UBee-Customer.mobileconfig">下載 iPhone 描述檔 <svg class="icon"><use href="#i-arrow"/></svg></a><a class="btn btn-outline-dark" href="https://ubee-line-bot-2-zezw.onrender.com/install.html">官方安裝教學</a></div></article>
+      <article class="install-card android"><div class="install-card-top"><span class="install-device-icon"><svg class="icon"><use href="#i-phone"/></svg></span><span class="install-device-badge">Android / Chrome</span></div><h3>Android 安裝 UBee</h3><p>透過支援 PWA 安裝的瀏覽器，將 UBee 加入手機主畫面。符合安裝條件時會顯示瀏覽器安裝提示。</p><button type="button" class="btn btn-dark js-install" id="androidInstallBtn">安裝 UBee APP <svg class="icon"><use href="#i-arrow"/></svg></button></article>
+    </div><div class="install-footer"><svg class="icon" style="color:#b48a15"><use href="#i-shield"/></svg><span id="installStatus" role="status" aria-live="polite">不用安裝也可以直接從網頁版使用 UBee。</span><a class="btn btn-outline-dark" href="/order.html">直接開啟 UBee <svg class="icon"><use href="#i-arrow"/></svg></a></div></div></section>
+    <section class="section region" id="area"><div class="container region-inner"><div><div class="eyebrow yellow">SERVICE AREA / 服務範圍</div><h2 class="big-heading">從台中出發，<br>服務更多生活需求。</h2><p style="font-size:15px;color:#696969;line-height:1.95;max-width:520px">UBee 以台中為核心營運，依各地區的小U運力逐步提供服務。下單頁可確認可用城市與任務內容；實際能否承接，須視距離、時間、天候與當下運力。</p><div class="region-tags"><span>台中核心</span><span>分區運力</span><span>即時條件確認</span></div></div><div class="region-panel"><div class="region-row"><span class="region-dot"></span><div><strong>台中市</strong><small>核心服務區域，依行政區及當下運力確認</small></div></div><div class="region-row"><span class="region-dot" style="background:#c5c5c5"></span><div><strong>其他服務城市</strong><small>以用戶端實際可選地區與服務狀態為準</small></div></div><div class="region-row"><span class="region-dot" style="background:#c5c5c5"></span><div><strong>跨區與特殊任務</strong><small>需經平台依任務條件另行確認</small></div></div></div></div></section>
+    <section class="section partner" id="partner"><div class="container"><div class="partner-panel"><div><div class="eyebrow">FOR BUSINESSES / 店家配送</div><h2>店家忙出貨，<br>配送交給 UBee。</h2><p>店家有取件、送貨或臨時配送需求，可以從正式用戶端直接建立任務；固定、高頻需求則可聯繫客服評估。一般店家商品依實際店內售價，跑腿服務費另計。</p></div><div class="partner-actions"><a class="btn btn-dark" href="/order.html">店家直接下單 <svg class="icon"><use href="#i-arrow"/></svg></a><a class="btn btn-white" href="https://lin.ee/pKZCR9r" target="_blank" rel="noopener noreferrer">聯絡 UBee 客服</a></div></div></div></section>
+    <section class="section faq" id="faq"><div class="container"><div class="section-heading"><div class="eyebrow yellow">FAQ / 常見問題</div><h2>開始之前，你可能想知道。</h2><p>使用規則以實際服務頁面、平台條款及正式下單結果為準。</p></div><div class="faq-grid">
+      <details class="faq-item"><summary>第一次使用，需要先註冊會員嗎？</summary><p>不需要先完成傳統註冊。新用戶可先選擇服務與填寫任務，第一次真正送出訂單時，系統會依流程要求姓名、手機等必要資料與條款同意，建立安全使用身分。已有帳號的手機則依原帳號登入流程處理。</p></details>
+      <details class="faq-item"><summary>UBee 如何計算服務費用？</summary><p>依服務類型、任務距離、時間、地點及特殊條件估價。預估與實際應付費用以正式下單頁及確認結果為準；代買商品費與跑腿服務費分開計算。</p></details>
+      <details class="faq-item"><summary>要從 App Store 或 Google Play 下載嗎？</summary><p>不需要到 App Store 或 Google Play 下載。iPhone 可以由 UBee 官方安裝中心下載 Web Clip 描述檔，依 iOS 設定完成安裝；Android 可以使用 Chrome 的 PWA 安裝功能，也可以直接使用網頁版。</p></details>
+      <details class="faq-item"><summary>幫我買的商品，是店內價格嗎？</summary><p>UBee 的代買方式是依店家實際售價購買，不另外替店家把商品上架加價；若有差價、缺貨或替代品，仍須依任務溝通與實際收據確認。跑腿服務費另計。</p></details>
+      <details class="faq-item"><summary>U 幣可以折抵多少？</summary><p>符合規則的 U 幣可以用於符合資格的訂單折抵，單筆最高折抵 NT$20，且不超過服務費 20% 等系統設定上限；實際可用額度以系統顯示為準。</p></details>
+      <details class="faq-item"><summary>哪些服務地區目前可以使用？</summary><p>以台中為核心，其他服務城市依實際開放狀態及在地小U運力提供。實際是否可承接，請以下單頁顯示及平台確認為準，不代表所有縣市或行政區都已有即時運力。</p></details>
+      <details class="faq-item"><summary>哪些任務可能無法承接？</summary><p>違法、危險、來源不明物品，或需要特殊許可、資格及不適合一般跑腿執行的任務，可能被拒絕承接。代駕與特殊任務另須符合當地營運、車輛及人員資格條件。</p></details>
+      <details class="faq-item"><summary>店家需要先簽約才可以下單嗎？</summary><p>一般臨時配送需求可直接使用 UBee 用戶端。若有高頻、多點或企業服務需求，可以透過官方客服討論適合的方式；實際承接仍依平台安排。</p></details>
+    </div></div></section>
+    <section class="last-cta"><div class="container last-cta-inner"><div><h2>需要跑一趟？<br>現在就交給 UBee。</h2><p>免事先註冊，從挑選服務開始。</p></div><div class="last-cta-actions"><a class="btn btn-yellow" href="/order.html">立即下單 <svg class="icon"><use href="#i-arrow"/></svg></a><a class="btn btn-outline-light" href="https://ubee-line-bot-2-zezw.onrender.com/install.html">安裝 UBee APP</a></div></div></section>
+  </main>
+  <footer class="footer"><div class="container"><div class="footer-top"><div><a href="#top" class="brand" aria-label="UBee 官方網站首頁"><span class="brand-word">UBee<span class="dot">.</span></span><span class="brand-caption">跑腿服務<br>官方網站</span></a><p>生活中的大小事，交給 UBee。<br>系統化生活跑腿服務平台。</p></div><div><h4>快速連結</h4><a href="/order.html">UBee 用戶端</a><a href="https://ubee-rider-web.vercel.app/rider.html" target="_blank" rel="noopener noreferrer">加入 UBee Driver</a><a href="https://ubee-line-bot-2-zezw.onrender.com/install.html">安裝說明</a><a href="#faq">常見問題</a></div><div><h4>聯絡 UBee</h4><a href="https://lin.ee/pKZCR9r" target="_blank" rel="noopener noreferrer">LINE 官方客服</a><div class="footer-text">LINE ID：@686rvnvn</div><a href="mailto:as25252159@yahoo.com.tw">as25252159@yahoo.com.tw</a><div class="footer-text">台中為核心營運區域</div></div></div><div class="copyright">© 2026 UBee 跑腿 · Official Website V2 · 本頁服務與功能說明以平台實際開放狀態為準。</div></div></footer>
+  <div class="mobile-actions" aria-label="快速使用 UBee"><a class="btn btn-yellow" href="/order.html">立即下單 <svg class="icon"><use href="#i-arrow"/></svg></a><a class="btn btn-dark" href="https://ubee-line-bot-2-zezw.onrender.com/install.html">安裝 APP</a></div>
+  <div class="modal" id="installModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true"><div class="modal-box" tabindex="-1"><div class="modal-head"><h2 id="modalTitle">安裝 UBee 到手機</h2><button type="button" class="modal-close" id="modalClose" aria-label="關閉安裝教學">×</button></div><p class="modal-sub" id="modalSubtitle">請依照裝置顯示的方式完成安裝。</p><div id="modalSteps" class="modal-steps"></div><div class="modal-note" id="modalNote"></div><a class="btn btn-dark" href="/order.html">直接使用網頁版</a></div></div>
+  <script>
+  (() => {
+    'use strict';
+    // ===== 正式站部署設定 =====
+    // iPhone Web Clip 路徑已依先前提供的 UBee 官方網址接入。
+    // 正式部署前仍須以 iPhone Safari 實測網址回應、描述檔內容及安裝提示。
+    const OFFICIAL_IOS_WEBCLIP_PROFILE_URL = 'https://ubee-line-bot-2-zezw.onrender.com/profiles/UBee-Customer.mobileconfig';
+    const CUSTOMER_APP_URL = '/order.html';
+    const EXISTING_CUSTOMER_SW_URL = '/ubee-customer-sw.js';
 
-  </div>
+    const $ = id => document.getElementById(id);
+    const menuToggle = $('menuToggle');
+    const mobileMenu = $('mobileMenu');
+    const status = $('installStatus');
+    const modal = $('installModal');
+    const modalBox = modal.querySelector('.modal-box');
+    let previousFocus = null;
+    let deferredInstallPrompt = null;
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const android = /Android/i.test(ua);
+    const line = /\bLine\//i.test(ua) || /LIFF/i.test(ua);
+    const standalone = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 
-  <script data-ubee-install-page="official">
-    (() => {
-      'use strict';
+    function validProfileURL(raw) {
+      if (!raw) return null;
+      try {
+        const url = new URL(raw, window.location.href);
+        // 正式描述檔必須走 HTTPS；避免外站不明描述檔與 http 連結。
+        return url.protocol === 'https:' && /\.mobileconfig(?:$|[?#])/i.test(url.href) ? url.href : null;
+      } catch (_) { return null; }
+    }
+    const profileURL = validProfileURL(OFFICIAL_IOS_WEBCLIP_PROFILE_URL);
 
-      const CUSTOMER_APP_URL = '/order.html';
-      const CUSTOMER_SW_URL = '/ubee-customer-sw.js';
+    function closeMenu() {
+      mobileMenu.classList.remove('open');
+      menuToggle.setAttribute('aria-expanded', 'false');
+      menuToggle.setAttribute('aria-label', '開啟導覽選單');
+    }
+    menuToggle.addEventListener('click', () => {
+      const opening = !mobileMenu.classList.contains('open');
+      mobileMenu.classList.toggle('open', opening);
+      menuToggle.setAttribute('aria-expanded', String(opening));
+      menuToggle.setAttribute('aria-label', opening ? '關閉導覽選單' : '開啟導覽選單');
+    });
+    mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
 
-      const installButtons = Array.from(
-        document.querySelectorAll('.js-install-trigger')
-      );
-
-      const guideButtons = Array.from(
-        document.querySelectorAll('.js-install-guide')
-      );
-
-      const installStatus = document.getElementById('installStatus');
-      const lineBrowserAlert = document.getElementById('lineBrowserAlert');
-      const modal = document.getElementById('installModal');
-      const modalClose = document.getElementById('installModalClose');
-      const modalTitle = document.getElementById('installModalTitle');
-      const modalSubtitle = document.getElementById('installModalSubtitle');
-      const installSteps = document.getElementById('installSteps');
-
-      let deferredInstallPrompt = null;
-
-      const ua = navigator.userAgent || '';
-      const isIOS = /iPad|iPhone|iPod/i.test(ua);
-      const isAndroid = /Android/i.test(ua);
-      const isLineBrowser = /\bLine\//i.test(ua) || /LIFF/i.test(ua);
-      const isStandalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.navigator.standalone === true;
-
-      const setStatus = text => {
-        if (installStatus) installStatus.textContent = text;
-      };
-
-      const setInstallButtonText = text => {
-        installButtons.forEach(button => {
-          button.textContent = text;
-        });
-      };
-
-      const makeStep = (number, title, text) => {
-        const item = document.createElement('div');
-        item.className = 'install-step';
-
-        const num = document.createElement('div');
-        num.className = 'install-step-num';
-        num.textContent = String(number);
-
-        const body = document.createElement('div');
-        const strong = document.createElement('strong');
-        const span = document.createElement('span');
-
-        strong.textContent = title;
-        span.textContent = text;
-
-        body.append(strong, span);
-        item.append(num, body);
-
-        return item;
-      };
-
-      const showGuide = mode => {
-        if (!modal || !installSteps) return;
-
-        installSteps.replaceChildren();
-
-        if (mode === 'line') {
-          modalTitle.textContent = '先用手機瀏覽器開啟';
-          modalSubtitle.textContent = 'LINE 內建瀏覽器通常不會顯示完整的 PWA 安裝功能。';
-
-          installSteps.append(
-            makeStep(1, '打開 LINE 的頁面選單', '點右上角的「⋯」或瀏覽器選單。'),
-            makeStep(2, '改用外部瀏覽器', isIOS
-              ? '選擇以 Safari 開啟。'
-              : '選擇以 Chrome 或預設瀏覽器開啟。'),
-            makeStep(3, '回到本頁安裝', isIOS
-              ? '在 Safari 點分享，再選擇「加入主畫面」。'
-              : '再次點「安裝 UBee APP」，依提示完成安裝。')
-          );
-        } else if (mode === 'ios') {
-          modalTitle.textContent = 'iPhone 安裝方式';
-          modalSubtitle.textContent = '請使用 Safari 將 UBee 加入主畫面。';
-
-          installSteps.append(
-            makeStep(1, '使用 Safari 開啟本頁', '若你在 LINE、Facebook 或其他 App 內，請先改用 Safari 開啟。'),
-            makeStep(2, '點擊 Safari 分享按鈕', '在瀏覽器工具列找到方框向上箭頭的分享按鈕。'),
-            makeStep(3, '選擇「加入主畫面」', '確認名稱為「UBee」後，點右上角「加入」。')
-          );
-        } else if (mode === 'android') {
-          modalTitle.textContent = 'Android 安裝方式';
-          modalSubtitle.textContent = '請使用 Chrome 或支援安裝 PWA 的瀏覽器。';
-
-          installSteps.append(
-            makeStep(1, '使用 Chrome 開啟本頁', '若你在 LINE 內，請先選擇以外部瀏覽器開啟。'),
-            makeStep(2, '點擊「安裝 UBee APP」', '瀏覽器符合安裝條件時，會顯示正式安裝視窗。'),
-            makeStep(3, '完成安裝', '安裝完成後，手機桌面會出現 UBee 圖示。')
-          );
-        } else {
-          modalTitle.textContent = '安裝 UBee APP';
-          modalSubtitle.textContent = '你的瀏覽器目前沒有顯示自動安裝視窗。';
-
-          installSteps.append(
-            makeStep(1, '打開瀏覽器選單', '在 Chrome、Edge 或 Safari 中開啟本頁。'),
-            makeStep(2, '尋找安裝選項', '選擇「安裝應用程式」、「加到主畫面」或類似選項。'),
-            makeStep(3, '完成安裝', '之後可從桌面或應用程式列表直接開啟 UBee。')
-          );
-        }
-
-        modal.classList.add('show');
-        document.body.style.overflow = 'hidden';
-      };
-
-      const hideGuide = () => {
-        if (!modal) return;
-        modal.classList.remove('show');
-        document.body.style.overflow = '';
-      };
-
-      const handleInstall = async () => {
-        if (isStandalone) {
-          window.location.href = CUSTOMER_APP_URL;
-          return;
-        }
-
-        if (isLineBrowser) {
-          showGuide('line');
-          return;
-        }
-
-        if (deferredInstallPrompt) {
-          const promptEvent = deferredInstallPrompt;
-          deferredInstallPrompt = null;
-
-          try {
-            await promptEvent.prompt();
-            const choice = await promptEvent.userChoice;
-
-            if (choice && choice.outcome === 'accepted') {
-              setStatus('已接受安裝，完成後即可從手機桌面開啟 UBee。');
-            } else {
-              setStatus('你尚未完成安裝，之後仍可再次安裝 UBee APP。');
-            }
-          } catch (error) {
-            console.error('UBee PWA 安裝提示失敗：', error);
-            showGuide(isIOS ? 'ios' : (isAndroid ? 'android' : 'other'));
-          }
-
-          return;
-        }
-
-        showGuide(isIOS ? 'ios' : (isAndroid ? 'android' : 'other'));
-      };
-
-      installButtons.forEach(button => {
-        button.addEventListener('click', handleInstall);
-      });
-
-      guideButtons.forEach(button => {
-        button.addEventListener('click', () => {
-          showGuide(
-            isLineBrowser
-              ? 'line'
-              : (isIOS ? 'ios' : (isAndroid ? 'android' : 'other'))
-          );
-        });
-      });
-
-      if (modalClose) {
-        modalClose.addEventListener('click', hideGuide);
+    const makeStep = (num,title,copy) => {
+      const outer=document.createElement('div'); outer.className='modal-step';
+      const n=document.createElement('div'); n.className='modal-step-number'; n.textContent=String(num);
+      const box=document.createElement('div'); const b=document.createElement('strong');b.textContent=title;
+      const s=document.createElement('span');s.textContent=copy;box.append(b,s);outer.append(n,box);return outer;
+    };
+    function showGuide(type) {
+      previousFocus=document.activeElement;
+      const titles={line:'先改用手機瀏覽器開啟',ios:'iPhone 安裝 UBee',android:'Android 安裝 UBee',other:'將 UBee 加入主畫面'};
+      $('modalTitle').textContent=titles[type] || titles.other;
+      $('modalSubtitle').textContent = type === 'line' ? 'LINE 內建瀏覽器可能無法直接安裝，請依照下列步驟。' : '下列操作會依手機及瀏覽器版本略有差異。';
+      const steps=$('modalSteps');steps.replaceChildren();
+      const list=type === 'line' ? [
+        ['打開 LINE 頁面選單','點選右上角「⋯」或外部瀏覽器開啟功能。'],
+        ['改用瀏覽器',ios?'以 Safari 開啟本頁。':'以 Chrome 或預設瀏覽器開啟本頁。'],
+        ['返回安裝區',ios?'選擇 iPhone 安裝說明，依可用方式完成安裝。':'選擇 Android 安裝按鈕，依提示完成安裝。']
+      ] : type === 'ios' ? [
+        ['從 Safari 開啟','請使用 Safari 開啟 UBee 官方網頁，不要直接從 LINE 內建瀏覽器安裝。'],
+        ['下載描述檔',profileURL?'回到 iPhone 區塊，按「下載 iPhone 描述檔」並依 Safari 提示下載。':'請改至官方安裝中心查看最新下載方式。'],
+        ['至設定完成安裝','在 iPhone 的「設定」開啟「已下載描述檔」，檢查名稱及來源後依提示完成安裝。'],
+        ['替代方式：加入主畫面','若未使用描述檔，可從 Safari 分享選單選擇「加入主畫面」。']
+      ] : type === 'android' ? [
+        ['使用 Chrome 開啟本頁','避免 LINE 等內建瀏覽器，建議改用 Chrome。'],
+        ['開啟瀏覽器選單','選擇「安裝應用程式」或「新增至主畫面」。'],
+        ['從桌面開啟 UBee','安裝完成後，可在手機主畫面直接使用。']
+      ] : [
+        ['使用支援的瀏覽器','請使用 Safari、Chrome 或 Edge 開啟。'],
+        ['開啟瀏覽器選單','尋找「安裝」或「加入主畫面」選項。'],
+        ['也可直接使用網頁版','安裝不是下單的必要條件。']
+      ];
+      list.forEach(([title,body],index)=>steps.append(makeStep(index+1,title,body)));
+      $('modalNote').textContent = type === 'ios' ? '安全提醒：請只使用 UBee 已確認的正式描述檔連結，勿安裝來源不明的設定描述檔。' : '若瀏覽器未顯示安裝功能，仍可直接使用下方網頁版入口。';
+      modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.classList.add('dialog-open');$('modalClose').focus();
+    }
+    function closeGuide() {modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.classList.remove('dialog-open');previousFocus?.focus?.();}
+    $('modalClose').addEventListener('click',closeGuide);
+    modal.addEventListener('click',event=>{if(event.target===modal)closeGuide();});
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&modal.classList.contains('open'))closeGuide();
+      if(event.key==='Escape')closeMenu();
+      if(event.key==='Tab'&&modal.classList.contains('open')){
+        const all=[...modal.querySelectorAll('button,a[href],input,select,[tabindex]:not([tabindex="-1"])')].filter(x=>!x.disabled);
+        const first=all[0],last=all[all.length-1];
+        if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+        else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
       }
+    });
 
-      if (modal) {
-        modal.addEventListener('click', event => {
-          if (event.target === modal) hideGuide();
-        });
-      }
+    function updateStatus(copy) {if(status)status.textContent=copy;}
+    function launchOfficialProfile() {
+      if(line) return showGuide('line');
+      if(profileURL && ios) {
+        // 只有使用者主動點擊，才啟動官方 HTTPS 描述檔 URL。
+        window.location.assign(profileURL);
+      } else showGuide(ios?'ios':'other');
+    }
+    // 下載錨點保留真實 href；LINE 內建瀏覽器與非 iOS 裝置改為顯示指引。
+    $('iosInstallBtn').addEventListener('click', event => {
+      if (line || !ios) {event.preventDefault();showGuide(line?'line':'ios');}
+    });
+    async function installPWA() {
+      if(standalone()) {window.location.assign(CUSTOMER_APP_URL);return;}
+      if(line){showGuide('line');return;}
+      if(ios){launchOfficialProfile();return;}
+      if(deferredInstallPrompt){
+        const current=deferredInstallPrompt;deferredInstallPrompt=null;
+        try{await current.prompt();const choice=await current.userChoice;
+          updateStatus(choice?.outcome==='accepted'?'已接受安裝，完成後即可從桌面開啟 UBee。':'尚未完成安裝，也可以直接使用網頁版。');
+        }catch(_){showGuide(android?'android':'other');}
+      } else showGuide(android?'android':'other');
+    }
+    document.querySelectorAll('.js-install').forEach(el=>el.addEventListener('click',installPWA));
+    window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateStatus('你的瀏覽器已準備好，可透過 Android 安裝按鈕安裝 UBee。');});
+    window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateStatus('UBee 已完成安裝，可以從主畫面開啟。');});
+    if(line){$('lineAlert').classList.add('is-visible');updateStatus('安裝前請先改用 Safari 或 Chrome 等外部瀏覽器。');}
+    else if(standalone()) updateStatus('UBee 已在獨立視窗中開啟；可以直接開始下單。');
+    else if(ios) updateStatus(profileURL?'可選擇 iPhone 正式描述檔安裝，或直接使用網頁版。':'iPhone 可查看安裝指引，或直接使用網頁版。');
+    else if(android) updateStatus('Android 請使用 Chrome；若安裝視窗尚未出現，可依教學手動加入主畫面。');
 
-      document.addEventListener('keydown', event => {
-        if (event.key === 'Escape') hideGuide();
+    // 沿用舊版網站既有 SW 路徑與 scope；未修改 SW 檔案本身或正式訂單快取規則。
+    if('serviceWorker' in navigator && location.protocol==='https:') {
+      window.addEventListener('load',async()=>{
+        try{const reg=await navigator.serviceWorker.register(EXISTING_CUSTOMER_SW_URL,{scope:'/',updateViaCache:'none'});await reg.update().catch(()=>{});}
+        catch(err){console.warn('UBee：正式用戶端 Service Worker 註冊未成功',err);}
       });
-
-      window.addEventListener('beforeinstallprompt', event => {
-        event.preventDefault();
-        deferredInstallPrompt = event;
-
-        setInstallButtonText('安裝 UBee APP 到手機');
-        setStatus('你的裝置已準備好，可以直接安裝 UBee APP。');
-      });
-
-      window.addEventListener('appinstalled', () => {
-        deferredInstallPrompt = null;
-        setInstallButtonText('開啟 UBee APP');
-        setStatus('UBee APP 已安裝完成。');
-      });
-
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', async () => {
-          try {
-            const registration = await navigator.serviceWorker.register(
-              CUSTOMER_SW_URL,
-              {
-                scope: '/',
-                updateViaCache: 'none'
-              }
-            );
-
-            await registration.update().catch(() => {});
-          } catch (error) {
-            console.error('UBee Service Worker 註冊失敗：', error);
-          }
-        });
-      }
-
-      if (isStandalone) {
-        setInstallButtonText('開啟 UBee APP');
-        setStatus('你已經安裝 UBee APP，點擊按鈕即可直接開啟。');
-      } else if (isLineBrowser) {
-        lineBrowserAlert?.classList.add('show');
-        setInstallButtonText('查看如何安裝 UBee APP');
-        setStatus('請先從 LINE 改用 Safari 或 Chrome 開啟本頁。');
-      } else if (isIOS) {
-        setInstallButtonText('查看 iPhone 安裝方式');
-        setStatus('iPhone 請使用 Safari 的「加入主畫面」功能。');
-      } else if (isAndroid) {
-        setStatus('Android 建議使用 Chrome；安裝功能準備完成後會自動啟用。');
-      } else {
-        setStatus('你也可以先直接開啟網頁版，或使用瀏覽器選單安裝。');
-      }
-    })();
+    }
+  })();
   </script>
-
 </body>
 </html>
