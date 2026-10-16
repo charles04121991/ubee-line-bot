@@ -21505,25 +21505,23 @@ app.get('/api/dispatch/orders/:orderId/events', async (req, res) => {
 // - 其他裝置      -> 既有 install.html 作為備援
 // 只有裝置導向，不新增資料庫、授權、訂單或財務處理。
 // ============================================================
+// UBee Smart App Download V1.1 | LINE rich-menu safe landing
+// iOS: display a visible download button rather than redirecting to a profile.
+// Android: keep the existing install center. No business APIs are changed.
+// ============================================================
 app.get('/download-app', (req, res) => {
-  // 裝置判斷依 User-Agent，禁止共享快取沿用其他裝置的 302。
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.vary('User-Agent'); // 與既有 CORS Vary: Origin 並存。
-
-  const userAgent = String(req.get('user-agent') || '');
-  const isIOS = /\b(iPhone|iPad|iPod)\b/i.test(userAgent) ||
-    (/\bMacintosh\b/i.test(userAgent) && /\bMobile\//i.test(userAgent));
-  const isAndroid = /\bAndroid\b/i.test(userAgent);
-
-  if (isIOS) {
-    return res.redirect(302, '/profiles/UBee-Customer.mobileconfig');
-  }
-  if (isAndroid) {
-    return res.redirect(302, '/install.html?platform=android');
-  }
-  return res.redirect(302, '/install.html');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.vary('User-Agent');
+  const ua = String(req.get('user-agent') || '');
+  const isIOS = /\b(iPhone|iPad|iPod)\b/i.test(ua) ||
+    (/\bMacintosh\b/i.test(ua) && /\bMobile\//i.test(ua));
+  if (!isIOS) return res.redirect(302, /\bAndroid\b/i.test(ua) ? '/install.html?platform=android' : '/install.html');
+  return res.status(200).type('html').send(`<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#ffdf00"><title>下載 UBee 跑腿</title>
+<style>body{margin:0;background:#fff;color:#151515;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}main{max-width:430px;margin:0 auto;padding:48px 24px;text-align:center}.logo{background:#ffdf00;color:#111;font-size:48px;font-weight:900;letter-spacing:-2px;border-radius:22px;padding:35px 12px}h1{font-size:25px;margin:32px 0 10px}p{font-size:16px;line-height:1.7;color:#555}.button{display:block;background:#111;color:white;text-decoration:none;padding:17px 14px;border-radius:13px;font-size:18px;font-weight:700;margin:30px 0 18px}.help{font-size:14px;color:#666}.fallback{color:#333}</style></head><body><main><div class="logo">UBee</div><h1>安裝 UBee 跑腿</h1><p>點選下方按鈕下載 iPhone 描述檔，完成後至「設定」確認安裝。</p><a class="button" href="/profiles/UBee-Customer.mobileconfig">下載 UBee App</a><p class="help">下載後：設定 → 已下載描述檔 → 安裝</p><p class="help">若沒有出現下載提示，請改用 Safari 開啟此頁，或前往 <a class="fallback" href="/install.html">安裝說明</a>。</p></main></body></html>`);
 });
 
 app.get('/order.html', (req, res) => {
