@@ -29431,6 +29431,40 @@ body:not(.flow-active) .app select,
   #productionOrderFlow #flowPageProfile #ubeeMyServicesGroup .ubee-my-menu-copy strong,
   #productionOrderFlow #flowPageProfile #ubeeMyServicesGroup .ubee-my-ucoin-copy strong {font-size:11.5px!important;}
 }
+<style>
+
+/* UBee My Premium Native V1 — visual-only candidate; existing elements and events preserved. */
+#productionOrderFlow .ubee-my-page{--ubee-my-bg:#f6f7f8!important;}
+#productionOrderFlow .ubee-my-scroll{padding-left:16px!important;padding-right:16px!important;}
+#productionOrderFlow .ubee-my-top-actions{margin-bottom:10px!important;}
+#productionOrderFlow .ubee-my-root-title{font-size:25px!important;letter-spacing:-.6px!important;}
+#productionOrderFlow .ubee-my-account{background:#fff!important;border:1px solid #eceef0!important;border-radius:22px!important;padding:17px 14px!important;margin:0 0 12px!important;box-shadow:0 4px 16px rgba(0,0,0,.035)!important;}
+#productionOrderFlow .ubee-my-avatar{background:#ffdf37!important;border-radius:50%!important;}
+#productionOrderFlow .ubee-my-member-card{border-radius:22px!important;border:1px solid #f1dc96!important;background:linear-gradient(125deg,#fff5cc,#fffdf3)!important;box-shadow:0 5px 18px rgba(152,113,10,.07)!important;padding:18px!important;margin-bottom:14px!important;}
+#productionOrderFlow .ubee-my-groups{display:flex!important;flex-direction:column!important;gap:13px!important;}
+#productionOrderFlow .ubee-my-group{margin:0!important;min-width:0!important;}
+#productionOrderFlow .ubee-my-group h3{font-size:15px!important;font-weight:800!important;letter-spacing:.1px!important;margin:0 0 9px 4px!important;}
+#productionOrderFlow .ubee-my-menu{border:1px solid #eceef0!important;border-radius:20px!important;overflow:hidden!important;background:#fff!important;box-shadow:0 4px 16px rgba(0,0,0,.025)!important;}
+#productionOrderFlow .ubee-my-menu-item{min-height:60px!important;padding:13px 15px!important;}
+#productionOrderFlow .ubee-my-menu-icon{background:#f4f5f7!important;border-radius:12px!important;}
+#productionOrderFlow .ubee-my-menu-item:active,#productionOrderFlow .ubee-my-ucoin-card:active{background:#fff9e6!important;}
+/* Four shortcuts: retain original button IDs, data actions and UCoin balance binding. */
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;padding:13px 6px!important;align-items:stretch!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu > button{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;gap:7px!important;min-width:0!important;min-height:93px!important;padding:5px 1px!important;border:0!important;background:transparent!important;box-shadow:none!important;text-align:center!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu > button .ubee-my-menu-icon,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-ucoin-mark{display:flex!important;align-items:center!important;justify-content:center!important;width:48px!important;height:48px!important;flex:0 0 48px!important;border-radius:15px!important;background:#fff0b6!important;color:#222!important;font-size:20px!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu > button:nth-child(2) .ubee-my-menu-icon{background:#e7efff!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu > button:nth-child(3) .ubee-my-menu-icon{background:#e6f4e9!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu > button:nth-child(4) .ubee-my-menu-icon{background:#f2eafa!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu-copy,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-ucoin-copy{display:block!important;width:100%!important;min-width:0!important;text-align:center!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu-copy strong,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-ucoin-copy strong{display:block!important;font-size:12px!important;line-height:1.3!important;white-space:normal!important;word-break:keep-all!important;}
+#productionOrderFlow #ubeeMyServicesGroup .ubee-my-ucoin-copy small,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-ucoin-balance,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu-chevron,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-member-chevron,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu-arrow{display:none!important;}
+/* Installation stays prominent, using the original URL and click handler. */
+#productionOrderFlow #ubeeMyAppDownloadGroup .ubee-my-menu{border-color:#f0e1aa!important;background:#fffdf6!important;}
+#productionOrderFlow #ubeeMyAppDownloadGroup .ubee-my-menu-icon{background:#ffdf37!important;}
+#productionOrderFlow .ubee-my-menu-item:focus-visible,#productionOrderFlow .ubee-my-ucoin-card:focus-visible,#productionOrderFlow .ubee-my-member-card:focus-visible{outline:3px solid #d8a800!important;outline-offset:2px!important;}
+@media(max-width:350px){#productionOrderFlow .ubee-my-scroll{padding-left:11px!important;padding-right:11px!important;}#productionOrderFlow #ubeeMyServicesGroup .ubee-my-menu-copy strong,#productionOrderFlow #ubeeMyServicesGroup .ubee-my-ucoin-copy strong{font-size:11px!important;}}
+@media(prefers-reduced-motion:reduce){#productionOrderFlow .ubee-my-page *{transition:none!important;animation:none!important;}}
+</style>
 </style>
 
 </body>
