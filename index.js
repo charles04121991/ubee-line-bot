@@ -1,10 +1,11 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-08
-// Release: 2026_1008_RIDER_PRODUCTION_RELIABILITY_RC1_V5_20_4 + CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
+// UBee Backend｜Latest Release 2026-10-16
+// Release: 2026_1016_RIDER_PRODUCTION_HARDENING_V5_20_5 + CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
 // - Customer No-Register V4：移除舊傳統註冊端點，新增首單安全 Order Session；既有手機不會被重複建立帳號。
 // - UCoin Hard Cap V2：單筆折抵 NT$20 硬上限由後端 preview 與正式交易雙重強制。
 //
 // 本次整理：
+// - V5.20.5 Production Hardening：以 V5.20.4 為穩定母版，補強 Rider mutation 冪等回復、弱網狀態對帳與 PWA 安全切版；既有業務流程與資料契約維持不變。
 // - V5.20.4 Production Reliability RC1：補齊 Rider CORS PATCH/PUT、上線狀態與最新 GPS 同批寫入、正式營運錯誤韌性與前端互動可靠性契約。
 // - V5.18：新增 authenticated 小U公開基本資料與服務表現 API；公開資料可編輯，接單率讀 riderDispatchStats，準時率只採有明確預約／指定時間且有可信任狀態時間的任務。
 // - V5.17：保留 authenticated /api/rider/credential-summary，供正式騎士端車輛／文件／保險管理頁安全讀取審核摘要。
@@ -42207,6 +42208,7 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         : crypto.randomBytes(16).toString('hex');
 
     let acceptedOrder = null;
+    let acceptIdempotentRecovery = false;
 
     await db.runTransaction(async (transaction) => {
       const orderDoc = await transaction.get(orderRef);
@@ -42231,6 +42233,34 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         String(
           order.reservedRiderDocId || ''
         ).trim() === identity.riderDocId;
+
+      // Production Hardening V5.20.5：
+      // 如果前一次接單 transaction 已成功，但手機因 timeout 沒收到 response，
+      // 同一小U再次送到 accept-order 時直接回復 canonical 訂單，不重複統計／通知。
+      if(
+        orderStatus === 'accepted' &&
+        isOrderBelongsToRider(order, identity) &&
+        String(order.stackRole || '').trim().toUpperCase() !== 'QUEUED' &&
+        (
+          !String(latestRider.currentOrderId || '').trim() ||
+          String(latestRider.currentOrderId || '').trim().toUpperCase() === safeOrderId
+        )
+      ){
+        acceptedOrder = {
+          ...order,
+          id:safeOrderId,
+          status:'accepted',
+          riderStatus:String(order.riderStatus || 'accepted'),
+        };
+        acceptIdempotentRecovery = true;
+        transaction.set(riderRef, {
+          busy:true,
+          currentOrderId:safeOrderId,
+          lastActive:Date.now(),
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge:true });
+        return;
+      }
 
       const latestDispatch = getRiderDispatchEligibilityState(latestRider);
       if (!latestDispatch.qualificationEligible) {
@@ -42443,6 +42473,18 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
     clearDispatchPushTimers(
       safeOrderId
     );
+
+    if(acceptIdempotentRecovery){
+      return res.json({
+        success:true,
+        idempotent:true,
+        recovered:true,
+        orderId:safeOrderId,
+        status:'accepted',
+        order:acceptedOrder,
+        message:'已確認此任務先前已由你接單。',
+      });
+    }
 
     const acceptedNowMs = Date.now();
     Promise.allSettled([
@@ -43385,6 +43427,8 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
 
     let updatedOrder = null;
+    let statusMutationApplied = false;
+    let statusIdempotentRecovery = false;
     let multiStopAdvanced = false;
     let completedStopNumber = 0;
     let nextStopNumber = 0;
@@ -43430,6 +43474,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           id: safeOrderId,
           status,
         };
+        statusIdempotentRecovery = true;
         return;
       }
 
@@ -43439,6 +43484,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           id: safeOrderId,
           status: 'completed',
         };
+        statusIdempotentRecovery = true;
         return;
       }
 
@@ -43637,6 +43683,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           ...nextEtaPayload,
         };
 
+        statusMutationApplied = true;
         transaction.update(orderRef, updateData);
         transaction.set(riderRef, {
           busy: true,
@@ -43901,6 +43948,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         updateData.stackNextOrderId = queuedPromotionId;
       }
 
+      statusMutationApplied = true;
       transaction.update(orderRef, updateData);
 
       if (status === 'completed') {
@@ -44036,6 +44084,25 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     ).trim();
 
     orders[safeOrderId] = updatedOrder;
+
+    if(statusIdempotentRecovery && !statusMutationApplied){
+      return res.json({
+        success:true,
+        idempotent:true,
+        recovered:true,
+        orderId:safeOrderId,
+        status:effectiveStatus,
+        statusLabel:getStatusLabel(effectiveStatus),
+        order:updatedOrder,
+        multiStopAdvanced:false,
+        completedStopNumber:0,
+        nextStopNumber:0,
+        promotedOrderId:'',
+        promotedOrder:null,
+        smartStackPromoted:false,
+        message:'已確認任務目前就是此狀態。',
+      });
+    }
     if (promotedOrderId && promotedOrder) {
       orders[promotedOrderId] = promotedOrder;
       Promise.allSettled([
