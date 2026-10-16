@@ -15,16 +15,17 @@
 'use strict';
 
 const UBEE_CUSTOMER_SW_VERSION = '20261008-customer-production-reliability-hotfix-v1';
+const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
-const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
+const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}-${UBEE_CUSTOMER_ICON_REV}`;
 const PAGE_CACHE = `${CACHE_PREFIX}page-${UBEE_CUSTOMER_SW_VERSION}`;
 
 const APP_SHELL = [
   '/order.html',
   '/manifest-order.json',
-  '/ubee-customer-icon-192.png',
-  '/ubee-customer-icon-512.png'
+  `/ubee-customer-icon-192.png?v=${UBEE_CUSTOMER_ICON_REV}`,
+  `/ubee-customer-icon-512.png?v=${UBEE_CUSTOMER_ICON_REV}`
 ];
 
 const UBEE_CUSTOMER_STATIC_PATHS = new Set([
@@ -309,8 +310,8 @@ self.addEventListener('push', event => {
 
   const options = {
     body: data.body || 'UBee 跑腿有新的任務進度通知。',
-    icon: data.icon || '/ubee-customer-icon-192.png',
-    badge: data.badge || '/ubee-customer-icon-192.png',
+    icon: data.icon || `/ubee-customer-icon-192.png?v=${UBEE_CUSTOMER_ICON_REV}`,
+    badge: data.badge || `/ubee-customer-icon-192.png?v=${UBEE_CUSTOMER_ICON_REV}`,
     tag: data.tag || (
       orderId
         ? `ubee-customer-order-${orderId}`
