@@ -21498,16 +21498,12 @@ app.get('/api/dispatch/orders/:orderId/events', async (req, res) => {
 });
 
 // ============================================================
-// UBee Smart App Download V1 | LINE OA 單一下載入口
-// 路由：GET /download-app?openExternalBrowser=1
-// - iOS / iPadOS -> 正式 UBee Customer V3.1 描述檔
-// - Android      -> 既有 install.html PWA 安裝中心
-// - 其他裝置      -> 既有 install.html 作為備援
-// 只有裝置導向，不新增資料庫、授權、訂單或財務處理。
-// ============================================================
-// UBee Smart App Download V1.1 | LINE rich-menu safe landing
-// iOS: display a visible download button rather than redirecting to a profile.
-// Android: keep the existing install center. No business APIs are changed.
+// UBee Smart App Download V1.2 | LINE Rich Menu profile download fallback
+// This change is limited to the /download-app route.
+// iOS: show an instruction page. The primary link requests an external
+//      browser via LINE's openExternalBrowser=1 query parameter.
+//      On external entry, ?download=1 redirects to the existing profile.
+// Android/other: preserve existing installation-center routing.
 // ============================================================
 app.get('/download-app', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -21515,13 +21511,53 @@ app.get('/download-app', (req, res) => {
   res.setHeader('Expires', '0');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.vary('User-Agent');
+
   const ua = String(req.get('user-agent') || '');
   const isIOS = /\b(iPhone|iPad|iPod)\b/i.test(ua) ||
     (/\bMacintosh\b/i.test(ua) && /\bMobile\//i.test(ua));
-  if (!isIOS) return res.redirect(302, /\bAndroid\b/i.test(ua) ? '/install.html?platform=android' : '/install.html');
+  const isAndroid = /\bAndroid\b/i.test(ua);
+
+  if (isAndroid) return res.redirect(302, '/install.html?platform=android');
+  if (!isIOS) return res.redirect(302, '/install.html');
+
+  // After LINE explicitly opens the external browser, return the actual
+  // existing profile response through a same-origin redirect.
+  // Do not change the V3.1 profile, its MIME headers, or other services.
+  if (req.query.download === '1') {
+    return res.redirect(302, '/profiles/UBee-Customer.mobileconfig');
+  }
+
   return res.status(200).type('html').send(`<!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#ffdf00"><title>下載 UBee 跑腿</title>
-<style>body{margin:0;background:#fff;color:#151515;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}main{max-width:430px;margin:0 auto;padding:48px 24px;text-align:center}.logo{background:#ffdf00;color:#111;font-size:48px;font-weight:900;letter-spacing:-2px;border-radius:22px;padding:35px 12px}h1{font-size:25px;margin:32px 0 10px}p{font-size:16px;line-height:1.7;color:#555}.button{display:block;background:#111;color:white;text-decoration:none;padding:17px 14px;border-radius:13px;font-size:18px;font-weight:700;margin:30px 0 18px}.help{font-size:14px;color:#666}.fallback{color:#333}</style></head><body><main><div class="logo">UBee</div><h1>安裝 UBee 跑腿</h1><p>點選下方按鈕下載 iPhone 描述檔，完成後至「設定」確認安裝。</p><a class="button" href="/profiles/UBee-Customer.mobileconfig">下載 UBee App</a><p class="help">下載後：設定 → 已下載描述檔 → 安裝</p><p class="help">若沒有出現下載提示，請改用 Safari 開啟此頁，或前往 <a class="fallback" href="/install.html">安裝說明</a>。</p></main></body></html>`);
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffdf00">
+<title>安裝 UBee 跑腿</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#fff;color:#141414;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}
+main{max-width:460px;margin:0 auto;padding:40px 24px 64px;text-align:center}.brand{background:#ffdf00;border-radius:22px;font-size:46px;font-weight:900;padding:30px 12px;letter-spacing:-1px}
+h1{margin:28px 0 10px;font-size:25px}p{font-size:15px;line-height:1.75;color:#555}a{overflow-wrap:anywhere}.cta{display:block;background:#151515;color:white;text-decoration:none;padding:16px 12px;border-radius:13px;font-size:17px;font-weight:700;margin:23px 0 12px}
+.secondary{display:block;border:1px solid #777;color:#151515;text-decoration:none;padding:13px 12px;border-radius:12px;font-size:15px;font-weight:650;margin:12px 0 23px}
+.instructions{text-align:left;background:#f5f5f5;padding:17px 20px;border-radius:12px;font-size:14px;line-height:1.8}.instructions ol{margin:8px 0 0;padding-left:24px}
+.note{font-size:13px;color:#666}.help{font-size:14px}
+</style>
+</head>
+<body><main>
+<div class="brand">UBee</div>
+<h1>安裝 UBee 跑腿</h1>
+<p>你目前可能正在 LINE 內建瀏覽器。部分版本的 LINE 無法下載 iPhone 設定描述檔。</p>
+<a class="cta" href="/download-app?download=1&amp;openExternalBrowser=1">使用外部瀏覽器下載 UBee App</a>
+<p class="note">此按鈕會嘗試請 LINE 開啟手機的預設瀏覽器，再進入 iPhone 描述檔下載流程。</p>
+<a class="secondary" href="/profiles/UBee-Customer.mobileconfig">已在 Safari？直接下載描述檔</a>
+<div class="instructions"><strong>如果按下去仍沒有「允許下載」：</strong>
+<ol><li>使用 LINE 瀏覽器右下角的瀏覽器圖示或選單，選擇在 Safari 開啟。</li>
+<li>在 Safari 中點選上方「已在 Safari？直接下載描述檔」。</li>
+<li>iPhone 顯示下載提示後，按「允許」。</li>
+<li>打開「設定」→「已下載描述檔」，核對內容並完成安裝。</li></ol></div>
+<p class="help">如仍無法操作，可開啟 <a href="/install.html">原 UBee 安裝中心</a> 查看說明。</p>
+<p class="note">描述檔必須由你自行核對並授權安裝。這不是 App Store 原生 App 安裝。</p>
+</main></body></html>`);
 });
 
 app.get('/order.html', (req, res) => {
