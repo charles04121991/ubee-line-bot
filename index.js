@@ -21497,6 +21497,35 @@ app.get('/api/dispatch/orders/:orderId/events', async (req, res) => {
   }
 });
 
+// ============================================================
+// UBee Smart App Download V1 | LINE OA 單一下載入口
+// 路由：GET /download-app?openExternalBrowser=1
+// - iOS / iPadOS -> 正式 UBee Customer V3.1 描述檔
+// - Android      -> 既有 install.html PWA 安裝中心
+// - 其他裝置      -> 既有 install.html 作為備援
+// 只有裝置導向，不新增資料庫、授權、訂單或財務處理。
+// ============================================================
+app.get('/download-app', (req, res) => {
+  // 裝置判斷依 User-Agent，禁止共享快取沿用其他裝置的 302。
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.vary('User-Agent'); // 與既有 CORS Vary: Origin 並存。
+
+  const userAgent = String(req.get('user-agent') || '');
+  const isIOS = /\b(iPhone|iPad|iPod)\b/i.test(userAgent) ||
+    (/\bMacintosh\b/i.test(userAgent) && /\bMobile\//i.test(userAgent));
+  const isAndroid = /\bAndroid\b/i.test(userAgent);
+
+  if (isIOS) {
+    return res.redirect(302, '/profiles/UBee-Customer.mobileconfig');
+  }
+  if (isAndroid) {
+    return res.redirect(302, '/install.html?platform=android');
+  }
+  return res.redirect(302, '/install.html');
+});
+
 app.get('/order.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
