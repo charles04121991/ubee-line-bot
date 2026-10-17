@@ -1,11 +1,11 @@
 // ============================================================
-// UBee Backend｜Latest Release 2026-10-16
-// Release: 2026_1016_RIDER_PRODUCTION_HARDENING_V5_20_5 + CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
-// - Customer No-Register V4：移除舊傳統註冊端點，新增首單安全 Order Session；既有手機不會被重複建立帳號。
+// UBee Backend｜會員安全增量 2026-10-17（以 2026-10-08 後端正式基準為底）
+// Release: 20261017_CUSTOMER_MEMBER_SECURITY_V1 + 2026_1008_RIDER_PRODUCTION_RELIABILITY_RC1_V5_20_4 + CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
+// - Member Security V1：保留 No-Register V4 首單身分；可選主動會員註冊、已登入密碼設定／變更、LINE Bot 安全綁定；不使用 SMS／OTP，不宣稱手機已驗證。
+// - Customer No-Register V4：首單安全 Order Session；既有手機不會被重複建立帳號。
 // - UCoin Hard Cap V2：單筆折抵 NT$20 硬上限由後端 preview 與正式交易雙重強制。
 //
 // 本次整理：
-// - V5.20.5 Production Hardening：以 V5.20.4 為穩定母版，補強 Rider mutation 冪等回復、弱網狀態對帳與 PWA 安全切版；既有業務流程與資料契約維持不變。
 // - V5.20.4 Production Reliability RC1：補齊 Rider CORS PATCH/PUT、上線狀態與最新 GPS 同批寫入、正式營運錯誤韌性與前端互動可靠性契約。
 // - V5.18：新增 authenticated 小U公開基本資料與服務表現 API；公開資料可編輯，接單率讀 riderDispatchStats，準時率只採有明確預約／指定時間且有可信任狀態時間的任務。
 // - V5.17：保留 authenticated /api/rider/credential-summary，供正式騎士端車輛／文件／保險管理頁安全讀取審核摘要。
@@ -4462,7 +4462,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // =====================================================
 // UBee Customer Account System｜正式會員驗證＋Identity V1
-// - 註冊：手機號碼＋密碼（現階段不發送簡訊驗證碼）
+// - 可選主動註冊（姓名、手機、密碼），保留首單免註冊；不接入簡訊或聲稱門號已驗證
 // - 密碼：Node.js crypto.scrypt 雜湊
 // - Session：HttpOnly / SameSite=Lax Cookie，伺服器端 Firestore 驗證
 // - 客戶身分只接受 Session，禁止前端自行宣告 userId / customerId
@@ -4485,6 +4485,8 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
   sessions: 'customerSessions',
   passwordResetTokens: 'customerPasswordResetTokens',
   passwordResetBotSessions: 'customerPasswordResetBotSessions',
+  recoveryLinkChallenges: 'customerRecoveryLinkChallenges',
+  recoveryLineIndex: 'customerRecoveryLineIndex',
   counters: 'systemCounters',
 });
 
@@ -4756,6 +4758,8 @@ function customerAccountResponse(account, customerId) {
     growthReferralCode: String(source.growthReferralCode || ''),
     status: String(source.status || 'active'),
     passwordConfigured: Boolean(source.passwordHash?.hash),
+    loginEnabled: Boolean(source.passwordHash?.hash), // 相容既有前端顯示邏輯
+    recoveryLineLinked: Boolean(source.recoveryLineUserId && source.recoveryLineTrustLevel === 'trusted'),
     authMode: String(source.authMode || (source.passwordHash?.hash ? 'password' : 'order_session')),
     preferences: source.preferences || {},
     createdAtMs: Number(source.createdAtMs || 0),
@@ -5780,12 +5784,15 @@ function sendCustomerAuthError(res, error) {
 // - 同一手機若已存在帳號，絕不覆寫、絕不重建；回傳既有身分登入／密碼設定流程。
 // - 建立 account / phone index / member counter / growth / session 於同一 Firestore transaction，避免半套帳號。
 // =====================================================
-app.post('/api/customer-auth/order-session', async (req, res) => {
+async function createCustomerOnboarding(req, res, { withPassword = false } = {}) {
   res.setHeader('Cache-Control', 'no-store');
 
   try {
     // 若瀏覽器本來就有有效 Session，直接沿用，不重複建立身分。
     const existingAuth = await loadCustomerAuth(req).catch(() => null);
+    if (existingAuth && withPassword) {
+      throw customerAuthError('目前已登入 UBee，請至帳號與安全管理密碼，勿重複註冊。', 409, 'CUSTOMER_ALREADY_SIGNED_IN');
+    }
     if (existingAuth) {
       return res.json({
         success: true,
@@ -5827,6 +5834,9 @@ app.post('/api/customer-auth/order-session', async (req, res) => {
           : '這支手機已有 UBee 使用身分，請使用既有帳號登入。',
       });
     }
+
+    // 在通過手機格式、同意條款及既有帳號檢查後才執行 scrypt，避免無效註冊浪費 CPU。
+    const passwordHash = withPassword ? await hashCustomerPassword(req.body?.password, phone) : null;
 
     const incomingReferral = referralCode ? await resolveGrowthReferralCode(referralCode) : null;
     if (referralCode && !incomingReferral) {
@@ -5897,10 +5907,10 @@ app.post('/api/customer-auth/order-session', async (req, res) => {
         referredByType: incomingReferral ? String(incomingReferral.ownerType || '') : '',
         referredById: incomingReferral ? String(incomingReferral.ownerId || '') : '',
         growthReferralCode,
-        passwordHash: null,
+        passwordHash,
         passwordVersion: 1,
-        passwordConfigured: false,
-        authMode: 'order_session',
+        passwordConfigured: withPassword,
+        authMode: withPassword ? 'password' : 'order_session',
         status: 'active',
         failedLoginCount: 0,
         lockedUntilMs: 0,
@@ -5919,8 +5929,8 @@ app.post('/api/customer-auth/order-session', async (req, res) => {
           agreedAtClient: cleanText(agreements.agreedAtClient || '', 50),
           agreedAtMs: nowMs,
         },
-        source: 'customer-order-session',
-        schemaVersion: 'customer-account-v3-order-session',
+        source: withPassword ? 'customer-registration' : 'customer-order-session',
+        schemaVersion: withPassword ? 'customer-account-v4-register' : 'customer-account-v3-order-session',
         createdAtMs: nowMs,
         updatedAtMs: nowMs,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -6001,7 +6011,6 @@ app.post('/api/customer-auth/order-session', async (req, res) => {
       customer: customerAccountResponse(accountDoc.data() || {}, customerId),
     });
   } catch (error) {
-    console.error('❌ UBee 首單安全使用身分建立失敗：', error);
     if (error?.code === 'CUSTOMER_EXISTING_LOGIN_REQUIRED') {
       return res.status(409).json({
         success: false,
@@ -6011,8 +6020,63 @@ app.post('/api/customer-auth/order-session', async (req, res) => {
         message: error.message || '這支手機已建立 UBee 使用身分，請改用登入。',
       });
     }
+    if (Number(error?.statusCode || 500) >= 500) console.error('❌ UBee 會員身分建立失敗：', error);
     return sendCustomerAuthError(res, error);
   }
+}
+
+app.post('/api/customer-auth/order-session', (req, res) => createCustomerOnboarding(req, res));
+app.post('/api/customer-auth/register', (req, res) => createCustomerOnboarding(req, res, { withPassword:true }));
+
+// 密碼新增與變更由後端認證 Session，密碼更新後輪替 Session，其他裝置失效。
+app.post('/api/customer-auth/password/update', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const auth = req.customerAuth;
+    const nextPassword = String(req.body?.password || '');
+    const currentPassword = String(req.body?.currentPassword || '');
+    const hash = await hashCustomerPassword(nextPassword, auth.account.phone || '');
+    const oldHash = auth.account.passwordHash;
+    if (oldHash?.hash && !(await verifyCustomerPassword(currentPassword, oldHash))) {
+      throw customerAuthError('目前密碼不正確。', 401, 'CUSTOMER_CURRENT_PASSWORD_INVALID');
+    }
+    if (oldHash?.hash && await verifyCustomerPassword(nextPassword, oldHash)) {
+      throw customerAuthError('新密碼不能與目前密碼相同。', 400, 'CUSTOMER_PASSWORD_REUSE');
+    }
+    const rawToken = customerAuthRandomToken(32);
+    const newSessionRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(customerAuthHash(rawToken));
+    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(auth.customerId);
+    const nowMs = Date.now();
+    let nextVersion;
+    await db.runTransaction(async tx => {
+      const [accountDoc, oldSession] = await Promise.all([tx.get(accountRef), tx.get(auth.sessionRef)]);
+      const account = accountDoc.data() || {};
+      if (!accountDoc.exists || String(account.status || 'active') !== 'active' || !oldSession.exists || oldSession.data()?.revoked === true ||
+          Number(oldSession.data()?.expiresAtMs || 0) <= nowMs ||
+          Number(account.passwordVersion || 1) !== Number(auth.session.passwordVersion || 1)) {
+        throw customerAuthError('登入狀態已變更，請重新登入再試。', 401, 'CUSTOMER_LOGIN_REQUIRED');
+      }
+      if (Boolean(account.passwordHash?.hash) !== Boolean(oldHash?.hash) ||
+          (oldHash?.hash && account.passwordHash.hash !== oldHash.hash)) {
+        throw customerAuthError('密碼已於其他操作中變更，請重新登入。', 409, 'CUSTOMER_PASSWORD_CHANGED');
+      }
+      nextVersion = Number(account.passwordVersion || 1) + 1;
+      tx.set(accountRef, {
+        passwordHash:hash, passwordConfigured:true, authMode:'password', passwordVersion:nextVersion,
+        failedLoginCount:0, lockedUntilMs:0, passwordUpdatedAtMs:nowMs, updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+      tx.set(newSessionRef, {
+        customerId:auth.customerId, passwordVersion:nextVersion, createdAtMs:nowMs,
+        lastSeenAtMs:nowMs, expiresAtMs:nowMs + CUSTOMER_AUTH.sessionTtlMs, revoked:false,
+        ...customerAuthClientFingerprint(req), createdAt:admin.firestore.FieldValue.serverTimestamp()
+      });
+      tx.set(auth.sessionRef, {revoked:true, revokedAtMs:nowMs}, {merge:true});
+    });
+    setCustomerSessionCookie(req, res, rawToken);
+    const latest = await accountRef.get();
+    return res.json({success:true, passwordConfigured:true, customer:customerAccountResponse(latest.data() || {}, auth.customerId)});
+  } catch (error) { return sendCustomerAuthError(res, error); }
 });
 
 app.post('/api/customer-auth/login', async (req, res) => {
@@ -6089,6 +6153,73 @@ app.post('/api/customer-auth/login', async (req, res) => {
     return sendCustomerAuthError(res, error);
   }
 });
+
+// 無簡訊會員復原：已登入的裝置產生一次性 LINE 綁定指令（10 分鐘）。
+// 只有真正從 LINE Bot 收到正確指令才會建立 trusted LINE 復原關係。
+app.post('/api/customer-auth/recovery-line/start', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const raw = customerAuthRandomToken(24);
+    const challengeHash = customerAuthHash(raw);
+    const challengeRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLinkChallenges).doc(challengeHash);
+    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    const nowMs = Date.now();
+    await db.runTransaction(async tx => {
+      const doc = await tx.get(accountRef);
+      if (!doc.exists || String(doc.data()?.status || 'active') !== 'active') {
+        throw customerAuthError('會員帳號不可使用。', 403, 'CUSTOMER_ACCOUNT_UNAVAILABLE');
+      }
+      tx.set(accountRef, {recoveryLinkChallengeHash:challengeHash, updatedAtMs:nowMs}, {merge:true});
+      tx.set(challengeRef, {customerId, expiresAtMs:nowMs+600000, used:false, createdAtMs:nowMs,
+        createdAt:admin.firestore.FieldValue.serverTimestamp()});
+    });
+    return res.json({success:true, command:`綁定會員 ${raw}`, expiresAtMs:nowMs+600000});
+  } catch (error) { return sendCustomerAuthError(res, error); }
+});
+
+async function handleCustomerRecoveryLineLink(event, lineUserId, text) {
+  const match = String(text || '').trim().match(/^綁定會員\s+([A-Za-z0-9_-]{32})$/);
+  if (!match) return null;
+  const safeLineId = customerPasswordResetLineUserId(lineUserId);
+  if (!safeLineId || event.source?.type !== 'user') return replyText(event.replyToken, '請在 UBee LINE 官方帳號的一對一對話完成綁定。');
+  const challengeHash = customerAuthHash(match[1]);
+  const challengeRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLinkChallenges).doc(challengeHash);
+  const lineIndexRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLineIndex).doc(customerAuthHash(safeLineId));
+  const nowMs = Date.now();
+  try {
+    await db.runTransaction(async tx => {
+      const [challengeDoc, indexDoc] = await Promise.all([tx.get(challengeRef), tx.get(lineIndexRef)]);
+      const challenge = challengeDoc.data() || {};
+      const customerId = String(challenge.customerId || '');
+      if (!challengeDoc.exists || challenge.used === true || Number(challenge.expiresAtMs || 0) <= nowMs || !/^customer_[a-f0-9]{32}$/.test(customerId)) {
+        throw customerAuthError('綁定指令已過期或無效。', 410, 'CUSTOMER_RECOVERY_LINK_EXPIRED');
+      }
+      const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+      const accountDoc = await tx.get(accountRef);
+      const account = accountDoc.data() || {};
+      if (!accountDoc.exists || String(account.status || 'active') !== 'active' || account.recoveryLinkChallengeHash !== challengeHash) {
+        throw customerAuthError('帳號狀態已變更，請重新取得指令。', 409, 'CUSTOMER_RECOVERY_LINK_INVALID');
+      }
+      if (indexDoc.exists && indexDoc.data()?.customerId !== customerId) {
+        throw customerAuthError('此 LINE 帳號已綁定其他 UBee 會員，請聯繫客服核對。', 409, 'CUSTOMER_RECOVERY_LINE_IN_USE');
+      }
+      // 避免先前已綁定同一顧客的舊索引殘留；只允許本人有 Session 時啟動綁定。
+      const oldLine = customerPasswordResetLineUserId(account.recoveryLineUserId);
+      if (oldLine && oldLine !== safeLineId) {
+        tx.delete(db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLineIndex).doc(customerAuthHash(oldLine)));
+      }
+      tx.set(accountRef, {recoveryLineUserId:safeLineId, recoveryLineTrustedAtMs:nowMs,
+        recoveryLineTrustLevel:'trusted', recoveryLinkChallengeHash:'', updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()}, {merge:true});
+      tx.set(lineIndexRef, {customerId, lineUserIdHash:customerAuthHash(safeLineId), updatedAtMs:nowMs}, {merge:true});
+      tx.set(challengeRef, {used:true, usedAtMs:nowMs}, {merge:true});
+    });
+    return replyText(event.replyToken, '✅ UBee 會員的 LINE 帳號復原方式已綁定完成。未來忘記密碼，可在此輸入「忘記密碼 09xxxxxxxx」核對。');
+  } catch (error) {
+    return replyText(event.replyToken, error?.message || '目前無法完成綁定，請稍後重試。');
+  }
+}
 
 // =====================================================
 // UBee Customer Password Reset V1｜公開一次性連結 API
@@ -42208,7 +42339,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         : crypto.randomBytes(16).toString('hex');
 
     let acceptedOrder = null;
-    let acceptIdempotentRecovery = false;
 
     await db.runTransaction(async (transaction) => {
       const orderDoc = await transaction.get(orderRef);
@@ -42233,34 +42363,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         String(
           order.reservedRiderDocId || ''
         ).trim() === identity.riderDocId;
-
-      // Production Hardening V5.20.5：
-      // 如果前一次接單 transaction 已成功，但手機因 timeout 沒收到 response，
-      // 同一小U再次送到 accept-order 時直接回復 canonical 訂單，不重複統計／通知。
-      if(
-        orderStatus === 'accepted' &&
-        isOrderBelongsToRider(order, identity) &&
-        String(order.stackRole || '').trim().toUpperCase() !== 'QUEUED' &&
-        (
-          !String(latestRider.currentOrderId || '').trim() ||
-          String(latestRider.currentOrderId || '').trim().toUpperCase() === safeOrderId
-        )
-      ){
-        acceptedOrder = {
-          ...order,
-          id:safeOrderId,
-          status:'accepted',
-          riderStatus:String(order.riderStatus || 'accepted'),
-        };
-        acceptIdempotentRecovery = true;
-        transaction.set(riderRef, {
-          busy:true,
-          currentOrderId:safeOrderId,
-          lastActive:Date.now(),
-          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge:true });
-        return;
-      }
 
       const latestDispatch = getRiderDispatchEligibilityState(latestRider);
       if (!latestDispatch.qualificationEligible) {
@@ -42473,18 +42575,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
     clearDispatchPushTimers(
       safeOrderId
     );
-
-    if(acceptIdempotentRecovery){
-      return res.json({
-        success:true,
-        idempotent:true,
-        recovered:true,
-        orderId:safeOrderId,
-        status:'accepted',
-        order:acceptedOrder,
-        message:'已確認此任務先前已由你接單。',
-      });
-    }
 
     const acceptedNowMs = Date.now();
     Promise.allSettled([
@@ -43427,8 +43517,6 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
 
     let updatedOrder = null;
-    let statusMutationApplied = false;
-    let statusIdempotentRecovery = false;
     let multiStopAdvanced = false;
     let completedStopNumber = 0;
     let nextStopNumber = 0;
@@ -43474,7 +43562,6 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           id: safeOrderId,
           status,
         };
-        statusIdempotentRecovery = true;
         return;
       }
 
@@ -43484,7 +43571,6 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           id: safeOrderId,
           status: 'completed',
         };
-        statusIdempotentRecovery = true;
         return;
       }
 
@@ -43683,7 +43769,6 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           ...nextEtaPayload,
         };
 
-        statusMutationApplied = true;
         transaction.update(orderRef, updateData);
         transaction.set(riderRef, {
           busy: true,
@@ -43948,7 +44033,6 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         updateData.stackNextOrderId = queuedPromotionId;
       }
 
-      statusMutationApplied = true;
       transaction.update(orderRef, updateData);
 
       if (status === 'completed') {
@@ -44084,25 +44168,6 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     ).trim();
 
     orders[safeOrderId] = updatedOrder;
-
-    if(statusIdempotentRecovery && !statusMutationApplied){
-      return res.json({
-        success:true,
-        idempotent:true,
-        recovered:true,
-        orderId:safeOrderId,
-        status:effectiveStatus,
-        statusLabel:getStatusLabel(effectiveStatus),
-        order:updatedOrder,
-        multiStopAdvanced:false,
-        completedStopNumber:0,
-        nextStopNumber:0,
-        promotedOrderId:'',
-        promotedOrder:null,
-        smartStackPromoted:false,
-        message:'已確認任務目前就是此狀態。',
-      });
-    }
     if (promotedOrderId && promotedOrder) {
       orders[promotedOrderId] = promotedOrder;
       Promise.allSettled([
@@ -45806,7 +45871,7 @@ async function handleTextMessage(event) {
   console.log('請把這個 userId 複製到 Firebase riders 的 lineUserId 欄位:', userId);
   console.log('groupId:', event.source.groupId || '-');
   console.log('roomId:', event.source.roomId || '-');
-  console.log('text:', text);
+  console.log('text:', /^綁定會員\s/.test(String(text||'')) ? '[UBee 安全綁定指令已遮蔽]' : text);
 
   if (/^強制取消\s+UB\d+/i.test(text)) {
     const orderId = text.replace(/^強制取消\s+/i, '').trim().toUpperCase();
@@ -45819,6 +45884,9 @@ async function handleTextMessage(event) {
   }
 
   if (event.source.type === 'group') return null;
+
+  const recoveryLinkResult = await handleCustomerRecoveryLineLink(event, userId, text);
+  if (recoveryLinkResult !== null) return recoveryLinkResult;
 
   // UBee Password Reset V3：優先處理 LINE Bot 自動密碼重設狀態，
   // 避免使用者輸入歷史 UB 任務編號時被一般訂單查詢流程攔截。
