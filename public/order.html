@@ -4,7 +4,8 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261016-customer-native-my-v2
+  PWA: 20261017-customer-member-security-v1
+  Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
   0. Native Clean UI V1：移除主要下單流程、首頁、我的與通知設定中重複的灰色小字說明；功能標籤、即時狀態、價格、錯誤、安全與法律必要資訊保留。
@@ -28,7 +29,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261016-customer-native-my-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20261017-customer-member-security-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -7316,11 +7317,23 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 <div class="uca-error" id="ucaLoginPasswordError"></div>
 </div>
 <div class="uca-status" id="ucaLoginStatus"></div>
-<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaLoginSubmit" type="submit">登入 UBee</button><button class="uca-btn uca-btn-secondary" id="ucaContinueOrder" type="button">直接回到下單</button></div>
+<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaLoginSubmit" type="submit">登入 UBee</button><button class="uca-btn uca-btn-secondary" data-uca-go="register" type="button">建立新會員</button><button class="uca-btn uca-btn-secondary" id="ucaContinueOrder" type="button">直接回到下單</button></div>
 <div class="uca-security">新客第一次真正送出任務時，系統只會要求下單人姓名與手機，不需要先建立密碼或完成傳統註冊流程。</div>
 </form>
 </div>
 </section>
+<section class="uca-view" data-uca-view="register">
+<header class="uca-topbar"><button aria-label="返回登入" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="關閉" class="uca-icon-btn" data-uca-home="" type="button">×</button></header>
+<div class="uca-scroll"><div class="uca-heading"><div class="uca-kicker">MEMBER REGISTRATION</div><h2>建立 UBee 會員</h2><p class="uca-subtitle">可先註冊再下單，也可返回首頁免註冊估價。無簡訊驗證；填寫手機不代表已完成門號持有人驗證。</p></div>
+<form class="uca-panel" id="ucaRegisterForm" novalidate>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterName">本人姓名</label><input class="uca-input" id="ucaRegisterName" autocomplete="name" maxlength="40" placeholder="請填寫本人姓名" required></div>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterPhone">聯絡手機號碼</label><input class="uca-input" id="ucaRegisterPhone" inputmode="numeric" type="tel" maxlength="10" autocomplete="tel" placeholder="09xxxxxxxx" required></div>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterPassword">設定登入密碼</label><input class="uca-input" id="ucaRegisterPassword" type="password" maxlength="72" minlength="8" autocomplete="new-password" placeholder="8～72 字元，包含英文字母與數字" required></div>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterPasswordConfirm">再次輸入密碼</label><input class="uca-input" id="ucaRegisterPasswordConfirm" type="password" maxlength="72" autocomplete="new-password" required></div>
+<div class="uca-field"><label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.6"><input style="width:20px;flex:none;min-height:20px;margin-top:3px" type="checkbox" id="ucaRegisterAgree" required><span>我已閱讀並同意 UBee 服務條款、隱私權政策、計價規範與禁止委託事項；也瞭解手機尚未經門號驗證。</span></label></div>
+<div class="uca-status" id="ucaRegisterStatus" role="status" aria-live="polite"></div>
+<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaRegisterSubmit" type="submit">建立會員</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">已有會員，返回登入</button><button class="uca-btn uca-btn-secondary" data-uca-home="" type="button">不註冊，繼續下單</button></div>
+</form></div></section>
 <section class="uca-view" data-uca-view="forgot">
 <header class="uca-topbar"><button aria-label="返回" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="關閉" class="uca-icon-btn" data-uca-home="" type="button">×</button></header>
 <div class="uca-scroll"><div class="uca-heading"><div class="uca-kicker">PASSWORD RESET V3</div><h2>自動重設登入密碼</h2><p class="uca-subtitle">既有會員或首單自動建立身分後需要跨裝置登入時，可透過 UBee LINE Bot 完成身分核對與密碼設定。</p></div>
@@ -7354,17 +7367,38 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
   async function api(url,options={}){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);try{const response=await fetch(url,{...options,credentials:'include',cache:'no-store',headers:{Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})},signal:controller.signal});const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false){const error=new Error(data.message||data.error||`系統暫時無法處理（${response.status}）`);error.code=data.code||'';error.status=response.status;throw error}return data}catch(error){if(error.name==='AbortError')throw new Error('連線逾時，請檢查網路後再試。');throw error}finally{clearTimeout(timer)}}
   function showView(name,{push=true}={}){if(push&&state.view&&state.view!==name)state.history.push(state.view);state.view=name;views.forEach(view=>view.classList.toggle('active',view.dataset.ucaView===name));root.querySelectorAll('.uca-scroll').forEach(el=>el.scrollTop=0);setTimeout(()=>{if(name==='login')$('ucaLoginPhone')?.focus();if(name==='reset')$('ucaResetPassword')?.focus()},80)}
   function hide(){root.classList.remove('active');root.setAttribute('aria-hidden','true');document.body.classList.remove('ubee-customer-auth-open')}
-  function show(mode='login',options={}){root.classList.add('active');root.setAttribute('aria-hidden','false');document.body.classList.add('ubee-customer-auth-open');if(state.resetToken){state.history=[];showView('reset',{push:false});return}const targetView=mode==='forgot'?'forgot':'login';state.history=[];showView(targetView,{push:false});if(options?.phone){$('ucaLoginPhone').value=normalizePhone(options.phone);$('ucaForgotPhone').value=normalizePhone(options.phone);updateForgotSupportState()}if(options?.message)setStatus(targetView==='forgot'?'ucaForgotStatus':'ucaLoginStatus',String(options.message),'info')}
-  function goBack(){if(state.view==='forgot'){showView('login',{push:false});return}hide()}
+  function show(mode='login',options={}){root.classList.add('active');root.setAttribute('aria-hidden','false');document.body.classList.add('ubee-customer-auth-open');if(state.resetToken){state.history=[];showView('reset',{push:false});return}const targetView=['forgot','register'].includes(mode)?mode:'login';state.history=[];showView(targetView,{push:false});if(options?.phone){$('ucaLoginPhone').value=normalizePhone(options.phone);$('ucaForgotPhone').value=normalizePhone(options.phone);updateForgotSupportState()}if(options?.message)setStatus(targetView==='forgot'?'ucaForgotStatus':'ucaLoginStatus',String(options.message),'info')}
+  function goBack(){if(['forgot','register'].includes(state.view)){showView('login',{push:false});return}hide()}
   function resetPasswordState(){const value=$('ucaResetPassword')?.value||'';const rules={length:value.length>=8&&value.length<=72,letter:/[A-Za-z]/.test(value),number:/\d/.test(value)};root.querySelectorAll('#ucaResetPasswordRules [data-rule]').forEach(el=>el.classList.toggle('ok',Boolean(rules[el.dataset.rule])));return Object.values(rules).every(Boolean)}
   async function validatePasswordResetToken(){if(!state.resetToken)return false;show('reset');$('ucaResetSubmit').disabled=true;setStatus('ucaResetStatus');loading(true,'正在驗證重設連結');try{const data=await api('/api/customer-auth/password-reset/validate',{method:'POST',body:JSON.stringify({token:state.resetToken})});state.resetExpiresAtMs=Number(data.expiresAtMs||0);const expiresText=state.resetExpiresAtMs?new Date(state.resetExpiresAtMs).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false}):'15 分鐘內';$('ucaResetLinkInfo').textContent=`已驗證 ${data.maskedPhone||'你的 UBee 帳號'}。此連結將於 ${expiresText} 失效，且只能使用一次。`;$('ucaResetSubmit').disabled=false;return true}catch(error){$('ucaResetLinkInfo').textContent='這個重設連結目前無法使用。';setStatus('ucaResetStatus',error.message,'error');return false}finally{loading(false)}}
   async function submitPasswordReset(){if(!state.resetToken)return;const password=$('ucaResetPassword').value,confirm=$('ucaResetPasswordConfirm').value;setError('ucaResetPasswordError');setError('ucaResetPasswordConfirmError');setStatus('ucaResetStatus');if(!resetPasswordState()){setError('ucaResetPasswordError','密碼需至少 8 個字元，並包含英文字母與數字。');return}if(password!==confirm){setError('ucaResetPasswordConfirmError','兩次輸入的新密碼不一致。');return}$('ucaResetSubmit').disabled=true;loading(true,'正在重設密碼');try{const data=await api('/api/customer-auth/password-reset/complete',{method:'POST',body:JSON.stringify({token:state.resetToken,password})});state.resetToken='';state.resetExpiresAtMs=0;window.UBeeCustomerPasswordResetActive=false;try{history.replaceState(null,'',location.pathname)}catch(_){}$('ucaResetPassword').value='';$('ucaResetPasswordConfirm').value='';$('ucaLoginPassword').value='';showView('login',{push:false});setStatus('ucaLoginStatus',data.message||'密碼設定完成，請使用新密碼登入。','success')}catch(error){setStatus('ucaResetStatus',error.message,'error');$('ucaResetSubmit').disabled=false}finally{loading(false)}}
   async function finish(customer,target='order'){state.customer=customer||null;loading(true,'登入成功，正在開啟 UBee');try{if(typeof window.onUBeeCustomerAuthenticated==='function'){const ready=await window.onUBeeCustomerAuthenticated(state.customer,target);if(ready===false)throw new Error('會員資料已驗證，但用戶端尚未完成載入。')}else{window.location.replace('/order.html');return}hide()}catch(error){console.error('UBee 會員登入後初始化失敗：',error);show('login');setStatus('ucaLoginStatus','登入已完成，但用戶端載入失敗，請再試一次。','error')}finally{loading(false)}}
   async function submitLogin(event){event.preventDefault();const phone=normalizePhone($('ucaLoginPhone').value),password=$('ucaLoginPassword').value;$('ucaLoginPhone').value=phone;setError('ucaLoginPhoneError');setError('ucaLoginPasswordError');setStatus('ucaLoginStatus');let ok=true;if(!validPhone(phone)){setError('ucaLoginPhoneError','請輸入正確的台灣手機號碼。');ok=false}if(!password){setError('ucaLoginPasswordError','請輸入登入密碼。');ok=false}if(!ok)return;loading(true,'正在登入 UBee');try{const data=await api('/api/customer-auth/login',{method:'POST',body:JSON.stringify({phone,password})});await finish(data.customer||null,'order')}catch(error){setStatus('ucaLoginStatus',error.message,'error')}finally{loading(false)}}
+  async function submitRegister(event){
+    event.preventDefault();
+    const name=String($('ucaRegisterName').value||'').trim(),phone=normalizePhone($('ucaRegisterPhone').value),
+      password=$('ucaRegisterPassword').value, confirm=$('ucaRegisterPasswordConfirm').value;
+    if(name.length<2 || !validPhone(phone)){setStatus('ucaRegisterStatus','請輸入本人姓名及 09 開頭 10 碼手機號碼。','error');return}
+    if(password.length<8 || password.length>72 || !/[A-Za-z]/.test(password) || !/\d/.test(password) || password===phone){setStatus('ucaRegisterStatus','密碼必須為 8～72 字元、包含英文字母及數字，且不能等於手機號碼。','error');return}
+    if(password!==confirm || !$('ucaRegisterAgree').checked){setStatus('ucaRegisterStatus','請確認密碼一致並同意服務條款。','error');return}
+    const button=$('ucaRegisterSubmit');button.disabled=true;loading(true,'正在建立 UBee 會員');setStatus('ucaRegisterStatus');
+    try{
+      const referralCode=String(new URLSearchParams(location.search).get('ref')||'').trim().toUpperCase();
+      const data=await api('/api/customer-auth/register',{method:'POST',body:JSON.stringify({name,phone,password,referralCode,
+        agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})});
+      // 確認 HttpOnly Session 已保存，避免把建帳成功誤判成登入成功。
+      let me;
+      try{me=await api('/api/customer-auth/me')}catch(_){throw new Error('會員已建立，但無法確認本裝置登入狀態。請勿重複註冊；請以瀏覽器登入或聯繫客服。')}
+      if(me?.customer?.customerId!==data?.customer?.customerId)throw new Error('會員已建立，但登入狀態尚未確認。請勿重複註冊。');
+      $('ucaRegisterPassword').value='';$('ucaRegisterPasswordConfirm').value='';
+      await finish(me.customer,'order');
+    }catch(error){setStatus('ucaRegisterStatus',error.message,'error')}
+    finally{button.disabled=false;loading(false)}
+  }
   function updateForgotSupportState(){const phone=normalizePhone($('ucaForgotPhone').value);$('ucaForgotPhone').value=phone;const valid=validPhone(phone);$('ucaForgotSupport').disabled=!valid;$('ucaForgotCommandPreview').textContent=valid?`忘記密碼 ${phone}`:'忘記密碼 09xxxxxxxx';if(valid)setError('ucaForgotPhoneError');return valid}
   async function startAutomatedLinePasswordReset(){const phone=normalizePhone($('ucaForgotPhone').value);$('ucaForgotPhone').value=phone;if(!validPhone(phone)){setError('ucaForgotPhoneError','請輸入完整的 09 開頭 10 碼會員手機號碼。');$('ucaForgotPhone').focus();return}const command=`忘記密碼 ${phone}`;let copied=false;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(command);copied=true}}catch(_){}if(!copied){try{const temp=document.createElement('textarea');temp.value=command;temp.setAttribute('readonly','');temp.style.position='fixed';temp.style.opacity='0';document.body.appendChild(temp);temp.select();copied=document.execCommand('copy');temp.remove()}catch(_){}}setStatus('ucaForgotStatus',copied?`已複製「${command}」。進入 LINE 後貼上並送出。`:`進入 LINE 後請送出：「${command}」。`,'success');setTimeout(()=>window.openUBeeOfficialAccount?.(),180)}
-  root.addEventListener('click',event=>{const go=event.target.closest('[data-uca-go]')?.dataset.ucaGo;if(go==='forgot'){$('ucaForgotPhone').value=normalizePhone($('ucaLoginPhone').value);updateForgotSupportState();showView('forgot')}else if(go==='login')showView('login');if(event.target.closest('[data-uca-back]'))goBack();if(event.target.closest('[data-uca-home]'))hide();const passwordId=event.target.closest('[data-uca-password]')?.dataset.ucaPassword;if(passwordId){const input=$(passwordId),showPassword=input.type==='password';input.type=showPassword?'text':'password';event.target.textContent=showPassword?'隱藏':'顯示'}});
-  $('ucaLoginForm').addEventListener('submit',submitLogin);$('ucaContinueOrder').addEventListener('click',hide);$('ucaResetPassword').addEventListener('input',resetPasswordState);$('ucaResetSubmit').addEventListener('click',submitPasswordReset);$('ucaLoginPhone').addEventListener('input',event=>event.target.value=normalizePhone(event.target.value));$('ucaForgotPhone').addEventListener('input',event=>{event.target.value=normalizePhone(event.target.value);updateForgotSupportState()});$('ucaForgotSupport').addEventListener('click',startAutomatedLinePasswordReset);
+  root.addEventListener('click',event=>{const go=event.target.closest('[data-uca-go]')?.dataset.ucaGo;if(go==='forgot'){$('ucaForgotPhone').value=normalizePhone($('ucaLoginPhone').value);updateForgotSupportState();showView('forgot')}else if(go==='register')showView('register');else if(go==='login')showView('login');if(event.target.closest('[data-uca-back]'))goBack();if(event.target.closest('[data-uca-home]'))hide();const passwordId=event.target.closest('[data-uca-password]')?.dataset.ucaPassword;if(passwordId){const input=$(passwordId),showPassword=input.type==='password';input.type=showPassword?'text':'password';event.target.textContent=showPassword?'隱藏':'顯示'}});
+  $('ucaRegisterForm').addEventListener('submit',submitRegister);$('ucaLoginForm').addEventListener('submit',submitLogin);$('ucaContinueOrder').addEventListener('click',hide);$('ucaResetPassword').addEventListener('input',resetPasswordState);$('ucaResetSubmit').addEventListener('click',submitPasswordReset);$('ucaLoginPhone').addEventListener('input',event=>event.target.value=normalizePhone(event.target.value));$('ucaForgotPhone').addEventListener('input',event=>{event.target.value=normalizePhone(event.target.value);updateForgotSupportState()});$('ucaForgotSupport').addEventListener('click',startAutomatedLinePasswordReset);
   resetPasswordState();updateForgotSupportState();window.UBeeCustomerAuthHost=Object.freeze({show,hide,isOpen:()=>root.classList.contains('active')});if(state.resetToken)validatePasswordResetToken();
 })();
 </script>
@@ -19372,10 +19406,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyPasswordPanel">
 <div class="ubee-my-panel-head"><strong>修改密碼</strong><button data-my-close-account="" type="button">上一頁</button></div>
-<form class="ubee-flat-form" id="ubeePasswordForm">
-<label>目前密碼<input id="ubeeCurrentPassword" type="password"/></label>
-<label>新密碼<input id="ubeeNewPassword" minlength="8" type="password"/></label>
-<label>確認新密碼<input id="ubeeConfirmPassword" minlength="8" type="password"/></label>
+<div class="ubee-account-security-note" id="ubeePasswordInstruction">首次設定密碼不需要目前密碼；已設定密碼者必須輸入舊密碼。</div><form class="ubee-flat-form" id="ubeePasswordForm">
+<label id="ubeeCurrentPasswordRow">目前密碼<input id="ubeeCurrentPassword" type="password" autocomplete="current-password" maxlength="72"/></label>
+<label>新密碼<input id="ubeeNewPassword" minlength="8" maxlength="72" autocomplete="new-password" type="password"/></label>
+<label>確認新密碼<input id="ubeeConfirmPassword" minlength="8" maxlength="72" autocomplete="new-password" type="password"/></label>
 <button class="ubee-flat-primary" type="submit">確認修改</button>
 <div class="ubee-flat-status" id="ubeePasswordStatus"></div>
 </form>
@@ -19448,7 +19482,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <button class="ubee-flat-row" data-my-action="changePassword" type="button">修改登入密碼 <span>›</span></button>
 <button class="ubee-flat-row" data-flat-action="phone-help" type="button">變更手機號碼 <span>›</span></button>
 </div>
-<div class="ubee-account-security-note">登入資訊與重要帳號操作集中在這裡管理。</div>
+<div class="ubee-account-security-note">可在登入狀態下設定密碼，並透過 LINE 官方帳號建立免簡訊的安全復原方式。手機門號本身尚未驗證。</div>
+<div class="ubee-my-info-list"><button class="ubee-flat-row" id="ubeeRecoveryLineStart" type="button">綁定 LINE 安全復原 <span>›</span></button></div>
+<div class="ubee-flat-status" id="ubeeRecoveryLineStatus" aria-live="polite"></div>
 <button class="ubee-account-secondary-action" data-settings-action="logout" type="button">登出目前帳號</button>
 <button class="ubee-account-destructive-link" data-my-action="deleteAccount" type="button">申請刪除帳號</button>
 </section>
@@ -21704,7 +21740,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261016-customer-native-my-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261017-customer-member-security-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23661,8 +23697,8 @@ html,body{
     if(name) name.textContent = customer?.name || 'UBee 會員';
     if(phone) phone.textContent = customer?.phone || '尚未提供';
     if(email) email.textContent = customer?.email || '尚未提供';
-    if(accountStatus) accountStatus.textContent = customer?.loginEnabled===false ? '帳號狀態：本裝置已啟用・尚未設定登入密碼' : '帳號狀態：正常使用中';
-    if(passwordAction) passwordAction.innerHTML = customer?.loginEnabled===false ? '設定登入密碼 <span>›</span>' : '修改密碼 <span>›</span>';
+    if(accountStatus) accountStatus.textContent = customer?.passwordConfigured===false ? '帳號狀態：本裝置已啟用・尚未設定登入密碼' : '帳號狀態：正常使用中';
+    if(passwordAction) passwordAction.innerHTML = customer?.passwordConfigured===false ? '設定登入密碼 <span>›</span>' : '修改密碼 <span>›</span>';
   }
 
   function fillFeedbackContact(){
@@ -24030,10 +24066,10 @@ html,body{
     const panelId = panelMap[normalized];
     if(!panelId) return false;
 
-    if(normalized === 'changepassword' && getCurrentCustomerSafe()?.loginEnabled === false){
+    if(normalized === 'changepassword' && !getCurrentCustomerSafe()){
       root.classList.remove('active');
       document.body.classList.remove('flow-active','ubee-my-subpage-open');
-      window.UBeeCustomerAuthHost?.show('forgot',{phone:getCurrentCustomerSafe()?.phone||''});
+      window.UBeeCustomerAuthHost?.show('login');
       return true;
     }
 
@@ -24049,6 +24085,10 @@ html,body{
     closeMySubPages();
 
     if(normalized === 'account') fillAccountPanel();
+    if(normalized === 'changepassword'){
+      const currentRow=document.getElementById('ubeeCurrentPasswordRow');
+      if(currentRow)currentRow.hidden=getCurrentCustomerSafe()?.passwordConfigured===false;
+    }
     if(normalized === 'feedback') fillFeedbackContact();
     if(normalized === 'addresses'){
       // 常用地址先顯示記憶體／Session／本機快取，網路資料只在背景刷新。
@@ -25713,25 +25753,41 @@ body > #ubeePersistentBottomNav .ubee-bottom-notification-badge{
     if(status) status.textContent = '會員資料已儲存在此裝置。正式同步仍以後端會員資料為準。';
   });
 
-  $('ubeePasswordForm')?.addEventListener('submit',event=>{
+  $('ubeeRecoveryLineStart')?.addEventListener('click',async event=>{
+    const button=event.currentTarget,status=$('ubeeRecoveryLineStatus');
+    button.disabled=true;status.textContent='正在產生一次性綁定指令…';
+    try{
+      const response=await fetch('/api/customer-auth/recovery-line/start',{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json','Accept':'application/json'},body:'{}'});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok || data.success!==true)throw new Error(data.message||'取得綁定指令失敗');
+      let copied=false;
+      try{await navigator.clipboard.writeText(data.command);copied=true}catch(_){}
+      status.textContent=copied?'指令已複製。請前往 UBee LINE 官方帳號，在一對一對話貼上並送出；10 分鐘內有效。':`請複製以下指令並送到 UBee LINE 官方帳號（一對一）：${data.command}`;
+      if(copied)window.openUBeeOfficialAccount?.();
+    }catch(error){status.textContent=error.message||'請稍後再試';}
+    finally{button.disabled=false}
+  });
+  $('ubeePasswordForm')?.addEventListener('submit',async event=>{
     event.preventDefault();
-    const current = $('ubeeCurrentPassword')?.value || '';
-    const next = $('ubeeNewPassword')?.value || '';
-    const confirmNext = $('ubeeConfirmPassword')?.value || '';
-    const status = $('ubeePasswordStatus');
-    if(!current){
-      if(status) status.textContent = '請輸入目前密碼。';
-      return;
-    }
-    if(next.length < 8){
-      if(status) status.textContent = '新密碼至少需要 8 個字元。';
-      return;
-    }
-    if(next !== confirmNext){
-      if(status) status.textContent = '兩次輸入的新密碼不一致。';
-      return;
-    }
-    if(status) status.textContent = '資料已通過前端檢查；正式修改時仍須由後端驗證目前密碼。';
+    const customer=(typeof currentCustomer!=='undefined' ? currentCustomer : null);
+    const configured=customer?.passwordConfigured===true;
+    const current=$('ubeeCurrentPassword')?.value||'', next=$('ubeeNewPassword')?.value||'',confirmNext=$('ubeeConfirmPassword')?.value||'';
+    const status=$('ubeePasswordStatus'),button=event.currentTarget.querySelector('button[type="submit"]');
+    if(configured && !current){status.textContent='請輸入目前密碼。';return}
+    if(next.length<8 || next.length>72 || !/[A-Za-z]/.test(next) || !/\d/.test(next) || next===customer?.phone){status.textContent='新密碼必須為 8～72 字元，包含英文與數字，且不能等於手機號碼。';return}
+    if(next!==confirmNext){status.textContent='兩次輸入的新密碼不一致。';return}
+    button.disabled=true;status.textContent='正在安全更新密碼…';
+    try{
+      const response=await fetch('/api/customer-auth/password/update',{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({currentPassword:current,password:next})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok || data.success!==true)throw new Error(data.message||'密碼設定失敗，請重試。');
+      $('ubeeCurrentPassword').value='';$('ubeeNewPassword').value='';$('ubeeConfirmPassword').value='';
+      if(typeof currentCustomer!=='undefined')currentCustomer=data.customer;
+      window.__ubeeCurrentCustomer=data.customer;
+      const row=$('ubeeCurrentPasswordRow');if(row)row.hidden=false;
+      status.textContent='密碼已更新，其他裝置的登入已失效。本裝置繼續保持登入。';
+    }catch(error){status.textContent=error.message||'密碼修改失敗';}
+    finally{button.disabled=false}
   });
 
   document.addEventListener('DOMContentLoaded',loadProfileFields,{once:true});
