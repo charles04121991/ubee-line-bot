@@ -11366,19 +11366,15 @@ function buildRiderPendingTaskPreview(order = {}) {
     '送達區域待確認'
   );
 
-  // Rider Multi-stop Visibility V1：待接任務只提供行政區層級摘要。
-  // 完整門牌、電話與備註仍必須等接單成功後由 current-order 取得。
+  // V5.23.0：待接單多站點保留完整地址，不提供聯絡資訊。
   const rawPreviewDeliveryStops = Array.isArray(order.deliveryStops)
     ? order.deliveryStops.slice(0, 20)
     : [];
   const previewDropoffAreas = (rawPreviewDeliveryStops.length
-    ? rawPreviewDeliveryStops
-        .map(stop => getRiderPendingAreaLabel(
-          stop?.dropoffAddress || stop?.address || stop?.dropoff || '',
-          ''
-        ))
-        .filter(Boolean)
-    : [dropoffArea]
+    ? rawPreviewDeliveryStops.map(stop => String(
+        stop?.dropoffAddress || stop?.address || stop?.dropoff || ''
+      ).trim()).filter(Boolean)
+    : [String(dropoffAddress || '').trim()]
   ).filter(Boolean);
   const previewStopCount = Math.max(
     1,
@@ -11573,15 +11569,19 @@ function buildRiderPendingTaskPreview(order = {}) {
     pickupDistrict: previewRegion.pickupDistrict,
     pickupRegion: previewRegion.pickupFullDistrict,
 
-    // 接單前畫面只顯示行政區，不回傳門牌與聯絡資料。
+    // V5.23.0：僅經 riderAuth 與任務池資格驗證的小U可取得完整取送地址。
+    // 行政區欄位保留作為縣市隔離／舊版資料相容，不再覆寫完整地址。
     pickupArea,
     dropoffArea,
-    pickupAddress: pickupArea,
-    fromAddress: pickupArea,
-    pickup: pickupArea,
-    dropoffAddress: dropoffArea,
-    toAddress: dropoffArea,
-    dropoff: dropoffArea,
+    pickupAddress: String(pickupAddress || '').trim(),
+    fromAddress: String(pickupAddress || '').trim(),
+    pickup: String(pickupAddress || '').trim(),
+    dropoffAddress: String(dropoffAddress || '').trim(),
+    toAddress: String(dropoffAddress || '').trim(),
+    dropoff: String(dropoffAddress || '').trim(),
+    deliveryStops: rawPreviewDeliveryStops.map(stop => ({
+      dropoffAddress: String(stop?.dropoffAddress || stop?.address || stop?.dropoff || '').trim()
+    })),
     dropoffAreas: previewDropoffAreas.slice(0, previewStopCount),
     stopCount: previewStopCount,
     deliveryStopCount: previewStopCount,
