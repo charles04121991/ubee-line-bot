@@ -4,7 +4,7 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261017-customer-member-security-v1
+  PWA: 20261027-customer-four-tab-workbench-v1
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -29,7 +29,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261017-customer-member-security-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261027-customer-four-tab-workbench-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19649,9 +19649,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 </div>
 <nav aria-label="主要導覽" class="ubee-primary-bottom-nav" id="ubeePersistentBottomNav">
-<button aria-label="首頁" aria-current="page" class="active" data-nav-target="home" id="flowNavHome" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.8l8.5 6.7"/><path d="M5.5 9.8V20h13V9.8M9.3 20v-6.2h5.4V20"/></svg></span><span class="flow-nav-label">首頁</span></button>
+<button aria-label="首頁" aria-current="page" class="active" data-nav-target="home" id="flowNavHome" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.8l8.5 6.7"/><path d="M5.5 9.8V20h13V9.8M9.3 20v-6.2h5.4V20"/></svg></span><span class="flow-nav-label">下單</span></button>
 <button aria-label="訂單" data-nav-target="task" id="flowNavTasks" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 1.8 1.8 3.2-3.2M8.5 16h7"/></svg></span><span class="flow-nav-label">訂單</span></button>
-<button aria-label="通知" data-nav-target="notify" id="flowNavNotify" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span class="ubee-bottom-notification-badge" id="ubeeBottomNotificationBadge" hidden>0</span></span><span class="flow-nav-label">通知</span></button>
+<button aria-label="U幣" data-nav-target="ucoin" id="flowNavUCoin" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9 8.5h4a2.2 2.2 0 0 1 0 4.4h-2a2.2 2.2 0 0 0 0 4.4h4M12 6.5v2M12 17.3v1.2"/></svg></span><span class="flow-nav-label">U幣</span></button>
 <button aria-label="我的" data-nav-target="my" id="flowNavMy" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20.5c.8-4.1 3.2-6.2 7-6.2s6.2 2.1 7 6.2"/></svg></span><span class="flow-nav-label">我的</span></button>
 </nav>
 <script id="ubee-production-flow-v4-script">
@@ -21740,7 +21740,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261017-customer-member-security-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261027-customer-four-tab-workbench-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23682,7 +23682,7 @@ html,body{
       panel.hidden = true;
       panel.classList.remove('is-open');
     });
-    document.body.classList.remove('ubee-my-subpage-open');
+    document.body.classList.remove('ubee-my-subpage-open','ubee-ucoin-native-open');
     root.removeAttribute('data-my-section');
     currentMySection = '';
   }
@@ -25131,7 +25131,7 @@ body > #ubeePersistentBottomNav .ubee-bottom-notification-badge{
 }
 #productionOrderFlow .ubee-customer-notification-badge[hidden],
 body > #ubeePersistentBottomNav .ubee-bottom-notification-badge[hidden]{display:none!important}
-body > #ubeePersistentBottomNav #flowNavNotify .flow-nav-icon{position:relative!important}
+
 body > #ubeePersistentBottomNav .ubee-bottom-notification-badge{
   position:absolute;
   top:-7px;
@@ -27450,7 +27450,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   window.__UBEE_CUSTOMER_NAVIGATION_STACK_V3__=true;
 
   const STATE_KEY='ubeeCustomerNavigationV3';
-  const PRIMARY=new Set(['home','task','notify','store','my']);
+  const PRIMARY=new Set(['home','task','ucoin','notify','store','my']);
   const MY_SECTIONS=new Set(['account','coupons','addresses','growth','rewards','feedback','settings','favorites','serviceareas','becomerider','editprofile','changepassword','preferences','security','privacy','deleteaccount','ucoin']);
   const GROWTH_DETAILS=new Set(['benefits','tasks','achievements','history']);
   let applying=false;
@@ -27586,14 +27586,14 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   else syncViewport();
 })();
 </script>
-<script id="ubee-bottom-navigation-controller-v31">
+<script id="ubee-bottom-navigation-controller-v4">
 (() => {
   'use strict';
-  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V31__) return;
-  window.__UBEE_BOTTOM_NAV_CONTROLLER_V31__=true;
+  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V4__) return;
+  window.__UBEE_BOTTOM_NAV_CONTROLLER_V4__=true;
 
-  const targetToId={home:'flowNavHome',task:'flowNavTasks',notify:'flowNavNotify',my:'flowNavMy'};
-  const supportedTargets=new Set(['home','task','notify','store','my']);
+  const targetToId={home:'flowNavHome',task:'flowNavTasks',ucoin:'flowNavUCoin',my:'flowNavMy'};
+  const supportedTargets=new Set(['home','task','ucoin','notify','store','my']);
   let navigation=null;
   let navigationToken=0;
   let activeTarget='home';
@@ -27607,7 +27607,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   function setActive(target){
     activeTarget=normalizeTarget(target);
     if(document.body) document.body.dataset.ubeePrimaryNav=activeTarget;
-    const visualTarget=activeTarget==='store'?'home':activeTarget;
+    const visualTarget=activeTarget==='store'?'home':activeTarget==='notify'?'task':activeTarget;
     const activeId=targetToId[visualTarget]||targetToId.home;
     navigation?.querySelectorAll(':scope > button').forEach(button=>{
       const active=button.id===activeId;
@@ -27623,6 +27623,11 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   }
 
   async function openTarget(target,options={}){
+    if(target!=='ucoin' && document.getElementById('ubeeMyUCoinPanel')?.hidden===false){
+      window.closeUBeeMySubPages?.();
+      document.body.classList.remove('ubee-ucoin-native-open');
+    }
+    if(target==='ucoin') return window.UBeeUCoinV1?.open?.({asPrimary:true,fromHistory:true});
     if(target==='home'){
       return window.openUBeeHomePage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-navigation'});
     }
@@ -29084,7 +29089,7 @@ body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
 .ubee-my-ucoin-card{width:calc(100% - 64px);min-height:76px;margin:14px 32px 12px;padding:12px 16px;border:1px solid #ececef;border-radius:18px;background:#fff;display:grid;grid-template-columns:44px minmax(0,1fr) auto 14px;gap:12px;align-items:center;text-align:left;color:#111;box-shadow:0 2px 8px rgba(17,24,39,.035);-webkit-tap-highlight-color:transparent}
 .ubee-my-ucoin-card:active{background:#f8f8f8;transform:scale(.995)}
 .ubee-my-ucoin-mark,.ubee-ucoin-checkout-mark{display:grid;place-items:center;background:#ffca0a;color:#111;font-weight:1000;border-radius:13px}.ubee-my-ucoin-mark{width:44px;height:44px;font-size:21px}.ubee-my-ucoin-copy{display:flex;flex-direction:column;gap:2px;min-width:0}.ubee-my-ucoin-copy small,.ubee-my-ucoin-balance small{color:#96999e;font-size:13px;font-weight:700}.ubee-my-ucoin-copy strong{font-size:18px;line-height:1.25}.ubee-my-ucoin-balance{text-align:right;display:flex;flex-direction:column;gap:1px}.ubee-my-ucoin-balance strong{font-size:18px;white-space:nowrap}.ubee-my-subpage-open .ubee-my-ucoin-card{display:none}
-body.ubee-ucoin-native-open{overflow:hidden;background:#f5f6f8}body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open .ubee-primary-bottom-nav{display:none!important}body.ubee-ucoin-native-open #ubeeMyUCoinPanel{bottom:0!important;padding-bottom:0!important;background:#f5f6f8}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head{position:sticky;top:0;z-index:10;height:56px;min-height:56px;padding:0 16px;padding-top:env(safe-area-inset-top);box-sizing:content-box;background:rgba(255,255,255,.94);border-bottom:1px solid #e7e8eb;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head strong{font-size:18px;font-weight:900}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head button{width:40px;height:40px;padding:0;border:0;background:transparent;color:#111}
+body.ubee-ucoin-native-open{overflow:hidden;background:#f5f6f8}body.ubee-ucoin-native-open #ubeeMyUCoinPanel{bottom:var(--ubee-nav-total-height)!important;padding-bottom:0!important;background:#f5f6f8}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head{position:sticky;top:0;z-index:10;height:56px;min-height:56px;padding:0 16px;padding-top:env(safe-area-inset-top);box-sizing:content-box;background:rgba(255,255,255,.94);border-bottom:1px solid #e7e8eb;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head strong{font-size:18px;font-weight:900}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head button{width:40px;height:40px;padding:0;border:0;background:transparent;color:#111}
 .ubee-ucoin-content{padding:14px 16px calc(28px + env(safe-area-inset-bottom));background:#f5f6f8;min-height:100%;box-sizing:border-box}.ubee-ucoin-hero{position:relative;overflow:hidden;padding:20px;border-radius:20px;background:linear-gradient(140deg,#ffd21c 0%,#ffc400 100%);color:#111;box-shadow:0 8px 24px rgba(220,164,0,.18)}.ubee-ucoin-hero:after{content:"U";position:absolute;right:14px;top:-22px;font-size:118px;line-height:1;font-weight:1000;color:rgba(255,255,255,.27)}.ubee-ucoin-hero small{position:relative;z-index:1;color:#755800;font-size:14px;font-weight:800}.ubee-ucoin-hero strong{position:relative;z-index:1;display:block;font-size:36px;line-height:1.1;margin:8px 0 7px;letter-spacing:-1px}.ubee-ucoin-hero p{position:relative;z-index:1;margin:0;color:#715600;font-size:14px;font-weight:700}
 .ubee-ucoin-checkin{margin-top:12px;padding:16px;background:#fff;border-radius:20px;border:1px solid #e8e9ec}.ubee-ucoin-checkin-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.ubee-ucoin-checkin-title{display:flex;flex-direction:column;gap:2px}.ubee-ucoin-checkin-title strong{font-size:17px}.ubee-ucoin-checkin-title small{font-size:14px;color:#91959b}.ubee-ucoin-checkin-head button{min-width:92px;border:0;border-radius:12px;padding:10px 14px;background:#ffca0a;color:#111;font-size:15px;font-weight:900}.ubee-ucoin-checkin-head button:disabled{background:#eef0f3;color:#9a9ea4}.ubee-ucoin-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:14px}.ubee-ucoin-day{height:48px;padding:6px 1px;border-radius:11px;background:#f4f5f7;text-align:center;font-size:13px;line-height:1.1;color:#8b8e93;font-weight:800;box-sizing:border-box}.ubee-ucoin-day b{display:block;color:#222;font-size:13px;margin-top:5px}.ubee-ucoin-day.is-current{background:#fff5c9;box-shadow:inset 0 0 0 2px #f4bd00;color:#8c6900}
 .ubee-ucoin-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:12px;padding:3px;border-radius:13px;background:#e9eaed}.ubee-ucoin-tab{height:38px;border:0;border-radius:10px;background:transparent;color:#73777d;font-size:15px;font-weight:800}.ubee-ucoin-tab.is-active{background:#fff;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.08)}.ubee-ucoin-tabpanel{margin-top:10px;background:#fff;border:1px solid #e8e9ec;border-radius:20px;overflow:hidden}.ubee-ucoin-panel-title{padding:16px 16px 7px;font-size:16px;font-weight:900}.ubee-ucoin-section{margin:0;padding:0 16px;background:#fff;border:0;border-radius:0}.ubee-ucoin-section h3{display:none}.ubee-ucoin-task,.ubee-ucoin-history-row{min-height:62px;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #eceef1;box-sizing:border-box}.ubee-ucoin-task:last-child,.ubee-ucoin-history-row:last-child{border-bottom:0}.ubee-ucoin-task span,.ubee-ucoin-history-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.ubee-ucoin-task strong,.ubee-ucoin-history-copy strong{font-size:16px}.ubee-ucoin-task small,.ubee-ucoin-history-copy small{color:#969aa0;font-size:13px}.ubee-ucoin-task b{color:#9a6b00;font-size:15px;white-space:nowrap}.ubee-ucoin-history-row>strong{font-size:15px;white-space:nowrap}.ubee-ucoin-history-row>strong.is-plus{color:#15944c}.ubee-ucoin-history-row>strong.is-minus{color:#e44b3b}.ubee-ucoin-rule-list{padding:4px 16px 14px}.ubee-ucoin-rule-row{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid #eceef1}.ubee-ucoin-rule-row:last-child{border-bottom:0}.ubee-ucoin-rule-icon{flex:0 0 28px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:#fff3bd;color:#8f6800;font-size:14px;font-weight:1000}.ubee-ucoin-rule-row span{display:flex;flex-direction:column;gap:3px}.ubee-ucoin-rule-row strong{font-size:15px}.ubee-ucoin-rule-row small{font-size:14px;line-height:1.5;color:#777b81}.ubee-ucoin-empty{padding:34px 16px;color:#93969b;text-align:center;font-size:14px}
@@ -29104,12 +29109,12 @@ body.ubee-ucoin-native-open{overflow:hidden;background:#f5f6f8}body.ubee-ucoin-n
 #productionOrderFlow .ubee-my-ucoin-card .ubee-my-member-chevron{font-size:21px!important;color:#c7c7cc!important}
 
 /* V3：完整原生子頁；強制覆蓋既有 Panel 的內距與標題列規則。 */
-body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel.ubee-my-app-page{inset:0!important;bottom:0!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;overflow-y:auto!important;overscroll-behavior-y:contain!important}
+body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel.ubee-my-app-page{inset:0 0 var(--ubee-nav-total-height) 0!important;bottom:var(--ubee-nav-total-height)!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;overflow-y:auto!important;overscroll-behavior-y:contain!important}
 body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head{position:sticky!important;top:0!important;z-index:30!important;display:grid!important;grid-template-columns:44px minmax(0,1fr) 44px!important;align-items:center!important;width:100%!important;height:52px!important;min-height:52px!important;margin:0!important;padding:env(safe-area-inset-top) 12px 0!important;box-sizing:content-box!important;background:rgba(255,255,255,.96)!important;border-bottom:1px solid #ececf0!important;backdrop-filter:saturate(180%) blur(18px)!important;-webkit-backdrop-filter:saturate(180%) blur(18px)!important}
 body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head strong{display:block!important;grid-column:2!important;grid-row:1!important;align-self:center!important;justify-self:center!important;margin:0!important;color:#111!important;font-size:18px!important;font-weight:800!important;line-height:1.2!important;white-space:nowrap!important}
 body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head button{display:block!important;grid-column:1!important;grid-row:1!important;width:44px!important;height:44px!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important}
 body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head button::before{display:grid!important;width:44px!important;height:44px!important;place-items:center!important;color:#111!important;font-size:32px!important}
-body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open .ubee-primary-bottom-nav{display:none!important}
+
 
 #productionOrderFlow .ubee-ucoin-content{width:100%!important;min-height:calc(100% - 53px)!important;margin:0!important;padding:0 20px calc(28px + env(safe-area-inset-bottom))!important;background:#fff!important;box-sizing:border-box!important}
 #productionOrderFlow .ubee-ucoin-hero{min-height:112px!important;margin:0!important;padding:22px 68px 18px 2px!important;border:0!important;border-bottom:1px solid #ececf0!important;border-radius:0!important;background:#fff!important;color:#111!important;box-shadow:none!important}
@@ -29200,7 +29205,8 @@ body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open
     const profile=$('flowPageProfile'),panel=$('ubeeMyUCoinPanel');if(!profile||!panel)return;
     window.closeUBeeMySubPages?.();
     panel.hidden=false;panel.scrollTop=0;profile.setAttribute('data-my-section','ucoin');document.body.classList.add('ubee-my-subpage-open','ubee-ucoin-native-open');requestAnimationFrame(()=>panel.classList.add('is-open'));
-    if(!options.fromHistory)window.UBeeCustomerNavigation?.pushMySection?.('ucoin');
+    if(options.asPrimary){window.UBeePrimaryNavigation?.activate?.('ucoin')}
+    if(!options.fromHistory && !options.asPrimary)window.UBeeCustomerNavigation?.pushMySection?.('ucoin');
     $('ubeeMyUCoinContent').innerHTML='<div class="ubee-my-empty-state">正在讀取 U幣資料…</div>';
     try{await load()}catch(error){$('ubeeMyUCoinContent').innerHTML=`<div class="ubee-my-empty-state">${esc(error.message||'U幣資料暫時無法讀取')}</div>`}
   }
