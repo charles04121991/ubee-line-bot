@@ -10,7 +10,7 @@
 // - V5.18：新增 authenticated 小U公開基本資料與服務表現 API；公開資料可編輯，接單率讀 riderDispatchStats，準時率只採有明確預約／指定時間且有可信任狀態時間的任務。
 // - V5.17：保留 authenticated /api/rider/credential-summary，供正式騎士端車輛／文件／保險管理頁安全讀取審核摘要。
 // - V4.15：測驗改版為騎士端全螢幕 Native Quiz；後端端點與完整答案驗證規則不變。
-// - V4.14.2：三個 UBee 社群加入流程免密碼。
+// - V4.14.2（歷史）：曾採免密碼引導；V5.23.2 已移除免密碼提示，改顯示 LINE 入群密碼。
 // - V4.14.1：學習中心 Hotfix 保留。
 // - Self-Order Hard Lock V4.13：正式小U可正常使用客戶端下單，但本人不得看見、收到 Push、承接、預約、疊單或被調度指定自己的訂單。
 // - 客戶下單時由後端建立不可逆身分指紋；偵測到小U身分下單後，自動寫入客戶通知中心與小U通知中心。
@@ -1884,7 +1884,8 @@ const UBEE_JKOPAY_ACCOUNT =
   String(process.env.UBEE_JKOPAY_ACCOUNT || '901871793').trim();
 
 
-// Rider Community Server Config：公告／聊天／回報社群僅由後端提供給 bootstrap；社群加入不使用密碼。
+// Rider Community Server Config V3：社群網址和加入提示密碼由已驗證 rider bootstrap 提供。
+// 注意：這是 LINE 社群本身的入群密碼；UBee 僅作提示，最終由 LINE 驗證，不是 UBee 的身分驗證。
 const UBEE_RIDER_COMMUNITIES = Object.freeze({
   announcement: String(
     process.env.UBEE_RIDER_ANNOUNCEMENT_GROUP ||
@@ -1900,6 +1901,11 @@ const UBEE_RIDER_COMMUNITIES = Object.freeze({
   ).trim(),
 });
 
+// 與 LINE 社群管理設定同步；改密碼時優先由伺服器環境變數更新。
+// 公開給已登入且通過審核的小U作入群提示，請勿當作機密 API 金鑰使用。
+const UBEE_RIDER_COMMUNITY_JOIN_PASSWORD =
+  String(process.env.UBEE_RIDER_COMMUNITY_JOIN_PASSWORD || '1234').trim();
+
 function buildRiderCommunityPublicConfig() {
   const announcement = String(UBEE_RIDER_COMMUNITIES.announcement || '').trim();
   const chat = String(UBEE_RIDER_COMMUNITIES.chat || '').trim();
@@ -1907,7 +1913,8 @@ function buildRiderCommunityPublicConfig() {
 
   return {
     source: 'server',
-    version: 'rider-community-server-v2-no-password',
+    version: 'rider-community-server-v3-line-password-hint',
+    joinPassword: UBEE_RIDER_COMMUNITY_JOIN_PASSWORD,
     required: true,
     ready: Boolean(announcement && chat && report),
     announcement,
