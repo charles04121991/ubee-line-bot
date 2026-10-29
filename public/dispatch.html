@@ -466,16 +466,18 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 .live-tracking-strip{margin-top:9px;padding:9px 10px;border-radius:11px;background:#f7f8fa;border:1px solid var(--line);font-size:10px;line-height:1.55;color:#555b63}
 .live-tracking-strip strong{color:#111;font-size:11px}.live-tracking-strip.watch{background:#fffdf4;border-color:#f4df99}.live-tracking-strip.high,.live-tracking-strip.critical{background:#fff5f5;border-color:#ffc6c9;color:#9f2b32}
 .live-eta-badge{background:#eaf1ff;color:#245fc0}.live-gps-badge{background:#e9f8ef;color:#157a49}.live-gps-badge.delayed{background:#fff4dc;color:#aa6500}.live-gps-badge.stale,.live-gps-badge.critical{background:#ffe7e8;color:#bd2c33}.live-geo-badge{background:#fff5d8;color:#8a6500}
+
 </style>
 </head>
 
 <body>
+
 <div class="app">
 
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> Operations Center</div>
-      <div class="version">V6.0 · OPERATIONS WORKBENCH</div>
+      <div class="version">V6.0.2 · ACCESS PROTECTED</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -485,7 +487,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   </header>
 
   <div class="level4-banner">
-    <div><strong>UBee Operations Center V6.0｜整合營運工作台</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
+    <div><strong>UBee Operations Center V6.0.2｜免二次登入・存取保護</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
     <div class="level4-badge">CITY OPS：LIVE · PROFIT CONTROL：ON</div>
   </div>
 
@@ -833,6 +835,20 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 <script>
 'use strict';
 
+/* UBee Dispatch V6.0.2 — 免二次登入。安全驗證在 Cloudflare Access 與 Render API 執行。 */
+async function dispatchFetch(url,options={}){
+  const path=typeof url==='string'?url:String(url||'');
+  if(!path.startsWith('/api/dispatch/')) throw new Error('僅允許調度 API');
+  const headers=new Headers(options.headers||{});
+  headers.delete('X-UBee-Dispatch-Admin-Key');
+  headers.delete('X-Dispatch-Admin-Token');
+  headers.set('Accept','application/json');
+  const response=await fetch(path,{...options,headers,credentials:'same-origin',cache:'no-store'});
+  if(response.status===401||response.status===403){
+    throw new Error('調度存取未授權：請確認 Cloudflare Access 授權及網域設定。');
+  }
+  return response;
+}
 /* ============================================================
    UBee 智慧調度控制塔 V4 + V5｜第二階段異常案件中心 × V3 安全處置
    現有可直接使用：
@@ -2085,7 +2101,7 @@ async function loadDashboard({silent=false}={}){
   $('systemStatusText').textContent = '資料更新中';
 
   try{
-    const response = await fetch('/api/dispatch/dashboard',{
+    const response = await dispatchFetch('/api/dispatch/dashboard',{
       cache:'no-store',
       headers:{'Accept':'application/json'}
     });
@@ -2208,11 +2224,7 @@ function renderSelectedOrderTrail(bounds){
 
 
 function getDispatchAdminKey(){
-  return String(
-    $('dispatchAdminKey')?.value ||
-    localStorage.getItem('ubee_dispatch_admin_key') ||
-    ''
-  ).trim();
+  return true;
 }
 
 function weatherDefaultMeta(type){
@@ -2263,7 +2275,7 @@ function renderWeatherPricingStatus(){
 
 async function loadWeatherPricingSettings(){
   try{
-    const response=await fetch('/api/dispatch/dynamic-pricing',{
+    const response=await dispatchFetch('/api/dispatch/dynamic-pricing',{
       cache:'no-store',
       headers:{Accept:'application/json'}
     });
@@ -2298,13 +2310,7 @@ async function saveWeatherPricingSettings(){
   const button=$('saveWeatherPricingBtn');
   const adminKey=getDispatchAdminKey();
 
-  if(!adminKey){
-    toast('請先輸入調度管理金鑰');
-    $('dispatchAdminKey')?.focus();
-    return;
-  }
 
-  localStorage.setItem('ubee_dispatch_admin_key',adminKey);
 
   const type=String($('weatherTypeSelect')?.value||'none');
   const defaults=weatherDefaultMeta(type);
@@ -2326,11 +2332,10 @@ async function saveWeatherPricingSettings(){
   if(button) button.disabled=true;
 
   try{
-    const response=await fetch('/api/dispatch/dynamic-pricing',{
+    const response=await dispatchFetch('/api/dispatch/dynamic-pricing',{
       method:'POST',
       headers:{
         'Content-Type':'application/json',
-        'X-UBee-Dispatch-Admin-Key':adminKey
       },
       body:JSON.stringify({
         enabled:global.enabled!==false,
@@ -2424,13 +2429,7 @@ async function approveSelectedOrderItemSize(){
     return;
   }
 
-  if(!adminKey){
-    toast('請先輸入上方調度管理金鑰');
-    $('dispatchAdminKey')?.focus();
-    return;
-  }
 
-  localStorage.setItem('ubee_dispatch_admin_key',adminKey);
 
   const itemSize=String(
     $('selectedItemSizeSelect')?.value||
@@ -2448,14 +2447,13 @@ async function approveSelectedOrderItemSize(){
   const note=String($('selectedItemSizeNote')?.value||'').trim();
 
   try{
-    const response=await fetch(
+    const response=await dispatchFetch(
       `/api/dispatch/orders/${encodeURIComponent(order.id)}/item-size`,
       {
         method:'POST',
         headers:{
           'Content-Type':'application/json',
-          'X-UBee-Dispatch-Admin-Key':adminKey
-        },
+          },
         body:JSON.stringify({
           itemSize,
           feeOverride,
@@ -3301,7 +3299,7 @@ async function loadDispatchTimeline(orderId){
   state.selectedOrderEvents=[];renderDispatchTimeline();
   if(!orderId||!navigator.onLine) return;
   try{
-    const r=await fetch(`/api/dispatch/orders/${encodeURIComponent(orderId)}/events`,{cache:'no-store'});
+    const r=await dispatchFetch(`/api/dispatch/orders/${encodeURIComponent(orderId)}/events`,{cache:'no-store'});
     const d=await r.json().catch(()=>({}));
     if(!r.ok||d.success===false) throw new Error(d.message||'讀取事件失敗');
     if(String(state.selectedOrderId)!==String(orderId)) return;
@@ -3332,7 +3330,7 @@ function selectOrder(orderId,{pan=true}={}){
    真正派單寫入 API
    ========================= */
 async function postJson(url,body={}){
-  const response = await fetch(url,{
+  const response = await dispatchFetch(url,{
     method:'POST',
     headers:{
       'Content-Type':'application/json',
@@ -3743,7 +3741,7 @@ async function createDispatchIncident(){
   if(!description) return toast('請填寫異常說明');
   const btn=$('confirmIncidentBtn'); btn.disabled=true;
   try{
-    const response=await fetch(`/api/dispatch/orders/${encodeURIComponent(orderId)}/incidents`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,severity,assignedTo,description,source:'dispatch_center',actor:'UBee 調度中心'})});
+    const response=await dispatchFetch(`/api/dispatch/orders/${encodeURIComponent(orderId)}/incidents`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,severity,assignedTo,description,source:'dispatch_center',actor:'UBee 調度中心'})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data.success===false) throw new Error(data.message||`建立失敗 (${response.status})`);
     closeIncidentModal(); toast(data.message||'異常案件已建立');
@@ -3764,7 +3762,7 @@ async function transitionDispatchIncident(){
   if(action==='START'&&!assignedTo) return toast('請填寫負責人');
   const btn=$('confirmIncidentBtn'); btn.disabled=true;
   try{
-    const response=await fetch(`/api/dispatch/incidents/${encodeURIComponent(incidentId)}/transition`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,assignedTo,note,resolutionCode,actor:'UBee 調度中心'})});
+    const response=await dispatchFetch(`/api/dispatch/incidents/${encodeURIComponent(incidentId)}/transition`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,assignedTo,note,resolutionCode,actor:'UBee 調度中心'})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data.success===false) throw new Error(data.message||`更新失敗 (${response.status})`);
     closeIncidentModal(); toast(data.message||'異常案件已更新');
@@ -3858,11 +3856,7 @@ document.addEventListener('click',event=>{
 $('refreshBtn').addEventListener('click',()=>loadDashboard());
 $('fitMapBtn').addEventListener('click',()=>fitMapToData());
 
-if($('dispatchAdminKey')){
-  $('dispatchAdminKey').value=
-    localStorage.getItem('ubee_dispatch_admin_key')||
-    '';
-}
+// 管理金鑰不再從 localStorage 復原，避免舊版憑證殘留。
 
 $('weatherTypeSelect')?.addEventListener('change',event=>{
   const meta=weatherDefaultMeta(event.target.value);
@@ -3968,8 +3962,6 @@ window.addEventListener('resize',()=>{
    啟動
    ========================= */
 initMap();
-loadDashboard();
-loadWeatherPricingSettings();
 setInterval(()=>{if(!document.hidden && navigator.onLine && !state.loading)loadDashboard({silent:true});},10000);
 setInterval(renderWeatherPricingStatus,30000);
 
