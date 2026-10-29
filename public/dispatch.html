@@ -1,3 +1,4 @@
+<!-- V6.0 RC: requires integration / security / regression tests before production -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -473,8 +474,8 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 
   <header class="topbar">
     <div class="brand-wrap">
-      <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">V4 + V5 · PROFIT PRICING V1</div>
+      <div class="brand">U<span class="bee">Bee</span> Operations Center</div>
+      <div class="version">V6.0 · OPERATIONS WORKBENCH</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -484,7 +485,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   </header>
 
   <div class="level4-banner">
-    <div><strong>UBee 智慧調度控制塔 V4 + V5｜Profit Pricing V1</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
+    <div><strong>UBee Operations Center V6.0｜整合營運工作台</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
     <div class="level4-badge">CITY OPS：LIVE · PROFIT CONTROL：ON</div>
   </div>
 
@@ -578,7 +579,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
         <div class="panel-head">
           <div>
             <div class="panel-title">附近小U推薦</div>
-            <div class="panel-sub">依訂單取件點與小U即時座標計算直線距離並排序</div>
+            <div class="panel-sub">全區候選排序｜顯示距離但不以距離排除合法候選</div>
           </div>
         </div>
         <div class="panel-body">
@@ -590,8 +591,8 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
             <div id="v3RiskActionPanel" class="v3-risk-panel"></div>
 
             <div class="radius-row">
-              <strong style="font-size:12px">派單半徑</strong>
-              <select id="radiusSelect" class="radius-select">
+              <strong style="font-size:12px">全區任務池 · 無距離限制</strong>
+              <select id="radiusSelect" class="radius-select" hidden aria-hidden="true">
                 <option value="2">2 km</option>
                 <option value="3" selected>3 km</option>
                 <option value="5">5 km</option>
@@ -599,7 +600,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
                 <option value="12">12 km</option>
                 <option value="20">20 km</option>
               </select>
-              <button class="btn small yellow" id="expandRadiusBtn" disabled>擴大派單半徑</button>
+              <button class="btn small yellow" id="expandRadiusBtn" hidden disabled>已停用的擴圈操作</button>
               <button class="btn small" id="redispatchBtn" disabled>重新派單</button>
               <button class="btn small danger" id="unassignBtn" disabled>取消派單</button>
               <button class="btn small danger" id="emergencyRecoverBtn" disabled>啟動備援轉派</button>
@@ -616,7 +617,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
         </div>
       </div>
       <div class="panel">
-        <div class="panel-head"><div><div class="panel-title">調度事件時間軸</div><div class="panel-sub">追蹤建立、通知、接單、擴圈、轉派與完成等事件</div></div></div>
+        <div class="panel-head"><div><div class="panel-title">調度事件時間軸</div><div class="panel-sub">追蹤建立、通知、接單、全區重送、轉派與完成等事件</div></div></div>
         <div class="panel-body"><div class="timeline" id="dispatchTimeline"><div class="empty">選擇訂單後顯示調度事件</div></div></div>
       </div>
     </section>
@@ -858,7 +859,7 @@ const state = {
   incidentModalOrderId: '',
   incidentModalIncidentId: '',
   incidentModalAction: '',
-  radiusKm: 3,
+  radiusKm: 999,
   towerRiskFilter: 'all',
   stageFilter: '',
   zoneFilter: '',
@@ -1990,7 +1991,7 @@ async function renderMap(){
         const circle = new google.maps.Circle({
           map:state.map,
           center:pickup,
-          radius:state.radiusKm*1000,
+          radius:20000000,
           strokeColor:'#f59e0b',
           strokeOpacity:.26,
           strokeWeight:1.5,
@@ -3043,7 +3044,7 @@ function getCandidateRiders(order){
   if(insight && Array.isArray(insight.candidates) && insight.candidates.length){
     return insight.candidates
       .filter(c=>!c.skippedThisOrder)
-      .filter(c=>Number(c.distanceKm) <= state.radiusKm)
+      
       .map(c=>{
         const base=(state.data.riders||[]).find(r=>String(r.riderId)===String(c.riderId)||String(r.riderDocId)===String(c.riderDocId))||{};
         return {...base,...c,distanceKm:Number(c.distanceKm),dispatchScore:Number(c.score||0)};
@@ -3054,7 +3055,7 @@ function getCandidateRiders(order){
   const pLat=Number(order.pickupLat),pLng=Number(order.pickupLng);
   return (state.data.riders||[]).filter(r=>r.online===true && !r.busy).filter(r=>hasLatLng(r.currentLat,r.currentLng)).map(r=>({
     ...r,distanceKm:haversineKm(pLat,pLng,Number(r.currentLat),Number(r.currentLng)),dispatchScore:0
-  })).filter(r=>r.distanceKm<=state.radiusKm).sort((a,b)=>a.distanceKm-b.distanceKm);
+  })).sort((a,b)=>a.distanceKm-b.distanceKm);
 }
 
 function renderCandidates(){
@@ -3071,10 +3072,10 @@ function renderCandidates(){
   const canRecover=isActive && order?.recoveryEligible===true && highRisk;
 
   $('redispatchBtn').disabled = !isWaiting;
-  $('expandRadiusBtn').disabled = !isWaiting;
+  $('expandRadiusBtn').disabled = true;
   $('unassignBtn').disabled = !canUnassign;
   $('emergencyRecoverBtn').disabled = !canRecover;
-  $('radiusSelect').value = String(state.radiusKm);
+  $('radiusSelect').value = '20';
 
   const riskPanel=$('v3RiskActionPanel');
   if(riskPanel){ riskPanel.classList.remove('show'); riskPanel.innerHTML=''; }
@@ -3549,9 +3550,9 @@ async function emergencyRecoverOrder(orderId){
 async function expandRadius(orderId){
   if(!orderId) return;
 
-  const steps = [2,3,5,8,12,20];
-  const currentIndex = steps.findIndex(x=>x>=state.radiusKm);
-  const next = currentIndex >= 0 && currentIndex < steps.length-1 ? steps[currentIndex+1] : 20;
+  const steps = [999];
+  const currentIndex = 0;
+  const next = 999;
 
   if(next === state.radiusKm && state.radiusKm >= 20){
     toast('目前已是最大 20 km 派單半徑');
@@ -3969,7 +3970,7 @@ window.addEventListener('resize',()=>{
 initMap();
 loadDashboard();
 loadWeatherPricingSettings();
-setInterval(()=>loadDashboard({silent:true}),10000);
+setInterval(()=>{if(!document.hidden && navigator.onLine && !state.loading)loadDashboard({silent:true});},10000);
 setInterval(renderWeatherPricingStatus,30000);
 
 /* =========================================================
