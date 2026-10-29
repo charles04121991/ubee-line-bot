@@ -19792,6 +19792,19 @@ function serializeDispatchIncident(doc) {
 }
 
 
+// UBee Dispatch V6.0 RC｜統一管理 API 存取保護（部署前必須設定 DISPATCH_ADMIN_TOKEN）
+// 請由可信任的管理端代理附加 X-Dispatch-Admin-Token；不要將 token 寫入公開 HTML。
+function verifyDispatchAdminV6(req,res,next){
+  const expected = String(process.env.DISPATCH_ADMIN_TOKEN || '');
+  const provided = String(req.get('X-Dispatch-Admin-Token') || '');
+  if (!expected || !provided) return res.status(503).json({success:false,message:'調度管理驗證尚未完成設定。'});
+  const a=Buffer.from(expected),b=Buffer.from(provided);
+  if (a.length!==b.length || !crypto.timingSafeEqual(a,b)) return res.status(403).json({success:false,message:'調度管理權限不足。'});
+  next();
+}
+// 注意：此 middleware 要求登入代理/同源服務端注入憑證；不可直接在瀏覽器保存管理金鑰。
+app.use('/api/dispatch',verifyDispatchAdminV6);
+
 // ============================================================
 // UBee 調度中心：即時監控 Dashboard API
 // 僅恢復調度中心讀取資料，不修改派單／接單／財務核心流程。
