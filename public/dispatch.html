@@ -467,27 +467,53 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 .live-tracking-strip strong{color:#111;font-size:11px}.live-tracking-strip.watch{background:#fffdf4;border-color:#f4df99}.live-tracking-strip.high,.live-tracking-strip.critical{background:#fff5f5;border-color:#ffc6c9;color:#9f2b32}
 .live-eta-badge{background:#eaf1ff;color:#245fc0}.live-gps-badge{background:#e9f8ef;color:#157a49}.live-gps-badge.delayed{background:#fff4dc;color:#aa6500}.live-gps-badge.stale,.live-gps-badge.critical{background:#ffe7e8;color:#bd2c33}.live-geo-badge{background:#fff5d8;color:#8a6500}
 
+/* V6.0.1 Render 管理驗證：鎖定畫面與使用者自行輸入的操作金鑰 */
+.dispatch-auth-overlay{position:fixed;inset:0;z-index:200001;background:rgba(14,20,30,.91);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)}
+.dispatch-auth-panel{width:min(440px,100%);background:#fff;border-radius:24px;padding:28px;box-shadow:0 20px 80px rgba(0,0,0,.35);color:#14191f}
+.dispatch-auth-panel h2{font-size:23px;margin:0 0 10px;font-weight:1000}
+.dispatch-auth-panel p{font-size:13px;color:#515b65;line-height:1.75;margin:0 0 20px}
+.dispatch-auth-panel label{display:block;font-weight:900;font-size:13px;margin-bottom:8px}
+.dispatch-auth-panel input{width:100%;padding:14px 15px;border:1px solid #cbd1d6;border-radius:12px;font:inherit;font-size:15px;box-sizing:border-box}
+.dispatch-auth-panel input:focus{outline:2px solid #edba26;border-color:#e9ad00}
+.dispatch-auth-panel button{margin-top:14px;width:100%;border:none;padding:13px 16px;background:#f2bc25;color:#151515;border-radius:12px;font:inherit;font-weight:1000;cursor:pointer}
+.dispatch-auth-panel button:disabled{opacity:.6;cursor:wait}
+.dispatch-auth-error{margin-top:12px;color:#a12e2e;font-size:12px;line-height:1.6;min-height:20px;white-space:pre-line}
+.dispatch-auth-note{font-size:11px;color:#66717c;margin-top:16px;line-height:1.6}
+.dispatch-logout-btn{border-color:#c9ced5!important}
 </style>
 </head>
 
 <body>
 
+<!-- 管理驗證的前端表單不包含任何預設金鑰；伺服器決定是否授權。 -->
+<div class="dispatch-auth-overlay" id="dispatchAuthOverlay" role="dialog" aria-modal="true" aria-labelledby="dispatchAuthTitle">
+  <form class="dispatch-auth-panel" id="dispatchAuthForm" autocomplete="off">
+    <h2 id="dispatchAuthTitle">UBee 調度中心｜管理員驗證</h2>
+    <p>請輸入在 Render 設定的 <strong>DISPATCH_ADMIN_KEY</strong>（或既有管理金鑰）。驗證通過後才會讀取訂單與小U資料。</p>
+    <label for="dispatchAuthKeyInput">調度管理金鑰</label>
+    <input id="dispatchAuthKeyInput" type="password" autocomplete="off" spellcheck="false" required placeholder="輸入管理金鑰" />
+    <button type="submit" id="dispatchAuthSubmit">驗證並進入調度中心</button>
+    <div class="dispatch-auth-error" id="dispatchAuthError" role="alert" aria-live="polite"></div>
+    <div class="dispatch-auth-note">金鑰僅暫存在本頁記憶體中；重新整理或關閉分頁後須重新登入。請使用 HTTPS，不要將金鑰公開或分享。</div>
+  </form>
+</div>
 <div class="app">
 
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> Operations Center</div>
-      <div class="version">V6.0.2 · ACCESS PROTECTED</div>
+      <div class="version">V6.0.1 · RENDER AUTH FIX</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
       <button class="btn" id="fitMapBtn">定位全部</button>
       <button class="btn primary" id="refreshBtn">重新整理</button>
+      <button class="btn dispatch-logout-btn" id="dispatchLogoutBtn" type="button">鎖定調度中心</button>
     </div>
   </header>
 
   <div class="level4-banner">
-    <div><strong>UBee Operations Center V6.0.2｜免二次登入・存取保護</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
+    <div><strong>UBee Operations Center V6.0.1｜Render 管理驗證整合</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
     <div class="level4-badge">CITY OPS：LIVE · PROFIT CONTROL：ON</div>
   </div>
 
@@ -835,20 +861,82 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 <script>
 'use strict';
 
-/* UBee Dispatch V6.0.2 — 免二次登入。安全驗證在 Cloudflare Access 與 Render API 執行。 */
+/* ============================================================
+   Dispatch Auth V6.0.1 — Render 直接部署模式
+   - 管理金鑰只放在 JS 記憶體；不存 localStorage/sessionStorage/cookie。
+   - 所有 /api/dispatch/* 的讀寫請求統一走 dispatchFetch。
+   - 每次重新開頁都需重新認證；權限由後端統一判定。
+   ============================================================ */
+let dispatchAdminCredential = '';
+let dispatchAuthBusy = false;
+function dispatchAuthVisible(message=''){
+  const overlay=document.getElementById('dispatchAuthOverlay');
+  if(overlay) overlay.style.display='flex';
+  const error=document.getElementById('dispatchAuthError');
+  if(error && message) error.textContent=message;
+}
+function dispatchAuthLocked(message=''){
+  dispatchAdminCredential='';
+  dispatchAuthVisible(message || '管理授權失效，請重新輸入金鑰。');
+}
 async function dispatchFetch(url,options={}){
   const path=typeof url==='string'?url:String(url||'');
-  if(!path.startsWith('/api/dispatch/')) throw new Error('僅允許調度 API');
+  if(!path.startsWith('/api/dispatch/')){
+    throw new Error('dispatchFetch 僅允許呼叫調度管理 API。');
+  }
+  if(!dispatchAdminCredential){
+    dispatchAuthVisible('請先完成管理員驗證。');
+    throw new Error('尚未登入調度中心。');
+  }
   const headers=new Headers(options.headers||{});
-  headers.delete('X-UBee-Dispatch-Admin-Key');
-  headers.delete('X-Dispatch-Admin-Token');
+  headers.set('X-UBee-Dispatch-Admin-Key',dispatchAdminCredential);
   headers.set('Accept','application/json');
   const response=await fetch(path,{...options,headers,credentials:'same-origin',cache:'no-store'});
   if(response.status===401||response.status===403){
-    throw new Error('調度存取未授權：請確認 Cloudflare Access 授權及網域設定。');
+    dispatchAuthLocked('管理金鑰不正確或已變更，請重新驗證。');
   }
   return response;
 }
+async function submitDispatchAuth(event){
+  event.preventDefault();
+  if(dispatchAuthBusy) return;
+  const input=document.getElementById('dispatchAuthKeyInput');
+  const submit=document.getElementById('dispatchAuthSubmit');
+  const error=document.getElementById('dispatchAuthError');
+  const candidate=String(input?.value||'').trim();
+  if(!candidate){if(error) error.textContent='請輸入管理金鑰。';return;}
+  dispatchAuthBusy=true;
+  if(submit){submit.disabled=true;submit.textContent='正在驗證…';}
+  if(error)error.textContent='';
+  try{
+    const response=await fetch('/api/dispatch/auth/check',{
+      method:'GET',cache:'no-store',credentials:'same-origin',
+      headers:{'Accept':'application/json','X-UBee-Dispatch-Admin-Key':candidate}
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.success!==true){
+      throw new Error(data.message||`管理驗證失敗（HTTP ${response.status}）`);
+    }
+    dispatchAdminCredential=candidate;
+    if(input)input.value='';
+    const overlay=document.getElementById('dispatchAuthOverlay');
+    if(overlay)overlay.style.display='none';
+    await Promise.all([loadDashboard(),loadWeatherPricingSettings()]);
+  }catch(e){
+    dispatchAdminCredential='';
+    if(error)error.textContent=e.message||'驗證失敗，請檢查連線或管理金鑰。';
+  }finally{
+    dispatchAuthBusy=false;
+    if(submit){submit.disabled=false;submit.textContent='驗證並進入調度中心';}
+  }
+}
+function logoutDispatch(){
+  dispatchAdminCredential='';
+  // 重新載入以清除所有已渲染的訂單、小U和異常案件資料。
+  window.location.reload();
+}
+
+
 /* ============================================================
    UBee 智慧調度控制塔 V4 + V5｜第二階段異常案件中心 × V3 安全處置
    現有可直接使用：
@@ -2095,6 +2183,7 @@ async function loadDashboard({silent=false}={}){
     if(mapStatusEl) mapStatusEl.textContent = '連線受阻';
     return;
   }
+  if(!dispatchAdminCredential) return;
   if(state.loading) return;
   state.loading = true;
   if(!silent) $('refreshBtn').disabled = true;
@@ -2224,7 +2313,7 @@ function renderSelectedOrderTrail(bounds){
 
 
 function getDispatchAdminKey(){
-  return true;
+  return dispatchAdminCredential;
 }
 
 function weatherDefaultMeta(type){
@@ -2310,6 +2399,11 @@ async function saveWeatherPricingSettings(){
   const button=$('saveWeatherPricingBtn');
   const adminKey=getDispatchAdminKey();
 
+  if(!adminKey){
+    toast('請先輸入調度管理金鑰');
+    document.getElementById('dispatchAuthKeyInput')?.focus();
+    return;
+  }
 
 
   const type=String($('weatherTypeSelect')?.value||'none');
@@ -2336,6 +2430,7 @@ async function saveWeatherPricingSettings(){
       method:'POST',
       headers:{
         'Content-Type':'application/json',
+        'X-UBee-Dispatch-Admin-Key':adminKey
       },
       body:JSON.stringify({
         enabled:global.enabled!==false,
@@ -2429,6 +2524,11 @@ async function approveSelectedOrderItemSize(){
     return;
   }
 
+  if(!adminKey){
+    toast('請先完成管理員驗證');
+    document.getElementById('dispatchAuthKeyInput')?.focus();
+    return;
+  }
 
 
   const itemSize=String(
@@ -2453,7 +2553,8 @@ async function approveSelectedOrderItemSize(){
         method:'POST',
         headers:{
           'Content-Type':'application/json',
-          },
+          'X-UBee-Dispatch-Admin-Key':adminKey
+        },
         body:JSON.stringify({
           itemSize,
           feeOverride,
@@ -3962,7 +4063,10 @@ window.addEventListener('resize',()=>{
    啟動
    ========================= */
 initMap();
-setInterval(()=>{if(!document.hidden && navigator.onLine && !state.loading)loadDashboard({silent:true});},10000);
+document.getElementById('dispatchAuthForm').addEventListener('submit',submitDispatchAuth);
+document.getElementById('dispatchLogoutBtn').addEventListener('click',logoutDispatch);
+document.getElementById('dispatchAuthKeyInput')?.focus();
+setInterval(()=>{if(dispatchAdminCredential && !document.hidden && navigator.onLine && !state.loading)loadDashboard({silent:true});},10000);
 setInterval(renderWeatherPricingStatus,30000);
 
 /* =========================================================
