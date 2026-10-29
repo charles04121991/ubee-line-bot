@@ -482,26 +482,31 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 .dispatch-logout-btn{border-color:#c9ced5!important}
 </style>
 
-<style id="ubee-ops-v610">
-:root{--ops-edge:#111827}
-html{scroll-behavior:smooth}
-.app{max-width:1920px!important;margin:0 auto!important;padding:16px 22px 30px!important}
-.topbar{position:sticky;top:0;z-index:50;background:var(--bg,#0b1220);border-radius:16px;padding:12px 18px!important;box-shadow:0 8px 30px #0002}
-.ops-nav{display:flex;gap:8px;overflow-x:auto;padding:12px 0 16px;position:relative;z-index:2}
-.ops-nav a{white-space:nowrap;text-decoration:none;color:var(--text,#e5e7eb);font-size:13px;font-weight:700;border:1px solid var(--border,#334155);border-radius:12px;padding:10px 15px;background:var(--card,#162132)}
-.ops-nav a:hover,.ops-nav a:focus-visible{border-color:#facc15;outline:2px solid transparent}
-.kpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}
-.main-grid.ops-three-column{display:grid!important;grid-template-columns:minmax(280px,0.95fr) minmax(390px,1.55fr) minmax(310px,1fr)!important;gap:14px!important;align-items:start}
-.ops-three-column>.left-stack,.ops-three-column>.right-stack,.ops-three-column>.ops-dispatch-stack{min-width:0;display:flex;flex-direction:column;gap:14px}
-.ops-three-column>.left-stack>.panel:first-child,.ops-three-column>.right-stack>.panel:first-child,.ops-three-column>.ops-dispatch-stack>.panel:first-child{min-height:500px}
-.ops-three-column .order-list{max-height:620px;overflow-y:auto}
-.ops-three-column .map-wrap{height:520px!important;min-height:420px}
-.ops-three-column .candidate-list{max-height:460px;overflow-y:auto}
-.ops-three-column .filters{flex-wrap:wrap}
-.ops-dispatch-stack{position:sticky;top:102px;max-height:calc(100vh - 120px);overflow-y:auto}
+
+<style id="ubee-ops-v611">
+html{scroll-behavior:smooth;scroll-padding-top:90px}
+.app{max-width:1920px;margin:auto;padding:12px 20px 28px}
+.topbar{position:relative;z-index:2}
+.ops-nav{display:flex;gap:8px;overflow-x:auto;padding:12px 0}
+.ops-nav a{white-space:nowrap;text-decoration:none;color:#161616;font-size:13px;font-weight:800;border:1px solid #d2d5d9;border-radius:10px;padding:9px 14px;background:white}
+.ops-nav a:focus-visible{outline:2px solid #d5a00b}
+.level4-banner{margin-bottom:12px;padding:12px 16px}
+.ops-primary-kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.ops-primary-kpis .kpi{padding:12px 14px}
+.ops-primary-kpis .kpi .value{font-size:25px}
+.main-grid.ops-three-column{display:grid;grid-template-columns:minmax(280px,0.9fr) minmax(440px,1.55fr) minmax(320px,1fr);gap:12px;align-items:start;margin-bottom:14px}
+.ops-three-column>.left-stack,.ops-three-column>.right-stack,.ops-three-column>.ops-dispatch-stack{min-width:0;display:flex;flex-direction:column;gap:12px}
+.ops-three-column .order-list{max-height:calc(100vh - 360px);min-height:280px;overflow-y:auto}
+.ops-three-column .map-wrap{height:min(62vh,630px);min-height:400px}
+.ops-three-column .candidate-list{max-height:45vh;overflow-y:auto}
 .ops-three-column .panel{min-width:0}
-@media(max-width:1250px){.main-grid.ops-three-column{grid-template-columns:minmax(260px,1fr) minmax(350px,1.4fr)!important}.ops-dispatch-stack{grid-column:1/-1;position:static;max-height:none}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
-@media(max-width:780px){.app{padding:10px!important}.main-grid.ops-three-column{grid-template-columns:minmax(0,1fr)!important}.ops-dispatch-stack{grid-column:auto}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}.topbar{position:relative}.ops-three-column .map-wrap{height:390px!important}}
+.ops-three-column .filters{flex-wrap:wrap}
+.ops-secondary-metrics{margin:12px 0 16px}
+.ops-secondary-metrics>summary{cursor:pointer;font-size:13px;font-weight:800;padding:12px 14px;background:white;border-radius:12px;border:1px solid #e1e2e4}
+.ops-secondary-metrics>.kpis{grid-template-columns:repeat(5,minmax(0,1fr));margin-top:10px}
+.control-tower,.intel-grid{margin-top:12px}
+@media(max-width:1300px){.main-grid.ops-three-column{grid-template-columns:minmax(270px,1fr) minmax(390px,1.4fr)}.ops-dispatch-stack{grid-column:1/-1}.ops-primary-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:790px){.app{padding:9px}.main-grid.ops-three-column{grid-template-columns:minmax(0,1fr)}.ops-dispatch-stack{grid-column:auto}.ops-primary-kpis,.ops-secondary-metrics>.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-three-column .map-wrap{height:400px}}
 </style>
 </head>
 
@@ -524,7 +529,7 @@ html{scroll-behavior:smooth}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> Operations Center</div>
-      <div class="version">V6.1.0 · OPERATIONS WORKBENCH</div>
+      <div class="version">V6.1.1 · OPERATIONS WORKBENCH</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -542,73 +547,18 @@ html{scroll-behavior:smooth}
     <a href="#opsPricing">財務與定價</a>
   </nav>
   <div class="level4-banner">
-    <div><strong>UBee Operations Center V6.1.0｜智慧營運調度工作台</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
+    <div><strong>UBee Operations Center V6.1.1｜智慧營運調度工作台</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
     <div class="level4-badge">CITY OPS：LIVE · PROFIT CONTROL：ON</div>
   </div>
 
-  <section class="kpis">
-    <div class="kpi"><div class="label">全部小U</div><div class="value" id="totalRiders">-</div><div class="sub">已審核且仍有效的運力名單</div></div>
+  <section class="kpis ops-primary-kpis">
     <div class="kpi"><div class="label">上線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">目前保持上線的小U</div></div>
     <div class="kpi"><div class="label">可接單小U</div><div class="value" id="available">-</div><div class="sub">可進入智慧候選</div></div>
     <div class="kpi"><div class="label">待派單</div><div class="value" id="waiting">-</div><div class="sub" id="waitingSub">等待媒合中的訂單</div></div>
     <div class="kpi"><div class="label">配送中</div><div class="value" id="active">-</div><div class="sub">已由小U承接</div></div>
-    <div class="kpi"><div class="label">今日完成</div><div class="value" id="completed">-</div><div class="sub">今日完成任務</div></div>
     <div class="kpi"><div class="label">高風險任務</div><div class="value" id="highRisk">-</div><div class="sub">需優先人工關注</div></div>
-    <div class="kpi"><div class="label">15分鐘預測需求</div><div class="value" id="forecastDemand">-</div><div class="sub">規則＋歷史樣本預測</div></div>
-    <div class="kpi"><div class="label">預測運力缺口</div><div class="value" id="forecastGap">-</div><div class="sub">負數代表可能缺員</div></div>
-    <div class="kpi"><div class="label">異常提醒</div><div class="value" id="alerts">-</div><div class="sub">需人工關注</div></div>
   </section>
 
-  <section class="control-tower">
-    <div class="control-box">
-      <div class="control-title">全局即時任務控制塔</div>
-      <div class="control-main"><span id="towerLiveOrders">-</span> <small>張即時任務</small></div>
-      <div class="risk-strip" id="riskStrip">
-        <button class="ops-pill active" data-tower-filter="all">全部</button>
-        <button class="ops-pill" data-tower-filter="NORMAL">🟢 正常 <span id="towerNormal">0</span></button>
-        <button class="ops-pill" data-tower-filter="WATCH">🟡 注意 <span id="towerWatch">0</span></button>
-        <button class="ops-pill" data-tower-filter="HIGH">🟠 高風險 <span id="towerHigh">0</span></button>
-        <button class="ops-pill" data-tower-filter="CRITICAL">🔴 緊急 <span id="towerCritical">0</span></button>
-      </div>
-      <div class="stage-strip" id="stageStrip">
-        <button class="ops-pill" data-stage-filter="waiting">等待接單 <span id="stageWaiting">0</span></button>
-        <button class="ops-pill" data-stage-filter="pickup">前往取件 <span id="stagePickup">0</span></button>
-        <button class="ops-pill" data-stage-filter="pickup_wait">等待取件 <span id="stagePickupWait">0</span></button>
-        <button class="ops-pill" data-stage-filter="delivery">配送中 <span id="stageDelivery">0</span></button>
-        <button class="ops-pill" data-stage-filter="dropoff">抵達送達 <span id="stageDropoff">0</span></button>
-        <button class="ops-pill" data-stage-filter="clear">清除階段篩選</button>
-      </div>
-    </div>
-    <div class="city-health">
-      <div class="city-health-head"><div><div class="control-title" style="color:var(--muted)">城市與小U健康</div><div class="city-status" id="cityStatus">分析中</div></div><div class="badge" id="selectedZoneBadge">全台中</div></div>
-      <div class="health-grid">
-        <div class="health-mini"><b id="healthHealthy">0</b><span>🟢 狀態良好</span></div>
-        <div class="health-mini"><b id="healthTask">0</b><span>🔵 任務中</span></div>
-        <div class="health-mini"><b id="healthUnstable">0</b><span>🟡 連線不穩</span></div>
-        <div class="health-mini"><b id="healthCritical">0</b><span>🔴 任務異常</span></div>
-        <div class="health-mini"><b id="healthOffline">0</b><span>⚪ 離線</span></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="intel-grid" id="opsIntelligence">
-    <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">智慧調度建議</div><div class="panel-sub">只提出建議，不自動執行高風險操作</div></div></div>
-      <div class="panel-body"><div class="intel-list" id="recommendationList"><div class="empty">智慧分析載入中…</div></div></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">區域供需與缺口</div><div class="panel-sub">依即時訂單、在線運力與 15 分鐘預測排序</div></div></div>
-      <div class="panel-body"><div class="zone-grid" id="zoneGrid"><div class="empty">區域分析載入中…</div></div></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">15 分鐘預測</div><div class="panel-sub">資料不足時會降低信心，不假裝精準</div></div></div>
-      <div class="panel-body" id="forecastPanel"><div class="empty">預測載入中…</div></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><div><div class="panel-title" id="opsPricing">區域動態定價</div><div class="panel-sub">依各區即時待派單與有效運力顯示目前調度費</div></div></div>
-      <div class="panel-body"><div class="zone-grid" id="dynamicPricingGrid"><div class="empty">動態定價載入中…</div></div></div>
-    </div>
-  </section>
 
   <main class="main-grid" id="opsWorkbench">
 
@@ -747,6 +697,67 @@ html{scroll-behavior:smooth}
     </section>
 
   </main>
+
+  <details class="ops-secondary-metrics"><summary>更多營運指標（全部小U、今日完成、預測、提醒）</summary><section class="kpis">
+    <div class="kpi"><div class="label">全部小U</div><div class="value" id="totalRiders">-</div><div class="sub">已審核且仍有效的運力名單</div></div>
+    <div class="kpi"><div class="label">今日完成</div><div class="value" id="completed">-</div><div class="sub">今日完成任務</div></div>
+    <div class="kpi"><div class="label">15分鐘預測需求</div><div class="value" id="forecastDemand">-</div><div class="sub">規則＋歷史樣本預測</div></div>
+    <div class="kpi"><div class="label">預測運力缺口</div><div class="value" id="forecastGap">-</div><div class="sub">負數代表可能缺員</div></div>
+    <div class="kpi"><div class="label">異常提醒</div><div class="value" id="alerts">-</div><div class="sub">需人工關注</div></div>
+</section></details>
+
+  <section class="control-tower">
+    <div class="control-box">
+      <div class="control-title">全局即時任務控制塔</div>
+      <div class="control-main"><span id="towerLiveOrders">-</span> <small>張即時任務</small></div>
+      <div class="risk-strip" id="riskStrip">
+        <button class="ops-pill active" data-tower-filter="all">全部</button>
+        <button class="ops-pill" data-tower-filter="NORMAL">🟢 正常 <span id="towerNormal">0</span></button>
+        <button class="ops-pill" data-tower-filter="WATCH">🟡 注意 <span id="towerWatch">0</span></button>
+        <button class="ops-pill" data-tower-filter="HIGH">🟠 高風險 <span id="towerHigh">0</span></button>
+        <button class="ops-pill" data-tower-filter="CRITICAL">🔴 緊急 <span id="towerCritical">0</span></button>
+      </div>
+      <div class="stage-strip" id="stageStrip">
+        <button class="ops-pill" data-stage-filter="waiting">等待接單 <span id="stageWaiting">0</span></button>
+        <button class="ops-pill" data-stage-filter="pickup">前往取件 <span id="stagePickup">0</span></button>
+        <button class="ops-pill" data-stage-filter="pickup_wait">等待取件 <span id="stagePickupWait">0</span></button>
+        <button class="ops-pill" data-stage-filter="delivery">配送中 <span id="stageDelivery">0</span></button>
+        <button class="ops-pill" data-stage-filter="dropoff">抵達送達 <span id="stageDropoff">0</span></button>
+        <button class="ops-pill" data-stage-filter="clear">清除階段篩選</button>
+      </div>
+    </div>
+    <div class="city-health">
+      <div class="city-health-head"><div><div class="control-title" style="color:var(--muted)">城市與小U健康</div><div class="city-status" id="cityStatus">分析中</div></div><div class="badge" id="selectedZoneBadge">全台中</div></div>
+      <div class="health-grid">
+        <div class="health-mini"><b id="healthHealthy">0</b><span>🟢 狀態良好</span></div>
+        <div class="health-mini"><b id="healthTask">0</b><span>🔵 任務中</span></div>
+        <div class="health-mini"><b id="healthUnstable">0</b><span>🟡 連線不穩</span></div>
+        <div class="health-mini"><b id="healthCritical">0</b><span>🔴 任務異常</span></div>
+        <div class="health-mini"><b id="healthOffline">0</b><span>⚪ 離線</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="intel-grid" id="opsIntelligence">
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">智慧調度建議</div><div class="panel-sub">只提出建議，不自動執行高風險操作</div></div></div>
+      <div class="panel-body"><div class="intel-list" id="recommendationList"><div class="empty">智慧分析載入中…</div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">區域供需與缺口</div><div class="panel-sub">依即時訂單、在線運力與 15 分鐘預測排序</div></div></div>
+      <div class="panel-body"><div class="zone-grid" id="zoneGrid"><div class="empty">區域分析載入中…</div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">15 分鐘預測</div><div class="panel-sub">資料不足時會降低信心，不假裝精準</div></div></div>
+      <div class="panel-body" id="forecastPanel"><div class="empty">預測載入中…</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title" id="opsPricing">區域動態定價</div><div class="panel-sub">依各區即時待派單與有效運力顯示目前調度費</div></div></div>
+      <div class="panel-body"><div class="zone-grid" id="dynamicPricingGrid"><div class="empty">動態定價載入中…</div></div></div>
+    </div>
+  </section>
+
+
 </div>
 
 <!-- 指定小U確認視窗 -->
@@ -4168,26 +4179,20 @@ setInterval(renderWeatherPricingStatus,30000);
 })();
 </script>
 
-<script id="ubee-ops-v610-layout">
+
+<script id="ubee-ops-v611-layout">
 (function(){
-  const main=document.querySelector('main.main-grid');
+  const main=document.getElementById('opsWorkbench');
   if(!main)return;
-  const left=main.querySelector(':scope > .left-stack');
-  const right=main.querySelector(':scope > .right-stack');
-  if(!left||!right)return;
   const candidate=document.getElementById('candidateList')?.closest('.panel');
   const timeline=document.getElementById('dispatchTimeline')?.closest('.panel');
-  const map=document.getElementById('map')?.closest('.panel') || right.querySelector('.panel');
-  const dispatch=document.createElement('section');
-  dispatch.className='ops-dispatch-stack';
-  dispatch.setAttribute('aria-label','任務詳情與調度操作');
-  if(candidate)dispatch.appendChild(candidate);
-  if(timeline)dispatch.appendChild(timeline);
-  main.appendChild(dispatch);
+  const stack=document.createElement('section');
+  stack.className='ops-dispatch-stack';
+  stack.setAttribute('aria-label','訂單詳情與調度操作');
+  if(candidate)stack.appendChild(candidate);
+  if(timeline)stack.appendChild(timeline);
+  main.appendChild(stack);
   main.classList.add('ops-three-column');
-  // The map stays in the center column, and all existing event listeners and element IDs remain intact.
-  const note=document.querySelector('.level4-banner small');
-  if(note)note.textContent='訂單佇列、即時地圖與人工調度三欄協作；既有正式派單與交易保護邏輯保持不變。';
 })();
 </script>
 </body>
