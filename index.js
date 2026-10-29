@@ -25964,6 +25964,43 @@ app.get('/api/rider/v4/bootstrap', riderAuthMiddleware, async (req, res) => {
 
 // ============================================================
 // Rider V4 onboarding progress
+
+// V5.23.5 Rider Terms: authenticated, versioned draft with auditable consent.
+// Not yet a legally approved contract: do not block dispatch or onboarding until approved.
+const UBEE_RIDER_TERMS_V5235 = Object.freeze({
+  version:'rider-terms-v1-draft-20261029',
+  status:'DRAFT',
+  effectiveDate:null,
+  requiresAcceptance:false,
+  title:'小U平台條款與營運規範（草案）',
+  sections:[{"id": "1", "title": "合作與資格", "body": "小U應提供真實且必要的申請資料，依平台公布的審核、教學與測驗程序取得接單資格。合作關係、保險與其他法定權利義務，應依實際運作方式及適用法令判定，不因本規範名稱而改變。"}, {"id": "2", "title": "接單與任務執行", "body": "小U可依適用規定自主選擇是否承接任務；承接後應確認取送地址、物品、服務內容及費用，依系統流程履行並更新狀態。發生缺貨、客戶失聯、地址異常或無法履約時，應及時透過平台回報，不得擅自加價、轉交第三人或改為私人交易。"}, {"id": "3", "title": "報酬、代墊與結算", "body": "每筆報酬、平台費及代墊款應以任務明細、適用計價規則與正式結算紀錄為準。代購須依客戶同意的商品及預算執行，保留必要憑證；款項爭議可向客服申請核對。法定最低報酬、給付頻率及其他保障依適用法規辦理。"}, {"id": "4", "title": "品質、違規與申訴", "body": "禁止騷擾、侵占款項、偽造履約紀錄、故意洩漏客戶資訊及其他違法行為。平台調查違規時應提供合理說明與申訴機會，停權或終止合作須符合適用法律與契約；不得僅因依法拒接訂單或下線而任意處分。"}, {"id": "5", "title": "交通安全與資料保護", "body": "小U應遵守交通規則，遇危險天候、事故或疑似違法物品時以人身安全與合法性為優先，並依程序回報。客戶姓名、電話、地址、定位與訂單資訊僅得於執行服務及合法必要範圍內使用，不得私下行銷或公開轉傳。"}, {"id": "6", "title": "LINE 社群與平台資訊", "body": "公告、聊天與回報群應依群組用途使用；禁止張貼未經允許的廣告、詐騙、騷擾內容、客戶個資或擅自公開社群加入密碼。社群管理與接單資格處分應分別依各自規範辦理。"}]
+});
+const UBEE_RIDER_TERMS_HASH_V5235 = crypto.createHash('sha256').update(JSON.stringify(UBEE_RIDER_TERMS_V5235)).digest('hex');
+function ubeeRiderTermsAuthorized(req,res){
+  const docId=String(req.riderAuth?.riderDocId||'').trim();
+  if(!docId){res.status(401).json({success:false,code:'RIDER_TOKEN_REQUIRED',message:'請重新登入後查看條款。'});return '';}
+  return docId;
+}
+app.get('/api/rider/terms/current',riderAuthMiddleware,async(req,res)=>{
+  const docId=ubeeRiderTermsAuthorized(req,res);if(!docId)return;
+  try{
+    const snap=await db.collection('riderTermsConsents').doc(docId).collection('versions').doc(UBEE_RIDER_TERMS_V5235.version).get();
+    res.set('Cache-Control','no-store');
+    return res.json({success:true,terms:UBEE_RIDER_TERMS_V5235,documentHash:UBEE_RIDER_TERMS_HASH_V5235,accepted:snap.exists,acceptedAtMs:snap.exists?Number(snap.data()?.acceptedAtMs||0):null});
+  }catch(error){console.error('rider terms read:',error);return res.status(500).json({success:false,message:'條款暫時無法載入。'});}
+});
+app.post('/api/rider/terms/accept',riderAuthMiddleware,async(req,res)=>{
+  const docId=ubeeRiderTermsAuthorized(req,res);if(!docId)return;
+  if(UBEE_RIDER_TERMS_V5235.status!=='PUBLISHED')return res.status(409).json({success:false,code:'TERMS_DRAFT',message:'條款尚未正式發布，暫不能建立正式同意紀錄。'});
+  if(req.body?.version!==UBEE_RIDER_TERMS_V5235.version||req.body?.documentHash!==UBEE_RIDER_TERMS_HASH_V5235) return res.status(409).json({success:false,code:'TERMS_VERSION_CHANGED',message:'條款已更新，請重新閱讀。'});
+  try{
+    const ref=db.collection('riderTermsConsents').doc(docId).collection('versions').doc(UBEE_RIDER_TERMS_V5235.version);
+    const acceptedAtMs=Date.now();
+    await db.runTransaction(async tx=>{const snap=await tx.get(ref);if(!snap.exists)tx.create(ref,{riderDocId:docId,version:UBEE_RIDER_TERMS_V5235.version,documentHash:UBEE_RIDER_TERMS_HASH_V5235,acceptedAtMs,acceptedAt:admin.firestore.FieldValue.serverTimestamp(),method:'RIDER_APP_EXPLICIT_CONSENT'});});
+    return res.json({success:true,accepted:true,version:UBEE_RIDER_TERMS_V5235.version});
+  }catch(error){console.error('rider terms accept:',error);return res.status(500).json({success:false,message:'儲存同意紀錄失敗。'});}
+});
+
 app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, res) => {
   try {
     const ctx = await getRiderV4ApiContext(req);
