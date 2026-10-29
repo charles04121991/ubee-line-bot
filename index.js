@@ -1,4 +1,4 @@
-// UBee Driver V5.23.5.4｜Secure Rider Login｜2026-10-29
+// UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
 // ============================================================
 // UBee Backend｜會員安全增量 2026-10-17（以 2026-10-08 後端正式基準為底）
 // Release: 20261017_CUSTOMER_MEMBER_SECURITY_V1 + 2026_1008_RIDER_PRODUCTION_RELIABILITY_RC1_V5_20_4 + CUSTOMER_NO_REGISTER_V4_UCOIN_CAP_V2 + RIDER_NATIVE_PROFILE_PERFORMANCE_V5_18
@@ -7987,79 +7987,10 @@ async function findRiderByPhoneForLogin(phone) {
   };
 }
 
-
-// V5.23.5.4: password storage is separate from rider public/profile records.
-const RIDER_PASSWORD_COLLECTION = 'riderLoginCredentialsV1';
-const RIDER_PASSWORD_MIN_LENGTH = 10;
-function riderPasswordPolicy(password){
-  return typeof password==='string' && password.length>=RIDER_PASSWORD_MIN_LENGTH && password.length<=128 && /[A-Za-z]/.test(password) && /\d/.test(password);
-}
-function riderPasswordHash(password,salt){
-  return crypto.scryptSync(password,salt,64,{N:16384,r:8,p:1,maxmem:64*1024*1024}).toString('hex');
-}
-function riderPasswordMatches(password,credential){
-  const salt=String(credential?.salt||'');const stored=String(credential?.hash||'');
-  if(!/^[0-9a-f]{32}$/.test(salt)||!/^[0-9a-f]{128}$/.test(stored))return false;
-  const a=Buffer.from(riderPasswordHash(password,salt),'hex');
-  const c=Buffer.from(stored,'hex');return crypto.timingSafeEqual(a,c);
-}
-const riderLoginAttempts=new Map();
-function riderLoginThrottle(phone,ip){
-  const key=crypto.createHash('sha256').update(`${phone}|${ip}`).digest('hex');
-  const now=Date.now();const record=riderLoginAttempts.get(key)||{count:0,until:0};
-  if(record.until>now)return {blocked:true,key};
-  if(record.until<=now&&record.until)riderLoginAttempts.delete(key);
-  return {blocked:false,key};
-}
-function riderLoginFailure(key){
-  const now=Date.now();const v=riderLoginAttempts.get(key)||{count:0,until:0};v.count+=1;
-  if(v.count>=5){v.until=now+15*60*1000;v.count=0;}
-  riderLoginAttempts.set(key,v);
-}
-// A pre-existing authenticated Firebase rider session is required for password activation.
-// A phone-only cached session must NEVER authorize password enrollment.
-app.post('/api/rider/security/password',async(req,res)=>{
-  try{
-    const verified=await verifyRiderFirebaseIdToken(req);
-    if(!verified.ok)return res.status(401).json({success:false,message:'請使用已驗證的小U登入憑證設定密碼；若無有效憑證，請聯絡平台核實身分。'});
-    const token=verified.decodedToken||{};
-    if(token.role!=='rider'||!token.riderDocId)return res.status(403).json({success:false,message:'帳號權限不符。'});
-    const riderDocId=String(token.riderDocId);
-    const riderDoc=await db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDocId).get();
-    if(!riderDoc.exists)return res.status(403).json({success:false,message:'找不到正式小U帳號。'});
-    const {password,currentPassword}=req.body||{};
-    if(!riderPasswordPolicy(password))return res.status(400).json({success:false,message:'密碼需 10–128 碼，且同時包含英文字母與數字。'});
-    const ref=db.collection(RIDER_PASSWORD_COLLECTION).doc(riderDocId);
-    const old=await ref.get();
-    if(old.exists){
-      if(typeof currentPassword!=='string'||!riderPasswordMatches(currentPassword,old.data()))return res.status(403).json({success:false,message:'目前密碼不正確。'});
-    }else if(token.auth_time && Date.now()/1000-Number(token.auth_time)>24*3600){
-      return res.status(403).json({success:false,message:'首次設定密碼需使用近期有效的登入憑證，請聯絡平台核實身分。'});
-    }
-    const salt=crypto.randomBytes(16).toString('hex');
-    await ref.set({hash:riderPasswordHash(password,salt),salt,algorithm:'scrypt-N16384-r8-p1',updatedAt:admin.firestore.FieldValue.serverTimestamp(),createdAt:old.exists?(old.data().createdAt||admin.firestore.FieldValue.serverTimestamp()):admin.firestore.FieldValue.serverTimestamp()});
-    return res.json({success:true,message:old.exists?'密碼已更新。':'登入密碼已啟用。'});
-  }catch(err){console.error('Rider password enrollment:',err);return res.status(500).json({success:false,message:'密碼設定失敗，請稍後再試。'});}
-});
-app.get('/api/rider/security/password-status',async(req,res)=>{
-  try{
-    const verified=await verifyRiderFirebaseIdToken(req);
-    if(!verified.ok)return res.status(401).json({success:false,message:'需要已驗證登入憑證。'});
-    const token=verified.decodedToken||{};
-    if(token.role!=='rider'||!token.riderDocId)return res.status(403).json({success:false});
-    const doc=await db.collection(RIDER_PASSWORD_COLLECTION).doc(String(token.riderDocId)).get();
-    return res.json({success:true,configured:doc.exists});
-  }catch(err){return res.status(500).json({success:false,message:'無法讀取密碼設定狀態。'});}
-});
-
 app.post('/api/rider/login', async (req, res) => {
   try {
-    const { phone, password } = req.body || {};
-    const cleanPhone=normalizePhone(phone||'');
-    const attempt=riderLoginThrottle(cleanPhone,String(req.ip||''));
-    if(attempt.blocked)return res.status(429).json({success:false,message:'嘗試次數過多，請 15 分鐘後再試。'});
-    if(!/^09\d{8}$/.test(cleanPhone)||typeof password!=='string')return res.status(401).json({success:false,message:'手機號碼或密碼錯誤。'});
-    const result = await findRiderByPhoneForLogin(cleanPhone);
+    const { phone } = req.body || {};
+    const result = await findRiderByPhoneForLogin(phone);
 
     if (!result.ok) {
       return res.status(result.statusCode).json({
@@ -8069,13 +8000,6 @@ app.post('/api/rider/login', async (req, res) => {
       });
     }
 
-    const credentialDoc=await db.collection(RIDER_PASSWORD_COLLECTION).doc(String(result.riderDoc.id)).get();
-    if(!credentialDoc.exists){return res.status(403).json({success:false,code:'RIDER_PASSWORD_NOT_CONFIGURED',message:'尚未設定登入密碼。請使用原有已驗證的騎士端登入狀態進入設定，或聯絡平台完成身分核實。'});}
-    if(!riderPasswordMatches(password,credentialDoc.data())){
-      riderLoginFailure(attempt.key);
-      return res.status(401).json({success:false,message:'手機號碼或密碼錯誤。'});
-    }
-    riderLoginAttempts.delete(attempt.key);
     // Token 建立失敗時仍保留原本手機登入成功，
     // 避免 Firebase Auth 過渡期間影響現有接單與訂單流程。
     let firebaseUid = '';
@@ -8099,7 +8023,6 @@ app.post('/api/rider/login', async (req, res) => {
       );
     }
 
-    if(!firebaseCustomToken)return res.status(503).json({success:false,message:'安全登入憑證暫時無法建立，請稍後再試。'});
     return res.json({
       success: true,
       message: '登入成功。',
