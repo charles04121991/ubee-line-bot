@@ -483,30 +483,27 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 </style>
 
 
-<style id="ubee-ops-v611">
-html{scroll-behavior:smooth;scroll-padding-top:90px}
-.app{max-width:1920px;margin:auto;padding:12px 20px 28px}
-.topbar{position:relative;z-index:2}
-.ops-nav{display:flex;gap:8px;overflow-x:auto;padding:12px 0}
-.ops-nav a{white-space:nowrap;text-decoration:none;color:#161616;font-size:13px;font-weight:800;border:1px solid #d2d5d9;border-radius:10px;padding:9px 14px;background:white}
-.ops-nav a:focus-visible{outline:2px solid #d5a00b}
-.level4-banner{margin-bottom:12px;padding:12px 16px}
-.ops-primary-kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.ops-primary-kpis .kpi{padding:12px 14px}
-.ops-primary-kpis .kpi .value{font-size:25px}
-.main-grid.ops-three-column{display:grid;grid-template-columns:minmax(280px,0.9fr) minmax(440px,1.55fr) minmax(320px,1fr);gap:12px;align-items:start;margin-bottom:14px}
-.ops-three-column>.left-stack,.ops-three-column>.right-stack,.ops-three-column>.ops-dispatch-stack{min-width:0;display:flex;flex-direction:column;gap:12px}
-.ops-three-column .order-list{max-height:calc(100vh - 360px);min-height:280px;overflow-y:auto}
-.ops-three-column .map-wrap{height:min(62vh,630px);min-height:400px}
-.ops-three-column .candidate-list{max-height:45vh;overflow-y:auto}
-.ops-three-column .panel{min-width:0}
-.ops-three-column .filters{flex-wrap:wrap}
-.ops-secondary-metrics{margin:12px 0 16px}
-.ops-secondary-metrics>summary{cursor:pointer;font-size:13px;font-weight:800;padding:12px 14px;background:white;border-radius:12px;border:1px solid #e1e2e4}
-.ops-secondary-metrics>.kpis{grid-template-columns:repeat(5,minmax(0,1fr));margin-top:10px}
-.control-tower,.intel-grid{margin-top:12px}
-@media(max-width:1300px){.main-grid.ops-three-column{grid-template-columns:minmax(270px,1fr) minmax(390px,1.4fr)}.ops-dispatch-stack{grid-column:1/-1}.ops-primary-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:790px){.app{padding:9px}.main-grid.ops-three-column{grid-template-columns:minmax(0,1fr)}.ops-dispatch-stack{grid-column:auto}.ops-primary-kpis,.ops-secondary-metrics>.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-three-column .map-wrap{height:400px}}
+
+<style id="ubee-ops-v620">
+:root{--ops-sidebar:216px}html{scroll-behavior:auto}body{background:#f4f6f9!important}
+.app{max-width:none!important;margin:0!important;padding:16px 20px 26px calc(var(--ops-sidebar) + 24px)!important;min-height:100vh}
+.topbar{position:relative!important;top:auto!important;z-index:4;background:white!important;box-shadow:none!important;border:1px solid #e7eaf0!important;border-radius:14px!important;padding:14px 18px!important}
+.topbar .brand{font-size:clamp(19px,1.8vw,26px)}.topbar .version{font-size:10px}
+.ops-nav{position:fixed;left:0;top:0;bottom:0;width:var(--ops-sidebar);background:#101722;display:flex;flex-direction:column;gap:7px;padding:88px 12px 18px;z-index:5;box-sizing:border-box;box-shadow:4px 0 22px #18202c12}
+.ops-nav:before{content:'UBee  /  OPS';position:absolute;top:30px;left:22px;color:#f6c344;font-weight:1000;font-size:17px;letter-spacing:.04em}
+.ops-nav button{border:0;border-radius:11px;text-align:left;padding:14px 13px;background:transparent;color:#c8d1df;font-size:13px;font-weight:800;cursor:pointer}
+.ops-nav button:hover,.ops-nav button.is-active{background:#273549;color:#fff}.ops-nav button.is-active{box-shadow:inset 3px 0 #f3bc29}
+.ops-view{display:none!important}.ops-view.is-active{display:block!important}.ops-view.is-active.ops-grid{display:grid!important}
+.ops-main-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 12px}.ops-main-header h1{font-size:21px;margin:0;font-weight:1000}.ops-main-header p{font-size:12px;color:#697586;margin:3px 0 0}
+.kpis.ops-primary-kpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:10px!important;margin:0 0 12px!important}.kpis .kpi{border-radius:13px;box-shadow:none!important}
+.ops-grid{display:grid!important;grid-template-columns:minmax(260px,0.86fr) minmax(380px,1.45fr) minmax(300px,1.02fr)!important;gap:12px!important;align-items:start}
+.ops-grid>.left-stack,.ops-grid>.right-stack,.ops-grid>.ops-dispatch-stack{display:flex!important;flex-direction:column;gap:12px;min-width:0}.ops-grid .panel{border-radius:14px;box-shadow:none!important;min-width:0}.ops-grid .panel-head{padding:12px 14px}.ops-grid .panel-title{font-size:15px}.ops-grid .order-list{max-height:calc(100vh - 310px);min-height:350px;overflow:auto}.ops-grid .map-wrap{height:clamp(430px,61vh,690px)!important;min-height:430px}.ops-grid .candidate-list{max-height:40vh;overflow-y:auto}.ops-grid .filters{flex-wrap:wrap}
+.ops-dispatch-stack{display:flex;flex-direction:column;gap:12px;min-width:0}.ops-grid .panel-body{padding:12px}.ops-page{display:none}.ops-page.is-active{display:block}.ops-page>.panel,.ops-page>.control-tower,.ops-page>.intel-grid{margin-bottom:12px}
+.ops-page .ops-page-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ops-page .intel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ops-page .ops-secondary-metrics{display:block;margin-bottom:12px}.ops-page .ops-secondary-metrics>summary{cursor:pointer}.ops-page .ops-secondary-metrics[open] .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.ops-page .panel{box-shadow:none!important}.ops-page .riders-list{max-height:65vh;overflow-y:auto}.ops-page .alert-list{max-height:65vh;overflow-y:auto}
+@media(max-width:1380px){:root{--ops-sidebar:180px}.ops-grid{grid-template-columns:minmax(250px,.9fr) minmax(360px,1.3fr)!important}.ops-dispatch-stack{grid-column:1/-1;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))}.kpis.ops-primary-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:850px){:root{--ops-sidebar:0px}.app{padding:12px!important}.ops-nav{position:relative;width:auto;height:auto;display:flex;flex-direction:row;overflow-x:auto;padding:10px 0;box-shadow:none;background:transparent}.ops-nav:before{display:none}.ops-nav button{white-space:nowrap;background:#fff;color:#263144;border:1px solid #e3e7ec;padding:10px}.ops-nav button.is-active{background:#172131}.ops-grid{grid-template-columns:minmax(0,1fr)!important}.ops-dispatch-stack{grid-column:auto;display:flex!important}.kpis.ops-primary-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}.ops-page .ops-page-grid,.ops-page .intel-grid{grid-template-columns:1fr}.topbar{flex-wrap:wrap}}
 </style>
 </head>
 
@@ -529,7 +526,7 @@ html{scroll-behavior:smooth;scroll-padding-top:90px}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> Operations Center</div>
-      <div class="version">V6.1.1 · OPERATIONS WORKBENCH</div>
+      <div class="version">V6.2.0 · NATIVE OPERATIONS CONSOLE</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -539,19 +536,14 @@ html{scroll-behavior:smooth;scroll-padding-top:90px}
     </div>
   </header>
 
-  <nav class="ops-nav" aria-label="營運工作台導覽">
-    <a href="#opsWorkbench">即時調度</a>
-    <a href="#opsRiders">小U運力</a>
-    <a href="#opsIncidents">異常案件</a>
-    <a href="#opsIntelligence">城市供需</a>
-    <a href="#opsPricing">財務與定價</a>
+  <nav class="ops-nav" aria-label="營運後台導覽">
+    <button type="button" data-ops-view="dispatch" class="is-active">即時調度</button>
+    <button type="button" data-ops-view="overview">營運總覽</button>
+    <button type="button" data-ops-view="riders">小U運力</button>
+    <button type="button" data-ops-view="incidents">異常案件</button>
+    <button type="button" data-ops-view="analysis">城市供需與財務</button>
   </nav>
-  <div class="level4-banner">
-    <div><strong>UBee Operations Center V6.1.1｜智慧營運調度工作台</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
-    <div class="level4-badge">CITY OPS：LIVE · PROFIT CONTROL：ON</div>
-  </div>
-
-  <section class="kpis ops-primary-kpis">
+<section class="kpis ops-primary-kpis">
     <div class="kpi"><div class="label">上線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">目前保持上線的小U</div></div>
     <div class="kpi"><div class="label">可接單小U</div><div class="value" id="available">-</div><div class="sub">可進入智慧候選</div></div>
     <div class="kpi"><div class="label">待派單</div><div class="value" id="waiting">-</div><div class="sub" id="waitingSub">等待媒合中的訂單</div></div>
@@ -4180,19 +4172,49 @@ setInterval(renderWeatherPricingStatus,30000);
 </script>
 
 
-<script id="ubee-ops-v611-layout">
+
+<script id="ubee-ops-v620-console">
 (function(){
-  const main=document.getElementById('opsWorkbench');
-  if(!main)return;
-  const candidate=document.getElementById('candidateList')?.closest('.panel');
-  const timeline=document.getElementById('dispatchTimeline')?.closest('.panel');
-  const stack=document.createElement('section');
-  stack.className='ops-dispatch-stack';
-  stack.setAttribute('aria-label','訂單詳情與調度操作');
-  if(candidate)stack.appendChild(candidate);
-  if(timeline)stack.appendChild(timeline);
-  main.appendChild(stack);
-  main.classList.add('ops-three-column');
+  const app=document.querySelector('.app'), main=document.getElementById('opsWorkbench');
+  if(!app||!main)return;
+  const left=main.querySelector(':scope > .left-stack'),right=main.querySelector(':scope > .right-stack');
+  if(!left||!right)return;
+  const findPanel=id=>document.getElementById(id)?.closest('.panel');
+  const candidate=findPanel('candidateList'),timeline=findPanel('dispatchTimeline');
+  const riders=findPanel('riders'),incidents=findPanel('alertList');
+  const dispatchStack=document.createElement('section');dispatchStack.className='ops-dispatch-stack';
+  if(candidate)dispatchStack.appendChild(candidate);if(timeline)dispatchStack.appendChild(timeline);
+  main.appendChild(dispatchStack);main.classList.add('ops-grid','ops-view');
+  const pages={};
+  for(const key of ['overview','riders','incidents','analysis']){
+    const el=document.createElement('section');el.className='ops-page';el.dataset.opsPage=key;app.appendChild(el);pages[key]=el;
+  }
+  if(riders)pages.riders.appendChild(riders);if(incidents)pages.incidents.appendChild(incidents);
+  const secondary=app.querySelector('.ops-secondary-metrics');
+  const tower=app.querySelector('.control-tower');
+  const health=app.querySelector('.health-grid')||document.getElementById('cityHealth')?.closest('section');
+  if(secondary)pages.overview.appendChild(secondary);
+  if(tower)pages.overview.appendChild(tower);
+  if(health && health!==tower && !tower?.contains(health))pages.overview.appendChild(health);
+  const intelligence=app.querySelector('.intel-grid');if(intelligence)pages.analysis.appendChild(intelligence);
+  // Any unclassified original sections remain visible on overview, never deleted.
+  const primary=app.querySelector('.ops-primary-kpis');
+  const title=document.createElement('div');title.className='ops-main-header';
+  title.innerHTML='<div><h1 id="opsViewTitle">即時調度</h1><p id="opsViewSub">訂單佇列、即時地圖、調度操作</p></div>';
+  app.insertBefore(title,primary||main);
+  const names={dispatch:['即時調度','訂單佇列、即時地圖、調度操作'],overview:['營運總覽','任務風險、營運指標與運力健康'],riders:['小U運力','小U狀態與接單能力'],incidents:['異常案件','異常告警、處理紀錄與結案'],analysis:['城市供需與財務','供需預測、動態定價與營運分析']};
+  const views={dispatch:main,...pages};
+  function show(key){
+    if(!views[key])key='dispatch';
+    Object.entries(views).forEach(([k,el])=>el.classList.toggle('is-active',k===key));
+    document.querySelectorAll('[data-ops-view]').forEach(el=>{const active=el.dataset.opsView===key;el.classList.toggle('is-active',active);el.setAttribute('aria-current',active?'page':'false');});
+    document.getElementById('opsViewTitle').textContent=names[key][0];document.getElementById('opsViewSub').textContent=names[key][1];
+    // Google Maps must be resized when switching back to the dispatch tab.
+    if(key==='dispatch' && window.google?.maps?.event){const map=window.dispatchMap||window.map; if(map)try{google.maps.event.trigger(map,'resize')}catch(e){}}
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  document.querySelectorAll('[data-ops-view]').forEach(el=>el.addEventListener('click',()=>show(el.dataset.opsView)));
+  show('dispatch');
 })();
 </script>
 </body>
