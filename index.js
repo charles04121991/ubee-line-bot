@@ -1838,7 +1838,7 @@ app.use((req, res, next) => {
 
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-UBee-Support-Case-Id, X-UBee-Support-Access-Token, X-UBee-Support-Admin-Key, X-UBee-Support-Operator, X-UBee-Support-File-Name, X-UBee-Support-Evidence-Type, X-UBee-Rider-Phone, X-UBee-Rider-Line-User-Id, X-UBee-Rider-Document-Type, X-UBee-Rider-File-Name, X-UBee-Admin-Key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-UBee-Support-Case-Id, X-UBee-Support-Access-Token, X-UBee-Support-Admin-Key, X-UBee-Support-Operator, X-UBee-Dispatch-Admin-Key, X-Dispatch-Admin-Token, X-UBee-Support-File-Name, X-UBee-Support-Evidence-Type, X-UBee-Rider-Phone, X-UBee-Rider-Line-User-Id, X-UBee-Rider-Document-Type, X-UBee-Rider-File-Name, X-UBee-Admin-Key');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -19792,18 +19792,63 @@ function serializeDispatchIncident(doc) {
 }
 
 
-// UBee Dispatch V6.0 RC｜統一管理 API 存取保護（部署前必須設定 DISPATCH_ADMIN_TOKEN）
-// 請由可信任的管理端代理附加 X-Dispatch-Admin-Token；不要將 token 寫入公開 HTML。
-function verifyDispatchAdminV6(req,res,next){
-  const expected = String(process.env.DISPATCH_ADMIN_TOKEN || '');
-  const provided = String(req.get('X-Dispatch-Admin-Token') || '');
-  if (!expected || !provided) return res.status(503).json({success:false,message:'調度管理驗證尚未完成設定。'});
-  const a=Buffer.from(expected),b=Buffer.from(provided);
-  if (a.length!==b.length || !crypto.timingSafeEqual(a,b)) return res.status(403).json({success:false,message:'調度管理權限不足。'});
-  next();
+// ============================================================
+// UBee Dispatch V6.0.2 — Cloudflare Access JWT 伺服器驗證
+// Render 必須設定 CF_ACCESS_TEAM_DOMAIN 與 CF_ACCESS_AUD。
+// 直接連到 Render 原始網址也必須經過 JWT 驗證，禁止繞過代理。
+// ============================================================
+const dispatchAccessKeysV602 = {keys:[], expires:0};
+function dispatchAccessConfigV602(){
+  const domain=String(process.env.CF_ACCESS_TEAM_DOMAIN||'').trim().replace(/^https?:\/\//,'').replace(/\/$/,'');
+  const aud=String(process.env.CF_ACCESS_AUD||'').trim();
+  if(!domain||!aud||!/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain)) return null;
+  return {domain,aud,issuer:'https://'+domain};
 }
-// 注意：此 middleware 要求登入代理/同源服務端注入憑證；不可直接在瀏覽器保存管理金鑰。
-app.use('/api/dispatch',verifyDispatchAdminV6);
+async function dispatchAccessJwksV602(config){
+  if(dispatchAccessKeysV602.expires>Date.now()&&dispatchAccessKeysV602.keys.length) return dispatchAccessKeysV602.keys;
+  const url=config.issuer+'/cdn-cgi/access/certs';
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),5000);
+  try{
+    const response=await fetch(url,{signal:controller.signal});
+    if(!response.ok) throw new Error('JWKS fetch failed');
+    const data=await response.json();
+    if(!Array.isArray(data.keys)||!data.keys.length) throw new Error('No JWKS keys');
+    dispatchAccessKeysV602.keys=data.keys;
+    dispatchAccessKeysV602.expires=Date.now()+10*60*1000;
+    return data.keys;
+  }finally{clearTimeout(timeout);}
+}
+async function verifyDispatchAccessV602(req,res,next){
+  res.setHeader('Cache-Control','no-store, private');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  const config=dispatchAccessConfigV602();
+  if(!config) return res.status(503).json({success:false,code:'DISPATCH_ACCESS_NOT_CONFIGURED',message:'調度存取保護尚未設定：Render 需要 CF_ACCESS_TEAM_DOMAIN 與 CF_ACCESS_AUD。'});
+  const token=String(req.get('Cf-Access-Jwt-Assertion')||'').trim();
+  if(!token||token.length>12000) return res.status(401).json({success:false,code:'DISPATCH_ACCESS_REQUIRED',message:'缺少 Cloudflare Access 授權，請從受保護的調度網域進入。'});
+  try{
+    const parts=token.split('.');
+    if(parts.length!==3) throw new Error('Malformed JWT');
+    const header=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'));
+    const claims=JSON.parse(Buffer.from(parts[1],'base64url').toString('utf8'));
+    if(header.alg!=='RS256'||!header.kid) throw new Error('Invalid algorithm');
+    const now=Math.floor(Date.now()/1000);
+    if(claims.iss!==config.issuer||!Array.isArray(claims.aud)||!claims.aud.includes(config.aud)||!Number.isFinite(claims.exp)||claims.exp<=now||!Number.isFinite(claims.iat)||claims.iat>now+60) throw new Error('Invalid claims');
+    const keys=await dispatchAccessJwksV602(config);
+    const jwk=keys.find(k=>k.kid===header.kid&&k.kty==='RSA');
+    if(!jwk) throw new Error('Unknown key');
+    const key=crypto.createPublicKey({key:jwk,format:'jwk'});
+    const ok=crypto.verify('RSA-SHA256',Buffer.from(parts[0]+'.'+parts[1]),key,Buffer.from(parts[2],'base64url'));
+    if(!ok) throw new Error('Invalid signature');
+    req.dispatchAccessIdentity={sub:String(claims.sub||''),email:String(claims.email||'')};
+    return next();
+  }catch(error){
+    console.warn('[dispatch access] rejected:',error.message);
+    return res.status(401).json({success:false,code:'DISPATCH_ACCESS_UNAUTHORIZED',message:'調度存取授權無效或已到期。'});
+  }
+}
+app.use('/api/dispatch',verifyDispatchAccessV602);
+app.get('/api/dispatch/auth/check',(req,res)=>res.json({success:true,authenticated:true,version:'V6.0.2'}));
 
 // ============================================================
 // UBee 調度中心：即時監控 Dashboard API
@@ -20935,36 +20980,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
 // UBee 區域動態定價 V3｜調度中心設定 API
 // 正式環境建議以 DISPATCH_ADMIN_KEY 保護寫入。
 // =====================================================
-function verifyDynamicPricingAdmin(req, res, next) {
-  const expected = String(
-    process.env.DISPATCH_ADMIN_KEY ||
-    process.env.UBEE_SUPPORT_ADMIN_KEY ||
-    ''
-  ).trim();
-
-  if (!expected) {
-    return res.status(503).json({
-      success: false,
-      message: '尚未設定 DISPATCH_ADMIN_KEY，動態定價設定禁止修改。',
-    });
-  }
-
-  const supplied = String(
-    req.headers['x-ubee-dispatch-admin-key'] ||
-    req.body?.adminKey ||
-    ''
-  ).trim();
-
-  if (!supplied || supplied !== expected) {
-    return res.status(403).json({
-      success: false,
-      message: '調度管理驗證失敗。',
-    });
-  }
-
-  return next();
-}
-
+// 讀寫 API 已由上方 /api/dispatch 統一管理驗證保護，避免雙重金鑰規則。
 app.get('/api/dispatch/dynamic-pricing', async (req, res) => {
   try {
     const cache = await loadDynamicPricingSettings();
@@ -20987,7 +21003,7 @@ app.get('/api/dispatch/dynamic-pricing', async (req, res) => {
   }
 });
 
-app.post('/api/dispatch/dynamic-pricing', verifyDynamicPricingAdmin, async (req, res) => {
+app.post('/api/dispatch/dynamic-pricing', async (req, res) => {
   try {
     const payload = req.body && typeof req.body === 'object' ? req.body : {};
     const update = {
@@ -21088,7 +21104,6 @@ app.post('/api/dispatch/dynamic-pricing', verifyDynamicPricingAdmin, async (req,
 // =====================================================
 app.post(
   '/api/dispatch/orders/:orderId/item-size',
-  verifyDynamicPricingAdmin,
   async (req, res) => {
     try {
       const orderId = String(
