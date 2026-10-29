@@ -481,6 +481,28 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 .dispatch-auth-note{font-size:11px;color:#66717c;margin-top:16px;line-height:1.6}
 .dispatch-logout-btn{border-color:#c9ced5!important}
 </style>
+
+<style id="ubee-ops-v610">
+:root{--ops-edge:#111827}
+html{scroll-behavior:smooth}
+.app{max-width:1920px!important;margin:0 auto!important;padding:16px 22px 30px!important}
+.topbar{position:sticky;top:0;z-index:50;background:var(--bg,#0b1220);border-radius:16px;padding:12px 18px!important;box-shadow:0 8px 30px #0002}
+.ops-nav{display:flex;gap:8px;overflow-x:auto;padding:12px 0 16px;position:relative;z-index:2}
+.ops-nav a{white-space:nowrap;text-decoration:none;color:var(--text,#e5e7eb);font-size:13px;font-weight:700;border:1px solid var(--border,#334155);border-radius:12px;padding:10px 15px;background:var(--card,#162132)}
+.ops-nav a:hover,.ops-nav a:focus-visible{border-color:#facc15;outline:2px solid transparent}
+.kpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.main-grid.ops-three-column{display:grid!important;grid-template-columns:minmax(280px,0.95fr) minmax(390px,1.55fr) minmax(310px,1fr)!important;gap:14px!important;align-items:start}
+.ops-three-column>.left-stack,.ops-three-column>.right-stack,.ops-three-column>.ops-dispatch-stack{min-width:0;display:flex;flex-direction:column;gap:14px}
+.ops-three-column>.left-stack>.panel:first-child,.ops-three-column>.right-stack>.panel:first-child,.ops-three-column>.ops-dispatch-stack>.panel:first-child{min-height:500px}
+.ops-three-column .order-list{max-height:620px;overflow-y:auto}
+.ops-three-column .map-wrap{height:520px!important;min-height:420px}
+.ops-three-column .candidate-list{max-height:460px;overflow-y:auto}
+.ops-three-column .filters{flex-wrap:wrap}
+.ops-dispatch-stack{position:sticky;top:102px;max-height:calc(100vh - 120px);overflow-y:auto}
+.ops-three-column .panel{min-width:0}
+@media(max-width:1250px){.main-grid.ops-three-column{grid-template-columns:minmax(260px,1fr) minmax(350px,1.4fr)!important}.ops-dispatch-stack{grid-column:1/-1;position:static;max-height:none}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:780px){.app{padding:10px!important}.main-grid.ops-three-column{grid-template-columns:minmax(0,1fr)!important}.ops-dispatch-stack{grid-column:auto}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}.topbar{position:relative}.ops-three-column .map-wrap{height:390px!important}}
+</style>
 </head>
 
 <body>
@@ -502,7 +524,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> Operations Center</div>
-      <div class="version">V6.0.1 · RENDER AUTH FIX</div>
+      <div class="version">V6.1.0 · OPERATIONS WORKBENCH</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -512,8 +534,15 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
     </div>
   </header>
 
+  <nav class="ops-nav" aria-label="營運工作台導覽">
+    <a href="#opsWorkbench">即時調度</a>
+    <a href="#opsRiders">小U運力</a>
+    <a href="#opsIncidents">異常案件</a>
+    <a href="#opsIntelligence">城市供需</a>
+    <a href="#opsPricing">財務與定價</a>
+  </nav>
   <div class="level4-banner">
-    <div><strong>UBee Operations Center V6.0.1｜Render 管理驗證整合</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
+    <div><strong>UBee Operations Center V6.1.0｜智慧營運調度工作台</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
     <div class="level4-badge">CITY OPS：LIVE · PROFIT CONTROL：ON</div>
   </div>
 
@@ -532,7 +561,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 
   <section class="control-tower">
     <div class="control-box">
-      <div class="control-title">V4 · 全局即時任務控制塔</div>
+      <div class="control-title">全局即時任務控制塔</div>
       <div class="control-main"><span id="towerLiveOrders">-</span> <small>張即時任務</small></div>
       <div class="risk-strip" id="riskStrip">
         <button class="ops-pill active" data-tower-filter="all">全部</button>
@@ -551,7 +580,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
       </div>
     </div>
     <div class="city-health">
-      <div class="city-health-head"><div><div class="control-title" style="color:var(--muted)">V5 · 城市與小U健康</div><div class="city-status" id="cityStatus">分析中</div></div><div class="badge" id="selectedZoneBadge">全台中</div></div>
+      <div class="city-health-head"><div><div class="control-title" style="color:var(--muted)">城市與小U健康</div><div class="city-status" id="cityStatus">分析中</div></div><div class="badge" id="selectedZoneBadge">全台中</div></div>
       <div class="health-grid">
         <div class="health-mini"><b id="healthHealthy">0</b><span>🟢 狀態良好</span></div>
         <div class="health-mini"><b id="healthTask">0</b><span>🔵 任務中</span></div>
@@ -562,7 +591,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
     </div>
   </section>
 
-  <section class="intel-grid">
+  <section class="intel-grid" id="opsIntelligence">
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">智慧調度建議</div><div class="panel-sub">只提出建議，不自動執行高風險操作</div></div></div>
       <div class="panel-body"><div class="intel-list" id="recommendationList"><div class="empty">智慧分析載入中…</div></div></div>
@@ -576,19 +605,19 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
       <div class="panel-body" id="forecastPanel"><div class="empty">預測載入中…</div></div>
     </div>
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">V3 區域動態定價</div><div class="panel-sub">依各區即時待派單與有效運力顯示目前調度費</div></div></div>
+      <div class="panel-head"><div><div class="panel-title" id="opsPricing">區域動態定價</div><div class="panel-sub">依各區即時待派單與有效運力顯示目前調度費</div></div></div>
       <div class="panel-body"><div class="zone-grid" id="dynamicPricingGrid"><div class="empty">動態定價載入中…</div></div></div>
     </div>
   </section>
 
-  <main class="main-grid">
+  <main class="main-grid" id="opsWorkbench">
 
     <section class="left-stack">
       <div class="panel">
         <div class="panel-head">
           <div>
             <div class="panel-title">待派單／即時訂單</div>
-            <div class="panel-sub">點選訂單後，可查看附近小U候選與距離排序</div>
+            <div class="panel-sub">點選任務後，可在右側調度面板操作與查看全區候選</div>
           </div>
           <div class="filters">
             <button class="chip active" data-filter="all">全部</button>
@@ -606,7 +635,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
       <div class="panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">附近小U推薦</div>
+            <div class="panel-title">任務調度與小U候選</div>
             <div class="panel-sub">全區候選排序｜顯示距離但不以距離排除合法候選</div>
           </div>
         </div>
@@ -654,7 +683,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
       <div class="panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">V5 智慧城市供需地圖</div>
+            <div class="panel-title">即時營運地圖</div>
             <div class="panel-sub">區域供需風險圈＋訂單／小U＋選定任務最近移動軌跡；點區域卡可聚焦該區營運</div>
           </div>
         </div>
@@ -679,7 +708,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
       <div class="panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">全部小U</div>
+            <div class="panel-title" id="opsRiders">全部小U</div>
             <div class="panel-sub">已審核小U永遠保留；離線只改變狀態，不會從調度中心消失</div>
           </div>
           <div class="filters">
@@ -4136,6 +4165,29 @@ setInterval(renderWeatherPricingStatus,30000);
   window.addEventListener('online',recover);
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden) recover(); });
   if(!navigator.onLine){ setStatus('offline','系統狀態：裝置網路中斷'); banner('目前網路連線受阻，調度中心顯示的是最後一次成功同步資料。'); }
+})();
+</script>
+
+<script id="ubee-ops-v610-layout">
+(function(){
+  const main=document.querySelector('main.main-grid');
+  if(!main)return;
+  const left=main.querySelector(':scope > .left-stack');
+  const right=main.querySelector(':scope > .right-stack');
+  if(!left||!right)return;
+  const candidate=document.getElementById('candidateList')?.closest('.panel');
+  const timeline=document.getElementById('dispatchTimeline')?.closest('.panel');
+  const map=document.getElementById('map')?.closest('.panel') || right.querySelector('.panel');
+  const dispatch=document.createElement('section');
+  dispatch.className='ops-dispatch-stack';
+  dispatch.setAttribute('aria-label','任務詳情與調度操作');
+  if(candidate)dispatch.appendChild(candidate);
+  if(timeline)dispatch.appendChild(timeline);
+  main.appendChild(dispatch);
+  main.classList.add('ops-three-column');
+  // The map stays in the center column, and all existing event listeners and element IDs remain intact.
+  const note=document.querySelector('.level4-banner small');
+  if(note)note.textContent='訂單佇列、即時地圖與人工調度三欄協作；既有正式派單與交易保護邏輯保持不變。';
 })();
 </script>
 </body>
