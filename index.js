@@ -19793,62 +19793,57 @@ function serializeDispatchIncident(doc) {
 
 
 // ============================================================
-// UBee Dispatch V6.0.2 — Cloudflare Access JWT 伺服器驗證
-// Render 必須設定 CF_ACCESS_TEAM_DOMAIN 與 CF_ACCESS_AUD。
-// 直接連到 Render 原始網址也必須經過 JWT 驗證，禁止繞過代理。
+// UBee Dispatch V6.0.1｜Render 管理授權整合修正
+// - Render 優先配置 DISPATCH_ADMIN_KEY；相容舊 DISPATCH_ADMIN_TOKEN、UBEE_SUPPORT_ADMIN_KEY。
+// - 認證由 HTTPS 瀏覽器登入時提供；伺服器從不將密鑰送回客戶端。
+// - /api/dispatch 下所有讀取與寫入端點均受同一管理授權保護。
+// - 保留原有接單交易、縣市隔離、Smart Stack 與財務處理邏輯。
 // ============================================================
-const dispatchAccessKeysV602 = {keys:[], expires:0};
-function dispatchAccessConfigV602(){
-  const domain=String(process.env.CF_ACCESS_TEAM_DOMAIN||'').trim().replace(/^https?:\/\//,'').replace(/\/$/,'');
-  const aud=String(process.env.CF_ACCESS_AUD||'').trim();
-  if(!domain||!aud||!/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain)) return null;
-  return {domain,aud,issuer:'https://'+domain};
+function getDispatchAdminSecretV601(){
+  return String(
+    process.env.DISPATCH_ADMIN_KEY ||
+    process.env.DISPATCH_ADMIN_TOKEN ||
+    process.env.UBEE_SUPPORT_ADMIN_KEY ||
+    ''
+  ).trim();
 }
-async function dispatchAccessJwksV602(config){
-  if(dispatchAccessKeysV602.expires>Date.now()&&dispatchAccessKeysV602.keys.length) return dispatchAccessKeysV602.keys;
-  const url=config.issuer+'/cdn-cgi/access/certs';
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),5000);
-  try{
-    const response=await fetch(url,{signal:controller.signal});
-    if(!response.ok) throw new Error('JWKS fetch failed');
-    const data=await response.json();
-    if(!Array.isArray(data.keys)||!data.keys.length) throw new Error('No JWKS keys');
-    dispatchAccessKeysV602.keys=data.keys;
-    dispatchAccessKeysV602.expires=Date.now()+10*60*1000;
-    return data.keys;
-  }finally{clearTimeout(timeout);}
-}
-async function verifyDispatchAccessV602(req,res,next){
+const dispatchAuthFailuresV601 = new Map();
+function verifyDispatchAdminV6(req,res,next){
   res.setHeader('Cache-Control','no-store, private');
   res.setHeader('X-Content-Type-Options','nosniff');
-  const config=dispatchAccessConfigV602();
-  if(!config) return res.status(503).json({success:false,code:'DISPATCH_ACCESS_NOT_CONFIGURED',message:'調度存取保護尚未設定：Render 需要 CF_ACCESS_TEAM_DOMAIN 與 CF_ACCESS_AUD。'});
-  const token=String(req.get('Cf-Access-Jwt-Assertion')||'').trim();
-  if(!token||token.length>12000) return res.status(401).json({success:false,code:'DISPATCH_ACCESS_REQUIRED',message:'缺少 Cloudflare Access 授權，請從受保護的調度網域進入。'});
-  try{
-    const parts=token.split('.');
-    if(parts.length!==3) throw new Error('Malformed JWT');
-    const header=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'));
-    const claims=JSON.parse(Buffer.from(parts[1],'base64url').toString('utf8'));
-    if(header.alg!=='RS256'||!header.kid) throw new Error('Invalid algorithm');
-    const now=Math.floor(Date.now()/1000);
-    if(claims.iss!==config.issuer||!Array.isArray(claims.aud)||!claims.aud.includes(config.aud)||!Number.isFinite(claims.exp)||claims.exp<=now||!Number.isFinite(claims.iat)||claims.iat>now+60) throw new Error('Invalid claims');
-    const keys=await dispatchAccessJwksV602(config);
-    const jwk=keys.find(k=>k.kid===header.kid&&k.kty==='RSA');
-    if(!jwk) throw new Error('Unknown key');
-    const key=crypto.createPublicKey({key:jwk,format:'jwk'});
-    const ok=crypto.verify('RSA-SHA256',Buffer.from(parts[0]+'.'+parts[1]),key,Buffer.from(parts[2],'base64url'));
-    if(!ok) throw new Error('Invalid signature');
-    req.dispatchAccessIdentity={sub:String(claims.sub||''),email:String(claims.email||'')};
-    return next();
-  }catch(error){
-    console.warn('[dispatch access] rejected:',error.message);
-    return res.status(401).json({success:false,code:'DISPATCH_ACCESS_UNAUTHORIZED',message:'調度存取授權無效或已到期。'});
+  const expected=getDispatchAdminSecretV601();
+  if(!expected){
+    return res.status(503).json({
+      success:false,code:'DISPATCH_ADMIN_NOT_CONFIGURED',
+      message:'Render 尚未設定 DISPATCH_ADMIN_KEY。請到 Render → Environment 新增 DISPATCH_ADMIN_KEY 並重新部署；如已設定 UBEE_SUPPORT_ADMIN_KEY 可直接使用既有金鑰。'
+    });
   }
+  const address=String(req.ip||req.socket?.remoteAddress||'unknown');
+  const now=Date.now();
+  const failed=dispatchAuthFailuresV601.get(address);
+  if(failed && failed.until<=now) dispatchAuthFailuresV601.delete(address);
+  if(failed && failed.until>now && failed.count>=20){
+    res.setHeader('Retry-After',String(Math.ceil((failed.until-now)/1000)));
+    return res.status(429).json({success:false,code:'DISPATCH_AUTH_RATE_LIMIT',message:'管理驗證失敗次數過多，請稍後再試。'});
+  }
+  const provided=String(req.get('X-UBee-Dispatch-Admin-Key')||req.get('X-Dispatch-Admin-Token')||'').trim();
+  const a=Buffer.from(expected,'utf8');
+  const b=Buffer.from(provided,'utf8');
+  const accepted=b.length===a.length && b.length>0 && crypto.timingSafeEqual(a,b);
+  if(!accepted){
+    const current=dispatchAuthFailuresV601.get(address);
+    dispatchAuthFailuresV601.set(address,{
+      count:(current && current.until>now?current.count:0)+1,
+      until:current && current.until>now?current.until:now+15*60*1000
+    });
+    return res.status(401).json({success:false,code:'DISPATCH_ADMIN_UNAUTHORIZED',message:'調度管理金鑰不正確，請重新輸入。'});
+  }
+  dispatchAuthFailuresV601.delete(address);
+  return next();
 }
-app.use('/api/dispatch',verifyDispatchAccessV602);
-app.get('/api/dispatch/auth/check',(req,res)=>res.json({success:true,authenticated:true,version:'V6.0.2'}));
+app.use('/api/dispatch',verifyDispatchAdminV6);
+// 前端登入驗證的輕量端點：不載入 Firestore，也不洩漏環境變數。
+app.get('/api/dispatch/auth/check',(req,res)=>res.json({success:true,authenticated:true,version:'V6.0.1'}));
 
 // ============================================================
 // UBee 調度中心：即時監控 Dashboard API
