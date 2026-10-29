@@ -25965,7 +25965,7 @@ app.get('/api/rider/v4/bootstrap', riderAuthMiddleware, async (req, res) => {
 // ============================================================
 // Rider V4 onboarding progress
 
-// V5.23.5 Rider Terms: authenticated, versioned draft with auditable consent.
+// V5.23.5.1 Rider Terms: public draft read + authenticated versioned consent.
 // Not yet a legally approved contract: do not block dispatch or onboarding until approved.
 const UBEE_RIDER_TERMS_V5235 = Object.freeze({
   version:'rider-terms-v1-draft-20261029',
@@ -25981,13 +25981,43 @@ function ubeeRiderTermsAuthorized(req,res){
   if(!docId){res.status(401).json({success:false,code:'RIDER_TOKEN_REQUIRED',message:'請重新登入後查看條款。'});return '';}
   return docId;
 }
-app.get('/api/rider/terms/current',riderAuthMiddleware,async(req,res)=>{
-  const docId=ubeeRiderTermsAuthorized(req,res);if(!docId)return;
+// V5.23.5.1 Terms Read Compatibility Hotfix:
+// 條款內容是公開規範，可供未取得 Firebase ID Token 的相容登入小U閱讀。
+// 只有有效 rider ID Token 才可讀取「本人」的同意狀態；不得透過 riderId/phone 查他人紀錄。
+// 不能把舊版登入相容模式當成已完成正式身分驗證。
+app.get('/api/rider/terms/current',async(req,res)=>{
+  res.set('Cache-Control','no-store');
   try{
-    const snap=await db.collection('riderTermsConsents').doc(docId).collection('versions').doc(UBEE_RIDER_TERMS_V5235.version).get();
-    res.set('Cache-Control','no-store');
-    return res.json({success:true,terms:UBEE_RIDER_TERMS_V5235,documentHash:UBEE_RIDER_TERMS_HASH_V5235,accepted:snap.exists,acceptedAtMs:snap.exists?Number(snap.data()?.acceptedAtMs||0):null});
-  }catch(error){console.error('rider terms read:',error);return res.status(500).json({success:false,message:'條款暫時無法載入。'});}
+    const idToken=getBearerToken(req);
+    let riderDocId='';
+    if(idToken){
+      const verified=await verifyRiderFirebaseIdToken(req);
+      const claims=verified.ok ? (verified.decodedToken||{}) : {};
+      if(verified.ok && claims.role==='rider'){
+        riderDocId=String(claims.riderDocId||'').trim();
+      }
+    }
+    // DRAFT 沒有正式同意紀錄，不依賴 Firestore；簽署端點仍要求有效小U Token。
+    let accepted=false, acceptedAtMs=null;
+    if(riderDocId && UBEE_RIDER_TERMS_V5235.status==='PUBLISHED'){
+      const snap=await db.collection('riderTermsConsents').doc(riderDocId)
+        .collection('versions').doc(UBEE_RIDER_TERMS_V5235.version).get();
+      accepted=snap.exists;
+      if(accepted) acceptedAtMs=Number(snap.data()?.acceptedAtMs||0)||null;
+    }
+    return res.json({
+      success:true,
+      terms:UBEE_RIDER_TERMS_V5235,
+      documentHash:UBEE_RIDER_TERMS_HASH_V5235,
+      accepted,
+      acceptedAtMs,
+      // 前端據此區分「尚未同意」和「無法核實同意紀錄」。
+      consentRecordAvailable:Boolean(riderDocId)
+    });
+  }catch(error){
+    console.error('rider terms read:',error);
+    return res.status(500).json({success:false,message:'條款暫時無法載入。'});
+  }
 });
 app.post('/api/rider/terms/accept',riderAuthMiddleware,async(req,res)=>{
   const docId=ubeeRiderTermsAuthorized(req,res);if(!docId)return;
