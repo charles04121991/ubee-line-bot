@@ -24351,6 +24351,39 @@ app.post(
       const status = String(application.status || 'pending').toLowerCase();
       const nowMs = Date.now();
 
+      // Review V4: explicit profile-photo review, independent of document review.
+      if (action === 'mark_profile_photo') {
+        if (['training','approved','active','rejected'].includes(status)) {
+          return res.status(409).json({success:false,message:'此申請狀態不可修改大頭照審核。'});
+        }
+        if (!String(application.profilePhoto?.storagePath || '').trim()) {
+          return res.status(409).json({success:false,message:'尚未上傳大頭照，無法審核。'});
+        }
+        const photoStatus = String(req.body?.documentStatus || '').trim().toLowerCase();
+        if (!['pending','approved','needs_supplement'].includes(photoStatus)) {
+          return res.status(400).json({success:false,message:'大頭照審核狀態不正確。'});
+        }
+        if (photoStatus === 'needs_supplement' && !reason) {
+          return res.status(400).json({success:false,message:'要求補件必須填寫原因。'});
+        }
+        await applicationDoc.ref.update({
+          'profilePhoto.reviewStatus':photoStatus,
+          'profilePhoto.reviewReason':photoStatus === 'needs_supplement' ? reason : '',
+          'profilePhoto.reviewedBy':operator,
+          'profilePhoto.reviewedAtMs':nowMs,
+          reviewedAtMs:nowMs,
+          updatedAtMs:nowMs,
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        });
+        const freshDoc = await applicationDoc.ref.get();
+        await writeRiderApplicationReviewEvent({
+          application:freshDoc.data() || {}, type:'mark_profile_photo', operator,
+          reason:photoStatus === 'needs_supplement' ? reason : `大頭照審核：${photoStatus}`,
+          metadata:{photoStatus},
+        });
+        return res.json({success:true,message:'大頭照審核狀態已更新。',application:await serializeRiderApplicationForAdmin(freshDoc)});
+      }
+
       if (action === 'mark_document') {
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
@@ -24517,6 +24550,11 @@ app.post(
           message: '審核備註已儲存。',
           application: await serializeRiderApplicationForAdmin(freshDoc),
         });
+      }
+
+      // Review V4: block bulk document approval; each required document must be reviewed separately.
+      if (action === 'approve_group' || action === 'approve_all') {
+        return res.status(409).json({success:false,message:'V4 已停用整組／一鍵通過，請逐份審核必要文件與大頭照。'});
       }
 
       if (action === 'approve_group') {
@@ -25033,6 +25071,10 @@ app.post(
 
         if (application.profilePhotoRequired === true && !String(application.profilePhoto?.storagePath || '').trim()) {
           return res.status(409).json({ success:false, message:'缺少小U大頭照，不能正式通過。' });
+        }
+
+        if (application.profilePhotoRequired === true && String(application.profilePhoto?.reviewStatus || '').toLowerCase() !== 'approved') {
+          return res.status(409).json({success:false,message:'小U大頭照尚未個別審核通過，禁止正式核准。'});
         }
 
         const summary = summarizeRiderApplicationDocuments(application);
