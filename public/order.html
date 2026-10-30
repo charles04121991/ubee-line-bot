@@ -7492,7 +7492,6 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
       if(typeof currentCustomer!=='undefined')currentCustomer=confirmedMe.customer;
       if(typeof userId!=='undefined')userId=String(customer.customerId);
       window.__ubeeCurrentCustomer=confirmedMe.customer;
-      try{renderCustomerMemberInfo?.()}catch(_){}
       const resolve=pendingResolve;pendingResolve=pendingReject=null;close();resolve?.(String(customer.customerId));
     }catch(error){
       if(error.code==='CUSTOMER_EXISTING_LOGIN_REQUIRED'){
@@ -16057,7 +16056,6 @@ function startOrderListener(orderId){
       }
 
       if(['completed','done','cancelled','canceled'].includes(getCustomerCanonicalStatus(order,''))){
-        if(currentCustomerPage === 'customerProfilePage') renderCustomerMemberInfo();
         if(currentCustomerPage === 'customerTasksPage') renderRecentTasks();
 
         document.getElementById('draftBanner')?.remove();
@@ -16438,178 +16436,6 @@ function renderCustomerActiveTask(){
     stopped = true;
     if(timer) clearInterval(timer);
   };
-}
-
-function getMemberLevelText(){
-  return String(window.__ubeeCustomerGrowth?.tier?.label || '一般');
-}
-
-let ubeeCustomerGrowthRequestPromise=null;
-let ubeeCustomerGrowthReferralsRequestPromise=null;
-const UBEE_CUSTOMER_GROWTH_CACHE_MS=60000;
-const UBEE_CUSTOMER_GROWTH_REFERRALS_CACHE_MS=60000;
-
-function getCachedCustomerGrowthData(maxAgeMs=Infinity){
-  const growth=window.__ubeeCustomerGrowth||null;
-  if(!growth)return null;
-  const fetchedAt=Math.max(0,Number(window.__ubeeCustomerGrowthFetchedAt||0));
-  const age=fetchedAt>0?Math.max(0,Date.now()-fetchedAt):Infinity;
-  if(Number.isFinite(Number(maxAgeMs)) && age>Number(maxAgeMs))return null;
-  return {
-    success:true,
-    growth,
-    history:Array.isArray(window.__ubeeCustomerGrowthHistory)?window.__ubeeCustomerGrowthHistory:[],
-    fetchedAt,
-    cached:true
-  };
-}
-
-async function loadCustomerGrowth(options={}){
-  const maxAgeMs=Number.isFinite(Number(options?.maxAgeMs))?Math.max(0,Number(options.maxAgeMs)):0;
-  const force=options?.force===true;
-  const cached=!force?getCachedCustomerGrowthData(maxAgeMs):null;
-  if(cached)return cached;
-  if(ubeeCustomerGrowthRequestPromise)return ubeeCustomerGrowthRequestPromise;
-
-  ubeeCustomerGrowthRequestPromise=(async()=>{
-    const data=await customerApiFetch('/api/customer/growth');
-    window.__ubeeCustomerGrowth=data?.growth||null;
-    window.__ubeeCustomerGrowthHistory=Array.isArray(data?.history)?data.history:[];
-    window.__ubeeCustomerGrowthFetchedAt=Date.now();
-    return data;
-  })();
-
-  try{return await ubeeCustomerGrowthRequestPromise;}
-  finally{ubeeCustomerGrowthRequestPromise=null;}
-}
-
-function getCachedCustomerGrowthReferrals(maxAgeMs=Infinity){
-  const rows=Array.isArray(window.__ubeeCustomerGrowthReferrals)?window.__ubeeCustomerGrowthReferrals:null;
-  if(!rows)return null;
-  const fetchedAt=Math.max(0,Number(window.__ubeeCustomerGrowthReferralsFetchedAt||0));
-  const age=fetchedAt>0?Math.max(0,Date.now()-fetchedAt):Infinity;
-  if(Number.isFinite(Number(maxAgeMs)) && age>Number(maxAgeMs))return null;
-  return {success:true,referrals:rows,fetchedAt,cached:true};
-}
-
-async function loadCustomerGrowthReferrals(options={}){
-  const maxAgeMs=Number.isFinite(Number(options?.maxAgeMs))?Math.max(0,Number(options.maxAgeMs)):0;
-  const force=options?.force===true;
-  const cached=!force?getCachedCustomerGrowthReferrals(maxAgeMs):null;
-  if(cached)return cached;
-  if(ubeeCustomerGrowthReferralsRequestPromise)return ubeeCustomerGrowthReferralsRequestPromise;
-
-  ubeeCustomerGrowthReferralsRequestPromise=(async()=>{
-    const data=await customerApiFetch('/api/customer/growth/referrals');
-    window.__ubeeCustomerGrowthReferrals=Array.isArray(data?.referrals)?data.referrals:[];
-    window.__ubeeCustomerGrowthReferralsFetchedAt=Date.now();
-    return { ...data, referrals:window.__ubeeCustomerGrowthReferrals };
-  })();
-
-  try{return await ubeeCustomerGrowthReferralsRequestPromise;}
-  finally{ubeeCustomerGrowthReferralsRequestPromise=null;}
-}
-
-async function loadCustomerMemberStats(){
-  const data=await loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS});
-  const growth=data?.growth||{};
-  return {
-    taskCount:Number(growth.completedOrders||0),
-    completedOrders:Number(growth.completedOrders||0),
-    validReferrals:Number(growth.validReferrals||0),
-    couponCount:0,
-    tier:growth.tier||{key:'GENERAL',label:'一般'},
-    nextTier:growth.nextTier||null,
-    referralCode:String(growth.referralCode||''),
-    shareUrl:String(growth.shareUrl||'')
-  };
-}
-
-async function renderCustomerMemberInfo(){
-  const info =
-    qs('memberInfoText');
-
-  const count =
-    qs('memberTaskCount');
-
-  const couponCount =
-    qs('memberCouponCount');
-
-  const level =
-    qs('memberLevelText');
-
-  if(info){
-
-    info.innerText = userId
-      ? `${currentCustomer?.name || 'UBee 會員'}｜${currentCustomer?.memberNumber || '會員資料已載入'}`
-      : '直接下單模式｜不需先註冊';
-  }
-
-  if(!userId){
-
-    if(count){
-      count.innerText = '0';
-    }
-
-    if(couponCount){
-      couponCount.innerText = '0';
-    }
-
-    if(level){
-      level.innerText = '一般';
-    }
-
-    return;
-  }
-
-  if(count){
-    count.innerText = '讀取中';
-  }
-
-  try{
-    const stats =
-      await loadCustomerMemberStats();
-
-    if(count){
-      count.innerText =
-        String(
-          stats.taskCount || 0
-        );
-    }
-
-    if(couponCount){
-      couponCount.innerText =
-        String(
-          stats.couponCount || 0
-        );
-    }
-
-    if(level){
-      level.innerText =
-        getMemberLevelText(
-          stats.taskCount || 0
-        );
-    }
-
-  }catch(err){
-
-    console.error(
-      '讀取會員統計失敗:',
-      err
-    );
-
-    if(count){
-      count.innerText = '0';
-    }
-
-    if(couponCount){
-      couponCount.innerText = '0';
-    }
-
-    if(level){
-      level.innerText = '一般';
-    }
-  }
 }
 
 function getSavedCustomerAddress(){
@@ -17295,7 +17121,7 @@ async function initPage(options = {}){
     const authData=await authResponse.json().catch(()=>({}));
     if(authResponse.ok&&authData.authenticated&&authData.customer?.customerId){currentCustomer=authData.customer;userId=String(currentCustomer.customerId||'');window.__ubeeCurrentCustomer=currentCustomer}else{window.__ubeeCurrentCustomer=null}
     const configResponse=await fetch('/api/config',{cache:'no-store',credentials:'include'});const cfg=await configResponse.json().catch(()=>({}));if(!configResponse.ok)throw new Error(cfg.message||'無法載入 UBee 設定。');googleMapsApiKey=String(cfg.googleMapsApiKey||'').trim();googleMapsMapId=String(cfg.googleMapsMapId||'').trim();
-    window.UBeeCustomerAuthHost?.hide();setSubmitButton('確認並建立任務',false);renderCustomerMemberInfo();handleInitialOpenAction();
+    window.UBeeCustomerAuthHost?.hide();setSubmitButton('確認並建立任務',false);handleInitialOpenAction();
     ensureCustomerInitialLocationGate();startHomeServiceStatusRefresh();customerPageInitialized=true;return true;
   }catch(error){console.error('UBee 用戶端初始化失敗：',error);setSubmitButton('系統暫時無法連線',true);showUBeeCustomerNativeAlert?.(error.message||'UBee 暫時無法連線，請稍後再試。');return false}
 }
@@ -17885,7 +17711,6 @@ window.onUBeeCustomerAuthenticated = async (customer, target) => {
   // 不能再次呼叫 showFlow({fresh:false})，因為它仍會 showPage('home')。
   const checkoutConfirm = document.querySelector('#productionOrderFlow .flow-page[data-page="confirm"].active');
   if(ubeeCustomerRuntimeStarted && checkoutConfirm && customer?.customerId && target === 'order'){
-    try{renderCustomerMemberInfo?.()}catch(_){}
     const statusEl=document.getElementById('flowConfirmStatus');
     if(statusEl){
       const resuming=window.UBeeCheckoutAuthResume?.onLoginComplete?.()===true;
@@ -21265,11 +21090,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(!currentCustomer?.customerId){
       $('flowProfileName').textContent='歡迎使用 UBee';
       $('flowProfileSubtext').textContent='直接下單・登入與帳戶保護皆為選用';
-      if($('flowProfileTaskCount'))$('flowProfileTaskCount').textContent='0';
-      if($('flowProfileLevel'))$('flowProfileLevel').textContent='一般';
-      window.__ubeeCustomerGrowth=null;
-      window.__ubeeCustomerGrowthHistory=[];
-      window.__ubeeCustomerGrowthFetchedAt=0;
       return true;
     }
     $('flowProfileName').textContent=displayName||'UBee 客戶';
@@ -21289,10 +21109,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       .catch(error=>console.warn('預載我的訂單失敗：',error));
 
     // RC2：會員等級與成長資料不再預載；訂單與 U幣照常預載。
-    const memberTask=Promise.resolve();
-
     window.UBeeUCoinV1?.load?.().catch(()=>{});
-    Promise.allSettled([addressTask,orderTask,memberTask]).catch(()=>{});
+    Promise.allSettled([addressTask,orderTask]).catch(()=>{});
     return true;
   }
 
@@ -23167,222 +22985,6 @@ html,body{
 @media(max-width:380px){#productionOrderFlow .ubee-my-member-card{padding-left:14px;padding-right:14px}#productionOrderFlow .ubee-my-menu-copy small{font-size:13px}}
 </style>
 
-<style id="ubee-customer-member-level-progress-v1-style">
-/* Customer Member Level Progress V1｜會員等級進度視覺；只改呈現，不改 Growth Engine 規則 */
-#productionOrderFlow .ubee-member-level-card{
-  margin:0 0 22px;
-  padding:20px 18px 18px;
-  border:1px solid #ece9d8;
-  border-radius:22px;
-  background:
-    radial-gradient(circle at 10% 0%,rgba(250,204,21,.16),transparent 38%),
-    linear-gradient(180deg,#fffef7 0%,#ffffff 58%);
-  box-shadow:0 10px 28px rgba(35,31,10,.06);
-  overflow:hidden;
-}
-#productionOrderFlow .ubee-member-level-head{
-  display:grid;
-  grid-template-columns:54px minmax(0,1fr) auto;
-  gap:13px;
-  align-items:center;
-}
-#productionOrderFlow .ubee-member-level-mark{
-  width:54px;
-  height:54px;
-  border-radius:18px;
-  display:grid;
-  place-items:center;
-  background:#ffd21a;
-  color:#111;
-  box-shadow:0 8px 18px rgba(250,204,21,.26);
-}
-#productionOrderFlow .ubee-member-level-mark svg{
-  width:26px;
-  height:26px;
-}
-#productionOrderFlow .ubee-member-level-copy{
-  min-width:0;
-}
-#productionOrderFlow .ubee-member-level-copy small{
-  display:block;
-  color:#8b8f95;
-  font-size:14px;
-  font-weight:800;
-  line-height:1.25;
-}
-#productionOrderFlow .ubee-member-level-copy strong{
-  display:block;
-  margin-top:3px;
-  color:#111;
-  font-size:26px;
-  font-weight:1000;
-  line-height:1.12;
-  letter-spacing:-.5px;
-}
-#productionOrderFlow .ubee-member-level-next{
-  align-self:start;
-  margin-top:2px;
-  padding:6px 9px;
-  border-radius:999px;
-  background:#f5f3e8;
-  color:#72632a;
-  font-size:13px;
-  font-weight:850;
-  white-space:nowrap;
-}
-#productionOrderFlow .ubee-member-level-progress-head{
-  display:grid;
-  grid-template-columns:auto minmax(0,1fr) auto;
-  gap:10px;
-  align-items:center;
-  margin-top:22px;
-  color:#8d9197;
-  font-size:13px;
-  font-weight:800;
-}
-#productionOrderFlow .ubee-member-level-progress-head strong{
-  min-width:0;
-  overflow:hidden;
-  color:#4e5054;
-  font-size:13px;
-  font-weight:850;
-  text-align:center;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-#productionOrderFlow .ubee-member-level-track{
-  position:relative;
-  height:10px;
-  margin:10px 8px 0;
-  border-radius:999px;
-  background:#e9e9ed;
-  overflow:visible;
-}
-#productionOrderFlow .ubee-member-level-track-fill{
-  position:absolute;
-  inset:0 auto 0 0;
-  width:0;
-  border-radius:inherit;
-  background:linear-gradient(90deg,#f1b900 0%,#ffd21a 70%,#ffe36b 100%);
-  box-shadow:0 0 14px rgba(250,204,21,.34);
-  transition:width .75s cubic-bezier(.22,.61,.36,1);
-}
-#productionOrderFlow .ubee-member-level-current-dot,
-#productionOrderFlow .ubee-member-level-end-dot{
-  position:absolute;
-  top:50%;
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  transform:translate(-50%,-50%);
-}
-#productionOrderFlow .ubee-member-level-current-dot{
-  left:0;
-  background:#111;
-  border:4px solid #ffd21a;
-  box-shadow:0 0 0 4px rgba(250,204,21,.16),0 3px 9px rgba(0,0,0,.18);
-  transition:left .75s cubic-bezier(.22,.61,.36,1);
-}
-#productionOrderFlow .ubee-member-level-current-dot::after{
-  content:"";
-  position:absolute;
-  inset:-8px;
-  border:1px solid rgba(250,204,21,.35);
-  border-radius:50%;
-  animation:ubeeMemberLevelPulse 1.9s ease-out infinite;
-}
-#productionOrderFlow .ubee-member-level-end-dot{
-  left:100%;
-  width:14px;
-  height:14px;
-  background:#fff;
-  border:3px solid #d3d5d9;
-}
-#productionOrderFlow .ubee-member-level-progress-meta{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-top:13px;
-  color:#8b9096;
-  font-size:13px;
-  font-weight:700;
-  line-height:1.4;
-}
-#productionOrderFlow .ubee-member-level-progress-meta strong{
-  flex:0 0 auto;
-  color:#111;
-  font-size:14px;
-  font-weight:950;
-}
-#productionOrderFlow .ubee-member-level-roadmap{
-  position:relative;
-}
-#productionOrderFlow .ubee-member-level-roadmap .ubee-native-growth-row{
-  position:relative;
-  min-height:68px!important;
-  padding-top:12px!important;
-  padding-bottom:12px!important;
-}
-#productionOrderFlow .ubee-member-level-roadmap .ubee-native-growth-state{
-  position:relative;
-  z-index:2;
-}
-#productionOrderFlow .ubee-member-level-roadmap .ubee-native-growth-row:not(:last-child)::after{
-  content:"";
-  position:absolute;
-  z-index:1;
-  left:27px;
-  top:41px;
-  bottom:-28px;
-  width:2px;
-  background:#e3e5e8;
-}
-#productionOrderFlow .ubee-member-level-roadmap .ubee-native-growth-row.is-done:not(:last-child)::after{
-  background:linear-gradient(180deg,#7cc991,#facc15);
-}
-#productionOrderFlow .ubee-member-level-roadmap .ubee-native-growth-row.is-current .ubee-native-growth-state{
-  box-shadow:0 0 0 5px rgba(250,204,21,.15);
-}
-@keyframes ubeeMemberLevelPulse{
-  0%{opacity:.55;transform:scale(.75)}
-  70%{opacity:0;transform:scale(1.35)}
-  100%{opacity:0;transform:scale(1.35)}
-}
-@media (prefers-reduced-motion:reduce){
-  #productionOrderFlow .ubee-member-level-track-fill,
-  #productionOrderFlow .ubee-member-level-current-dot{
-    transition:none!important;
-  }
-  #productionOrderFlow .ubee-member-level-current-dot::after{
-    animation:none!important;
-  }
-}
-@media(max-width:380px){
-  #productionOrderFlow .ubee-member-level-card{
-    padding:18px 15px 16px;
-  }
-  #productionOrderFlow .ubee-member-level-head{
-    grid-template-columns:48px minmax(0,1fr);
-  }
-  #productionOrderFlow .ubee-member-level-mark{
-    width:48px;
-    height:48px;
-    border-radius:15px;
-  }
-  #productionOrderFlow .ubee-member-level-copy strong{
-    font-size:23px;
-  }
-  #productionOrderFlow .ubee-member-level-next{
-    grid-column:2;
-    justify-self:start;
-    margin-top:-3px;
-  }
-  #productionOrderFlow .ubee-member-level-progress-head strong{
-    font-size:13px;
-  }
-}
-</style>
 <script id="ubee-app-settings-controller">
 (() => {
   'use strict';
@@ -23662,7 +23264,7 @@ html,body{
     const email = document.getElementById('ubeeMyAccountEmail');
     const accountStatus = document.getElementById('ubeeMyAccountStatus');
     const passwordAction = document.querySelector('#ubeeMyAccountPanel [data-my-action="changePassword"]');
-    if(name) name.textContent = customer?.name || 'UBee 會員';
+    if(name) name.textContent = customer?.name || 'UBee 使用者';
     if(phone) phone.textContent = customer?.phone || '尚未提供';
     if(email) email.textContent = customer?.email || '尚未提供';
     if(accountStatus) accountStatus.textContent = customer?.passwordConfigured===false ? '帳號狀態：本裝置已啟用・尚未設定登入密碼' : '帳號狀態：正常使用中';
@@ -23690,325 +23292,6 @@ html,body{
 
   function returnToMyRoot(){
     closeMySubPages();
-  }
-
-  function growthEsc(value){
-    return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
-  }
-
-  function customerGrowthIcon(name){
-    const paths={
-      crown:'<path d="M4 8l4 4 4-7 4 7 4-4-2 10H6z"/><path d="M7 21h10"/>',
-      target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3"/>',
-      award:'<circle cx="12" cy="9" r="5"/><path d="m8.5 13-1 8 4.5-2 4.5 2-1-8"/>',
-      userPlus:'<circle cx="9" cy="8" r="3"/><path d="M3.5 20c.6-4 2.5-6 5.5-6 1.5 0 2.7.4 3.6 1.2M17 10v6M14 13h6"/>',
-      history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
-      clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-      check:'<path d="m5 12 4 4L19 6"/>'
-    };
-    return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths[name]||paths.clock}</svg>`;
-  }
-
-  function customerGrowthRules(){return [['一般',0],['黃金',1],['銅牌',30],['銀牌',50],['白銀',150],['金牌',300],['白金',600]];}
-
-  function customerGrowthTierRequirement(label,value){
-    if(label==='一般') return '完成第一筆有效任務';
-    if(label==='銅牌') return '30 位有效推薦好友';
-    return `${Number(value).toLocaleString('zh-TW')} 筆有效訂單`;
-  }
-
-  function formatCustomerGrowthDate(value){
-    const ms=Number(value||0);if(!ms)return '';
-    try{return new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ms));}catch(_){return ''}
-  }
-
-  function renderCustomerTaskRows(tasks=[]){
-    return (Array.isArray(tasks)?tasks:[]).map(item=>{const progress=Math.max(0,Number(item.progress||0));const target=Math.max(1,Number(item.target||1));const percent=Math.min(100,Math.round(progress/target*100));return `<div class="ubee-native-task-row"><div class="ubee-native-task-top"><strong>${growthEsc(item.title||'成長任務')}</strong><span>${item.completed?'已完成':`${progress.toLocaleString('zh-TW')} / ${target.toLocaleString('zh-TW')}`}</span></div><div class="ubee-native-task-bar"><span style="width:${percent}%"></span></div><small>${growthEsc(item.rewardText||'成長里程碑')}</small></div>`}).join('')||'<div class="ubee-my-empty-state">目前沒有新的成長任務。</div>';
-  }
-
-  function renderCustomerAchievementGrid(items=[]){
-    return (Array.isArray(items)?items:[]).map(item=>`<div class="ubee-native-achievement ${item.unlocked?'':'locked'}"><span class="ubee-native-achievement-mark">${customerGrowthIcon(item.unlocked?'award':'clock')}</span><strong>${growthEsc(item.title||'成就')}</strong><small>${growthEsc(item.description||'')}</small></div>`).join('')||'<div class="ubee-my-empty-state">目前沒有成就資料。</div>';
-  }
-
-  function getCustomerLevelProgress(growth){
-    const tierLabel=String(growth?.tier?.label||'一般');
-    const completed=Math.max(0,Number(growth?.completedOrders||0));
-    const referrals=Math.max(0,Number(growth?.validReferrals||0));
-    const next=growth?.nextTier||null;
-
-    if(!next){
-      return {
-        tierLabel,
-        nextLabel:'最高等級',
-        progress:100,
-        currentValue:completed,
-        targetValue:completed,
-        unit:'筆有效訂單',
-        headline:'已達目前最高會員等級',
-        detail:'你已完成目前會員等級的最高里程碑'
-      };
-    }
-
-    const nextLabel=String(next.label||'下一級');
-    const remainingReferrals=Math.max(0,Number(next.remainingReferrals||0));
-    const remainingOrders=Math.max(0,Number(next.remainingOrders||0));
-    const targetReferrals=Math.max(0,Number(next.minReferrals||0));
-    const targetOrders=Math.max(0,Number(next.minOrders||0));
-
-    let currentValue=0;
-    let targetValue=1;
-    let unit='筆有效訂單';
-    let remaining=0;
-
-    // 以「真正還沒完成的條件」決定目前進度。
-    // 例如銅牌完成推薦門檻後，升銀牌就會自然切回有效訂單進度。
-    if(remainingReferrals>0){
-      currentValue=referrals;
-      targetValue=Math.max(1,targetReferrals);
-      unit='位有效好友';
-      remaining=remainingReferrals;
-    }else if(remainingOrders>0){
-      currentValue=completed;
-      targetValue=Math.max(1,targetOrders);
-      unit='筆有效訂單';
-      remaining=remainingOrders;
-    }else if(targetReferrals>0 && referrals<targetReferrals){
-      currentValue=referrals;
-      targetValue=Math.max(1,targetReferrals);
-      unit='位有效好友';
-      remaining=Math.max(0,targetReferrals-referrals);
-    }else{
-      currentValue=completed;
-      targetValue=Math.max(1,targetOrders||completed||1);
-      unit='筆有效訂單';
-      remaining=Math.max(0,targetValue-completed);
-    }
-
-    const progress=Math.max(0,Math.min(100,Math.round(currentValue/targetValue*100)));
-    return {
-      tierLabel,
-      nextLabel,
-      progress,
-      currentValue,
-      targetValue,
-      unit,
-      remaining,
-      headline:`距離${nextLabel}還差 ${remaining.toLocaleString('zh-TW')} ${unit}`,
-      detail:`目前進度 ${Math.min(currentValue,targetValue).toLocaleString('zh-TW')} / ${targetValue.toLocaleString('zh-TW')} ${unit}`
-    };
-  }
-
-  function renderCustomerTierRoadmap(growth){
-    const rules=customerGrowthRules();const current=String(growth?.tier?.label||'一般');const currentIndex=Math.max(0,rules.findIndex(([label])=>label===current));
-    return rules.map(([label,value],index)=>{const state=index<currentIndex?'is-done':index===currentIndex?'is-current':'';const mark=index<currentIndex?'✓':index===currentIndex?'●':String(index+1);return `<div class="ubee-native-growth-row ${state}"><span class="ubee-native-growth-state">${growthEsc(mark)}</span><span class="ubee-native-growth-row-main"><strong>${growthEsc(label)}</strong><small>${growthEsc(customerGrowthTierRequirement(label,value))}</small></span><span class="ubee-native-growth-row-side">${index<currentIndex?'已達成':index===currentIndex?'目前':'未解鎖'}</span></div>`}).join('');
-  }
-
-  function renderCustomerGrowthDetail(type,growth,history=[]){
-    const target=document.getElementById('ubeeMyGrowthContent');if(!target)return;
-    const title=type==='benefits'?'階級與權益':type==='tasks'?'成長任務':type==='achievements'?'我的成就':'成長歷程';
-    const back=`<div class="ubee-native-growth-detail-head"><button class="ubee-native-growth-back" type="button" data-growth-detail-back>‹ 我的</button><strong>${growthEsc(title)}</strong></div>`;
-    if(type==='benefits'){
-      const rows=(Array.isArray(growth?.benefits)?growth.benefits:[]).map((text,index)=>{const status=index===0?'已取得':String(text).includes('資格')?'可參與':'已取得';return `<div class="ubee-native-growth-row is-done"><span class="ubee-native-growth-state">${customerGrowthIcon('check')}</span><span class="ubee-native-growth-row-main"><strong>${growthEsc(text)}</strong><small>${index===0?'目前等級身份':'符合目前等級可取得的資格'}</small></span><span class="ubee-native-growth-row-side">${status}</span></div>`}).join('');
-      const levelProgress=getCustomerLevelProgress(growth);
-      const progressCurrent=Math.min(levelProgress.currentValue,levelProgress.targetValue);
-      target.innerHTML=back+`<section class="ubee-member-level-card">
-        <div class="ubee-member-level-head">
-          <span class="ubee-member-level-mark">${customerGrowthIcon('crown')}</span>
-          <span class="ubee-member-level-copy">
-            <small>會員等級</small>
-            <strong>${growthEsc(levelProgress.tierLabel)}會員</strong>
-          </span>
-          <span class="ubee-member-level-next">${levelProgress.nextLabel==='最高等級'?'最高等級':`下一級 ${growthEsc(levelProgress.nextLabel)}`}</span>
-        </div>
-        <div class="ubee-member-level-progress-head">
-          <span>${growthEsc(levelProgress.tierLabel)}</span>
-          <strong>${growthEsc(levelProgress.headline)}</strong>
-          <span>${growthEsc(levelProgress.nextLabel)}</span>
-        </div>
-        <div class="ubee-member-level-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${levelProgress.progress}">
-          <span class="ubee-member-level-track-fill" data-level-progress="${levelProgress.progress}"></span>
-          <i class="ubee-member-level-current-dot" data-level-dot="${levelProgress.progress}" aria-hidden="true"></i>
-          <i class="ubee-member-level-end-dot" aria-hidden="true"></i>
-        </div>
-        <div class="ubee-member-level-progress-meta">
-          <span>${growthEsc(levelProgress.detail)}</span>
-          <strong>${levelProgress.progress}%</strong>
-        </div>
-      </section>
-      <div class="ubee-native-growth-section-title">等級總覽</div>
-      <section class="ubee-native-growth-list ubee-member-level-roadmap">${renderCustomerTierRoadmap(growth)}</section>
-      <div class="ubee-native-growth-section-title">目前權益</div>
-      <section class="ubee-native-growth-list">${rows||'<div class="ubee-my-empty-state">目前沒有額外權益。</div>'}</section>
-      <div class="ubee-native-growth-note">「可參與」代表符合活動或計畫的基本資格，不代表固定現金折抵、永久折扣或保證名額。</div>`;
-      requestAnimationFrame(()=>{
-        const fill=target.querySelector('.ubee-member-level-track-fill');
-        const dot=target.querySelector('.ubee-member-level-current-dot');
-        if(fill) fill.style.width=`${levelProgress.progress}%`;
-        if(dot) dot.style.left=`${levelProgress.progress}%`;
-      });
-    }else if(type==='tasks'){
-      target.innerHTML=back+`<section class="ubee-native-growth-list">${renderCustomerTaskRows(growth?.tasks||[])}</section>`;
-    }else if(type==='achievements'){
-      target.innerHTML=back+`<section class="ubee-native-growth-metrics"><div class="ubee-native-growth-metric"><small>已解鎖成就</small><strong>${Number(growth?.unlockedAchievementCount||0)}</strong></div><div class="ubee-native-growth-metric"><small>全部成就</small><strong>${Number(growth?.achievements?.length||0)}</strong></div></section><div class="ubee-native-achievement-grid">${renderCustomerAchievementGrid(growth?.achievements||[])}</div>`;
-    }else{
-      const historyHtml=history.length?history.map(item=>`<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>晉升${growthEsc(item.toTierLabel||item.toTier||'會員階級')}</strong><small>${growthEsc(item.reasonText||`累積 ${Number(item.completedOrders||0).toLocaleString('zh-TW')} 筆有效訂單`)}</small><small class="ubee-native-growth-history-date">${growthEsc(formatCustomerGrowthDate(item.createdAtMs)||'歷史紀錄')}</small></span><span class="ubee-native-growth-row-side">已達成</span></div>`).join(''):'<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>加入 UBee</strong><small>成長歷程從這裡開始</small></span><span class="ubee-native-growth-row-side">已建立</span></div>';
-      target.innerHTML=back+`<section class="ubee-native-growth-list">${historyHtml}</section>`;
-    }
-    target.querySelector('[data-growth-detail-back]')?.addEventListener('click',()=>{
-      if(window.UBeeCustomerNavigation?.backOrFallback){
-        window.UBeeCustomerNavigation.backOrFallback(()=>closeMySubPages());
-      }else{
-        closeMySubPages();
-      }
-    });
-  }
-
-
-  function setCustomerGrowthStatus(message=''){
-    const el=document.getElementById('ubeeCustomerGrowthStatus');if(el)el.textContent=message;
-  }
-
-  async function copyCustomerGrowthText(text,message){
-    try{await navigator.clipboard.writeText(String(text||''));setCustomerGrowthStatus(message||'已複製');}
-    catch(_){setCustomerGrowthStatus('無法自動複製，請長按推薦碼複製。');}
-  }
-
-  function renderCustomerInvitePanel(growth,referrals=[]){
-    const target=document.getElementById('ubeeMyInviteContent');if(!target)return;
-    const code=String(growth?.referralCode||'');const url=String(growth?.shareUrl||'');const referralCount=Number(growth?.validReferrals||0);
-    target.innerHTML=`
-      <section class="ubee-native-invite-code"><small>我的推薦碼</small><strong>${growthEsc(code||'載入中')}</strong><p>好友完成第一筆有效訂單後，才會計入有效推薦。</p></section>
-      <button class="ubee-native-growth-primary" type="button" data-growth-share>邀請好友</button>
-      <section class="ubee-native-growth-action-list"><button class="ubee-native-growth-action" type="button" data-growth-copy-link><span>複製邀請連結</span><span>›</span></button><button class="ubee-native-growth-action" type="button" data-growth-copy-code><span>複製推薦碼</span><span>›</span></button></section>
-      <section class="ubee-native-growth-metrics"><div class="ubee-native-growth-metric"><small>目前有效推薦</small><strong>${referralCount.toLocaleString('zh-TW')}</strong></div><div class="ubee-native-growth-metric"><small>認定方式</small><strong>完成首單</strong></div></section>
-      <div class="ubee-native-growth-section-title">好友推薦進度</div><section class="ubee-native-growth-list">${(Array.isArray(referrals)?referrals:[]).slice(0,10).map(item=>{const status=String(item.status||'registered');const qualified=status==='qualified';const orderCreated=status==='order_created';const title=qualified?'已完成首單':orderCreated?'首單進行中':'已加入 UBee';const desc=qualified?'已認定為有效推薦':orderCreated?'好友已建立第一筆訂單，完成後即計入':'等待好友建立並完成第一筆有效訂單';return `<div class="ubee-native-growth-row ${qualified?'is-done':''}"><span class="ubee-native-growth-state">${qualified?customerGrowthIcon('check'):customerGrowthIcon(orderCreated?'clock':'userPlus')}</span><span class="ubee-native-growth-row-main"><strong>${title}</strong><small>${growthEsc(desc)}</small></span><span class="ubee-native-growth-row-side">${qualified?'有效推薦':orderCreated?'進行中':'等待首單'}</span></div>`}).join('')||'<div class="ubee-my-empty-state">目前還沒有推薦進度。</div>'}</section>
-      <div class="ubee-native-growth-note">未完成首單、取消訂單、異常帳號或自我推薦都不計入。Growth Engine 只計算真正完成首筆有效訂單的新客戶。</div><div class="ubee-native-growth-status" id="ubeeCustomerGrowthStatus" role="status" aria-live="polite"></div>`;
-    target.querySelector('[data-growth-share]')?.addEventListener('click',async()=>{const text=`加入 UBee 跑腿，推薦碼：${code}`;if(navigator.share){try{await navigator.share({title:'UBee 跑腿',text,url});setCustomerGrowthStatus('分享完成');}catch(_){} }else await copyCustomerGrowthText(url,'邀請連結已複製');});
-    target.querySelector('[data-growth-copy-link]')?.addEventListener('click',()=>copyCustomerGrowthText(url,'邀請連結已複製'));
-    target.querySelector('[data-growth-copy-code]')?.addEventListener('click',()=>copyCustomerGrowthText(code,'推薦碼已複製'));
-  }
-
-  async function fillGrowthPanel(mode='rewards'){
-    if(mode!=='rewards'){ return openMyGrowthDetail('benefits'); }
-    const target=document.getElementById('ubeeMyInviteContent');
-    const cachedGrowth=getCachedCustomerGrowthData(Infinity);
-    const cachedReferrals=getCachedCustomerGrowthReferrals(Infinity);
-
-    if(cachedGrowth){
-      renderMyMemberCard(cachedGrowth.growth||{});
-      renderCustomerInvitePanel(cachedGrowth.growth||{},cachedReferrals?.referrals||[]);
-    }else if(target){
-      target.innerHTML='<div class="ubee-my-empty-state">正在讀取推薦資料…</div>';
-    }
-
-    const [growthResult,referralResult]=await Promise.allSettled([
-      loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS}),
-      loadCustomerGrowthReferrals({maxAgeMs:UBEE_CUSTOMER_GROWTH_REFERRALS_CACHE_MS})
-    ]);
-
-    const growthData=growthResult.status==='fulfilled'?growthResult.value:cachedGrowth;
-    const referralData=referralResult.status==='fulfilled'?referralResult.value:cachedReferrals;
-    if(growthData?.growth){
-      renderMyMemberCard(growthData.growth||{});
-      renderCustomerInvitePanel(growthData.growth||{},referralData?.referrals||[]);
-    }else if(!cachedGrowth && target){
-      target.innerHTML='<div class="ubee-my-empty-state">推薦資料暫時無法讀取，請稍後再試。</div>';
-    }
-  }
-
-  function renderMyMemberCard(growth){
-    const tier=document.getElementById('ubeeMyMemberTier');
-    const orders=document.getElementById('ubeeMyMemberOrders');
-    const nextText=document.getElementById('ubeeMyMemberNext');
-    const bar=document.getElementById('ubeeMyMemberProgressBar');
-    if(!tier||!orders||!nextText||!bar)return;
-    const tierLabel=String(growth?.tier?.label||'一般');
-    const completed=Math.max(0,Number(growth?.completedOrders||0));
-    const referrals=Math.max(0,Number(growth?.validReferrals||0));
-    const next=growth?.nextTier||null;
-    let progress=100;
-    let copy='已達目前最高會員等級';
-    if(next){
-      if(Number(next.remainingReferrals||0)>0 || Number(next.minReferrals||0)>0){
-        const target=Math.max(1,Number(next.minReferrals||0));
-        progress=Math.min(100,Math.round(referrals/target*100));
-        copy=`距離${String(next.label||'下一階')}還差 ${Math.max(0,Number(next.remainingReferrals||0)).toLocaleString('zh-TW')} 位有效好友`;
-      }else{
-        const target=Math.max(1,Number(next.minOrders||0));
-        progress=Math.min(100,Math.round(completed/target*100));
-        copy=`距離${String(next.label||'下一階')}還差 ${Math.max(0,Number(next.remainingOrders||0)).toLocaleString('zh-TW')} 筆有效訂單`;
-      }
-    }
-    tier.textContent=`${tierLabel}會員`;
-    orders.textContent=`${completed.toLocaleString('zh-TW')} 單`;
-    nextText.textContent=copy;
-    bar.style.width=`${Math.max(0,progress)}%`;
-  }
-
-  async function refreshMyMemberCard(){
-    const card=document.getElementById('ubeeMyMemberCard');
-    if(!card)return;
-    if(!getCurrentCustomerSafe()){
-      document.getElementById('ubeeMyMemberTier').textContent='登入後查看會員成長';
-      document.getElementById('ubeeMyMemberOrders').textContent='—';
-      document.getElementById('ubeeMyMemberNext').textContent='登入後可查看牌級、任務與成就';
-      document.getElementById('ubeeMyMemberProgressBar').style.width='0%';
-      return;
-    }
-    const cached=getCachedCustomerGrowthData(Infinity);
-    if(cached?.growth)renderMyMemberCard(cached.growth);
-    try{
-      const data=await loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS});
-      renderMyMemberCard(data?.growth||{});
-    }catch(_){
-      if(!cached)document.getElementById('ubeeMyMemberNext').textContent='會員資料暫時無法更新';
-    }
-  }
-
-  let growthDetailRequestToken=0;
-  async function openMyGrowthDetail(type,options={}){
-    const detail=safeText(type).toLowerCase();
-    if(!['benefits','tasks','achievements','history'].includes(detail))return false;
-    if(!getCurrentCustomerSafe()){
-      root.classList.remove('active');
-      document.body.classList.remove('flow-active','ubee-my-subpage-open');
-      window.UBeeCustomerAuthHost?.show('login');
-      return true;
-    }
-    const requestToken=++growthDetailRequestToken;
-    showMyRoot();
-    preparePanels();
-    closeMySubPages();
-    const panel=document.getElementById('ubeeMyGrowthPanel');
-    if(!panel)return false;
-    panel.hidden=false;
-    panel.scrollTop=0;
-    currentMySection='growth';
-    root.setAttribute('data-my-section','growth');
-    document.body.classList.add('ubee-my-subpage-open');
-    const target=document.getElementById('ubeeMyGrowthContent');
-    const cached=getCachedCustomerGrowthData(Infinity);
-    if(cached?.growth){
-      renderMyMemberCard(cached.growth||{});
-      renderCustomerGrowthDetail(detail,cached.growth||{},cached.history||[]);
-    }else if(target){
-      target.innerHTML='<div class="ubee-my-empty-state">正在讀取會員資料…</div>';
-    }
-    requestAnimationFrame(()=>panel.classList.add('is-open'));
-    if(!options.fromHistory){
-      window.UBeeCustomerNavigation?.pushGrowthDetail?.(detail);
-    }
-    try{
-      const data=await loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS});
-      if(requestToken!==growthDetailRequestToken || currentMySection!=='growth')return true;
-      renderMyMemberCard(data?.growth||{});
-      renderCustomerGrowthDetail(detail,data?.growth||{},data?.history||[]);
-    }catch(_){
-      if(!cached && requestToken===growthDetailRequestToken && target){
-        target.innerHTML='<div class="ubee-my-empty-state">會員資料暫時無法讀取，請稍後再試。</div>';
-      }
-    }
-    return true;
   }
 
   function openMySection(action,options={}){
@@ -24050,7 +23333,7 @@ html,body{
       return true;
     }
 
-    if(['account','rewards'].includes(normalized) && !getCurrentCustomerSafe()){
+    if(normalized === 'account' && !getCurrentCustomerSafe()){
       root.classList.remove('active');
       document.body.classList.remove('flow-active','ubee-my-subpage-open');
       window.UBeeCustomerAuthHost?.show('login');
@@ -24072,7 +23355,6 @@ html,body{
       window.UBeeCustomerMyServiceData?.showCachedAddresses?.();
       window.UBeeCustomerMyServiceData?.refreshSavedAddresses?.().catch(()=>{});
     }
-    if(normalized === 'rewards') fillGrowthPanel(normalized);
     if(normalized === 'privacy' && !options.keepLegalDocument){
       const legalContent = document.getElementById('ubeeMyDocumentContent');
       if(legalContent){
@@ -24416,7 +23698,6 @@ html,body{
   }
 
   window.closeUBeeMySubPages = closeMySubPages;
-  window.openUBeeMyGrowthDetail = openMyGrowthDetail;
   window.openUBeeMySection = openMySection;
   window.openUBeeTaskPage = openTaskPage;
   window.showTasksTab = openTaskPage;
@@ -24998,21 +24279,16 @@ html,body{
 
 
   let ubeeMyPrefetchScheduled=false;
-  function scheduleUBeeMyGrowthPrefetch(){ /* RC2: growth/recommendation prefetch retired */ }
 
   const previousProfilePage = window.openUBeeProfilePage;
   if(typeof previousProfilePage === 'function'){
     window.openUBeeProfilePage = function(){
       closeMySubPages();
       const result=previousProfilePage.apply(this,arguments);
-      refreshMyMemberCard();
-      scheduleUBeeMyGrowthPrefetch();
       return result;
     };
     window.showProfileTab = window.openUBeeProfilePage;
   }
-  setTimeout(scheduleUBeeMyGrowthPrefetch,900);
-  setTimeout(scheduleUBeeMyGrowthPrefetch,2200);
 })();
 </script>
 
@@ -27389,8 +26665,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
   const STATE_KEY='ubeeCustomerNavigationV3';
   const PRIMARY=new Set(['home','task','ucoin','notify','store','my']);
-  const MY_SECTIONS=new Set(['account','coupons','addresses','growth','rewards','feedback','settings','favorites','serviceareas','becomerider','editprofile','changepassword','preferences','security','privacy','deleteaccount']);
-  const GROWTH_DETAILS=new Set(['benefits','tasks','achievements','history']);
+  const MY_SECTIONS=new Set(['account','coupons','addresses','feedback','settings','favorites','serviceareas','becomerider','editprofile','changepassword','preferences','security','privacy','deleteaccount']);
   let applying=false;
 
   const normalizePrimary=value=>PRIMARY.has(String(value||'').toLowerCase())?String(value).toLowerCase():'home';
@@ -27423,10 +26698,6 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
         await window.UBeePrimaryNavigation?.open?.('ucoin',{source:'history',skipHistory:true});
         return true;
       }
-      if(route.detail&&GROWTH_DETAILS.has(route.detail)){
-        await window.openUBeeMyGrowthDetail?.(route.detail,{fromHistory:true});
-        return true;
-      }
       if(route.sub&&MY_SECTIONS.has(route.sub)){
         window.openUBeeMySection?.(route.sub,{fromHistory:true});
         return true;
@@ -27451,7 +26722,6 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   window.UBeeCustomerNavigation=Object.freeze({
     pushPrimary(primary){return pushRoute({primary});},
     pushMySection(sub){return pushRoute({primary:'my',sub});},
-    pushGrowthDetail(detail){return pushRoute({primary:'my',sub:'growth',detail});},
     backOrFallback,
     isApplying:()=>applying,
     getState
