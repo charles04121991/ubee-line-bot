@@ -4,7 +4,7 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261030-customer-two-tab-workbench-rc1
+  PWA: 20261030-customer-two-tab-membership-simplification-rc2
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -29,7 +29,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261030-customer-two-tab-workbench-rc1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261030-customer-two-tab-membership-simplification-rc2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -7383,8 +7383,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
     if(password!==confirm || !$('ucaRegisterAgree').checked){setStatus('ucaRegisterStatus','請確認密碼一致並同意服務條款。','error');return}
     const button=$('ucaRegisterSubmit');button.disabled=true;loading(true,'正在建立 UBee 會員');setStatus('ucaRegisterStatus');
     try{
-      const referralCode=String(new URLSearchParams(location.search).get('ref')||'').trim().toUpperCase();
-      const data=await api('/api/customer-auth/register',{method:'POST',body:JSON.stringify({name,phone,password,referralCode,
+      const data=await api('/api/customer-auth/register',{method:'POST',body:JSON.stringify({name,phone,password,
         agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})});
       // 確認 HttpOnly Session 已保存，避免把建帳成功誤判成登入成功。
       let me;
@@ -7472,9 +7471,8 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
     if(!validPhone(phone)){setStatus('請填寫正確的 09 開頭 10 碼手機號碼。','is-error');phoneInput.focus();return}
     try{localStorage.setItem('ubee_order_identity_name',name);localStorage.setItem('ubee_order_identity_phone',phone)}catch(_){}
     setBusy(true,'正在建立安全使用身分，完成後會直接繼續送單。');
-    const referralCode=String(new URLSearchParams(location.search).get('ref')||'').trim().toUpperCase();
     try{
-      const data=await rawApi('/api/customer-auth/order-session',{method:'POST',body:JSON.stringify({name,phone,serviceCity:(typeof selectedServiceCity!=='undefined'?selectedServiceCity:''),referralCode,agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})});
+      const data=await rawApi('/api/customer-auth/order-session',{method:'POST',body:JSON.stringify({name,phone,serviceCity:(typeof selectedServiceCity!=='undefined'?selectedServiceCity:''),agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})});
       const customer=data.customer||{};
       if(!/^customer_[a-f0-9]{32}$/.test(String(customer.customerId||'')))throw new Error('後端未回傳有效的 Customer ID。');
       // 確保此瀏覽器已真的保存 HttpOnly Session；避免新帳號建立成功卻無法送單。
@@ -19313,17 +19311,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 <span aria-hidden="true" class="ubee-my-account-arrow"><svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24"><path d="m9 18 6-6-6-6"></path></svg></span>
 </button>
-<button class="ubee-my-member-card" data-my-growth-detail="benefits" id="ubeeMyMemberCard" type="button" aria-label="查看階級與權益">
-<div class="ubee-my-member-card-top"><span class="ubee-my-member-emblem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8l4 4 4-7 4 7 4-4-2 10H6z"/><path d="M7 21h10"/></svg></span><span class="ubee-my-member-copy"><small>會員等級・點擊查看權益</small><strong id="ubeeMyMemberTier">一般會員</strong></span><span class="ubee-my-member-chevron" aria-hidden="true">›</span></div>
-<div class="ubee-my-member-progress"><span id="ubeeMyMemberProgressBar" style="width:0%"></span></div>
-<div class="ubee-my-member-meta"><span id="ubeeMyMemberNext">完成第一筆有效訂單即可晉升</span><strong id="ubeeMyMemberOrders">0 單</strong></div>
-</button>
-
 <div class="ubee-my-groups">
 <section class="ubee-my-group" id="ubeeMyServicesGroup"><h3>我的服務</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="orders" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2.5"/><path d="M9 4.5V3h6v1.5M8.5 11h7M8.5 16h7"/></svg></span><span class="ubee-my-menu-copy"><strong>我的訂單</strong><small>查詢與追蹤</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="ucoin" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 8v5.1a3 3 0 0 0 6 0V8"/></svg></span><span class="ubee-my-menu-copy"><strong>我的U幣</strong><small>餘額與獎勵</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="addresses" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="ubee-my-menu-copy"><strong>常用地址</strong><small>取送地點</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="notifications" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span class="ubee-my-menu-copy"><strong>通知中心</strong><small>訊息與提醒</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="favorites" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></span><span class="ubee-my-menu-copy"><strong>常用任務</strong><small>快速使用</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button></div></section>
 <section class="ubee-my-group" id="ubeeMyAppDownloadGroup"><h3>快速安裝</h3><div class="ubee-my-menu"><button aria-label="下載 UBee 跑腿 App" class="ubee-my-menu-item" id="ubeeV2InstallEntry" onclick="window.location.assign('/install-customer.html')" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 18v3h16v-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></span><span class="ubee-my-menu-copy"><strong>下載 UBee App</strong><small>iPhone 描述檔安裝教學</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button></div></section>
-<section class="ubee-my-group"><h3>成長與邀請</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-growth-detail="tasks" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3"></path></svg></span><span class="ubee-my-menu-copy"><strong>成長任務</strong><small>目前的成長里程碑</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-growth-detail="achievements" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="12" cy="9" r="5"></circle><path d="m8.5 13-1 8 4.5-2 4.5 2-1-8"></path></svg></span><span class="ubee-my-menu-copy"><strong>我的成就</strong><small>已解鎖的會員成就</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="rewards" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 20c.6-4 2.5-6 5.5-6 1.5 0 2.7.4 3.6 1.2M17 10v6M14 13h6"></path></svg></span><span class="ubee-my-menu-copy"><strong>邀請好友</strong><small>推薦碼與好友進度</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-growth-detail="history" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5M12 7v5l3 2"></path></svg></span><span class="ubee-my-menu-copy"><strong>成長歷程</strong><small>會員晉升紀錄</small></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button></div></section>
-
 <section class="ubee-my-group"><h3>服務與支援</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="serviceAreas" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"></path></svg></span><span class="ubee-my-menu-copy"><strong>服務地區</strong></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="becomeRider" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="8" cy="7" r="3"></circle><path d="M2.5 20c.5-4 2.3-6 5.5-6 2 0 3.5.8 4.4 2.4M17 11v8M13 15h8"></path></svg></span><span class="ubee-my-menu-copy"><strong>成為小U</strong></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="support" data-ubee-line-support="" id="flowProfileSupport" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"></path><path d="M8 9h8M8 13h5"></path></svg></span><span class="ubee-my-menu-copy"><strong>聯繫客服</strong></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="feedback" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 20l4.5-1 10-10a2.8 2.8 0 0 0-4-4l-10 10z"></path><path d="m13 6 5 5"></path></svg></span><span class="ubee-my-menu-copy"><strong>意見回饋</strong></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button><button class="ubee-my-menu-item" data-my-action="settings" type="button"><span class="ubee-my-menu-icon"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19 13.5v-3l-2-.7-.7-1.7.9-1.9-2.1-2.1-1.9.9-1.7-.7L10.5 2h-3l-.7 2-1.7.7-1.9-.9-2.1 2.1.9 1.9-.7 1.7L0 10.5v3l2 .7.7 1.7-.9 1.9 2.1 2.1 1.9-.9 1.7.7.7 2.3h3l.7-2.3 1.7-.7 1.9.9 2.1-2.1-.9-1.9.7-1.7z" transform="translate(2 -0.5) scale(.83)"></path></svg></span><span class="ubee-my-menu-copy"><strong>設定</strong></span><span aria-hidden="true" class="ubee-my-menu-chevron">›</span></button></div></section>
 </div>
 <section class="ubee-my-panel" hidden="" id="ubeeMyAddressesPanel">
@@ -19331,9 +19321,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-profile-list" id="flowProfileAddressesList"><div class="flow-empty">正在讀取常用地址…</div></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyAccountPanel">
-<div class="ubee-my-panel-head"><strong>會員帳號</strong><button data-my-close="" type="button">上一頁</button></div>
+<div class="ubee-my-panel-head"><strong>使用資料</strong><button data-my-close="" type="button">上一頁</button></div>
 <div class="ubee-account-summary">
-<strong id="ubeeMyAccountName">UBee 會員</strong>
+<strong id="ubeeMyAccountName">UBee 使用者</strong>
 <span id="ubeeMyAccountStatus">帳號狀態：正常使用中</span>
 </div>
 <div class="ubee-my-info-list">
@@ -19343,7 +19333,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="ubee-my-info-row"><span>加入日期</span><strong id="ubeeMyAccountJoined">—</strong></div>
 </div>
 <div class="ubee-account-actions">
-<button data-my-action="editProfile" type="button">編輯會員資料 <span>›</span></button>
+<button data-my-action="editProfile" type="button">編輯使用資料 <span>›</span></button>
 <button data-my-action="preferences" type="button">通知設定 <span>›</span></button>
 <button data-my-action="security" type="button">帳號與安全 <span>›</span></button>
 <button data-my-action="privacy" type="button">規範與隱私 <span>›</span></button>
@@ -19352,13 +19342,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="ubee-my-panel" hidden="" id="ubeeMyCouponsPanel">
 <div class="ubee-my-panel-head"><strong>優惠券</strong><button data-my-close="" type="button">關閉</button></div>
 <div class="ubee-my-empty-state" id="ubeeMyCouponsContent">目前沒有可使用的優惠券。</div>
-</section>
-<section class="ubee-my-panel ubee-my-growth-detail-panel" hidden="" id="ubeeMyGrowthPanel">
-<div id="ubeeMyGrowthContent"><div class="ubee-my-empty-state">正在讀取會員資料…</div></div>
-</section>
-<section class="ubee-my-panel" hidden="" id="ubeeMyRewardsPanel">
-<div class="ubee-my-panel-head"><strong>邀請好友</strong><button data-my-close="" type="button">上一頁</button></div>
-<div id="ubeeMyInviteContent"><div class="ubee-my-empty-state">正在讀取推薦資料…</div></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyFavoritesPanel">
 <div class="ubee-my-panel-head"><strong>常用任務</strong><button data-my-close="" type="button">上一頁</button></div>
@@ -21299,33 +21282,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const cachedOrders=typeof getCachedCustomerOrders==='function'?getCachedCustomerOrders(Infinity):null;
     if(cachedOrders)state.profileOrders=Array.isArray(cachedOrders.orders)?cachedOrders.orders:[];
 
-    const cachedGrowth=typeof getCachedCustomerGrowthData==='function'?getCachedCustomerGrowthData(Infinity):null;
-    if(cachedGrowth?.growth){
-      $('flowProfileTaskCount').textContent=String(Number(cachedGrowth.growth.completedOrders||0));
-      $('flowProfileLevel').textContent=String(cachedGrowth.growth?.tier?.label||'一般');
-    }
-
     // 「我的服務」資料在背景預熱；不阻塞我的頁，也不把畫面切成 Loading。
     const addressTask=loadSavedAddressesForProfile().catch(error=>console.warn('讀取常用地址失敗：',error));
     const orderTask=loadCustomerOrders({maxAgeMs:UBEE_CUSTOMER_ORDER_LIST_CACHE_MS,limit:100})
       .then(orders=>{state.profileOrders=Array.isArray(orders)?orders.slice(0,100):[];})
       .catch(error=>console.warn('預載我的訂單失敗：',error));
 
-    const memberTask=(async()=>{
-      try{
-        if(typeof loadCustomerMemberStats==='function'){
-          const stats=await loadCustomerMemberStats();
-          $('flowProfileTaskCount').textContent=String(stats?.taskCount||0);
-          $('flowProfileLevel').textContent=typeof getMemberLevelText==='function'?getMemberLevelText(stats?.taskCount||0):'一般';
-          if(typeof window.openUBeeMySection==='function' && window.__ubeeCustomerGrowth){
-            const tierEl=document.getElementById('ubeeMyMemberTier');
-            const ordersEl=document.getElementById('ubeeMyMemberOrders');
-            if(tierEl) tierEl.textContent=`${String(window.__ubeeCustomerGrowth?.tier?.label||'一般')}會員`;
-            if(ordersEl) ordersEl.textContent=`${Number(window.__ubeeCustomerGrowth?.completedOrders||0).toLocaleString('zh-TW')} 單`;
-          }
-        }
-      }catch(error){console.warn('讀取會員統計失敗：',error)}
-    })();
+    // RC2：會員等級與成長資料不再預載；訂單與 U幣照常預載。
+    const memberTask=Promise.resolve();
 
     window.UBeeUCoinV1?.load?.().catch(()=>{});
     Promise.allSettled([addressTask,orderTask,memberTask]).catch(()=>{});
@@ -21744,7 +21708,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261030-customer-two-tab-workbench-rc1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261030-customer-two-tab-membership-simplification-rc2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -25015,14 +24979,6 @@ html,body{
       return;
     }
 
-    const growthDetailButton = event.target.closest('#productionOrderFlow [data-my-growth-detail]');
-    if(growthDetailButton){
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openMyGrowthDetail(growthDetailButton.dataset.myGrowthDetail || '');
-      return;
-    }
-
     const actionButton = event.target.closest('#productionOrderFlow [data-my-action]');
     if(actionButton){
       event.preventDefault();
@@ -25042,20 +24998,7 @@ html,body{
 
 
   let ubeeMyPrefetchScheduled=false;
-  function scheduleUBeeMyGrowthPrefetch(){
-    if(ubeeMyPrefetchScheduled || !getCurrentCustomerSafe())return;
-    ubeeMyPrefetchScheduled=true;
-    const run=()=>{
-      ubeeMyPrefetchScheduled=false;
-      loadCustomerGrowth({maxAgeMs:UBEE_CUSTOMER_GROWTH_CACHE_MS}).catch(()=>{});
-      loadCustomerGrowthReferrals({maxAgeMs:UBEE_CUSTOMER_GROWTH_REFERRALS_CACHE_MS}).catch(()=>{});
-    };
-    if('requestIdleCallback' in window){
-      window.requestIdleCallback(run,{timeout:900});
-    }else{
-      setTimeout(run,120);
-    }
-  }
+  function scheduleUBeeMyGrowthPrefetch(){ /* RC2: growth/recommendation prefetch retired */ }
 
   const previousProfilePage = window.openUBeeProfilePage;
   if(typeof previousProfilePage === 'function'){
