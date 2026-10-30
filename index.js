@@ -1,3 +1,4 @@
+// UBee Rider Review V4.0.1 supplement extension — shared backend; original Driver header below
 // UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
 // ============================================================
 // UBee Backend｜會員安全增量 2026-10-17（以 2026-10-08 後端正式基準為底）
@@ -21790,6 +21791,20 @@ app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res
         req.body?.photoAuthenticityDeclared !== true) {
       return res.status(400).json({success:false,code:'PHOTO_AUTHENTICITY_DECLARATION_REQUIRED',message:'請確認本人照片真實性聲明。'});
     }
+    // V4.0.1: a photo explicitly requested by Rider Review must be re-submitted
+    // through application-supplement for review, not directly committed to ridersV2.
+    const pendingApplicationDoc = await db.collection(RIDER_V2_COLLECTIONS.applications).doc(phone).get();
+    const pendingPhotoReview = pendingApplicationDoc.exists ? (pendingApplicationDoc.data() || {}) : {};
+    if (pendingApplicationDoc.exists && (
+        String(pendingPhotoReview.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement' ||
+        (pendingPhotoReview.credentialMaintenanceActive === true &&
+         pendingPhotoReview.credentialMaintenanceProfilePhotoRequested === true)
+    )) {
+      return res.status(409).json({
+        success:false, code:'PROFILE_PHOTO_REVIEW_PENDING',
+        message:'管理員已要求大頭照補件，請使用申請進度中的補件流程上傳，審核通過後再更新正式大頭照。',
+      });
+    }
     const validated = await validateRiderProfilePhoto(req.body?.profilePhoto, phone);
     if (!validated.ok) return res.status(400).json({ success:false, message:validated.message });
     const nowMs=Date.now();
@@ -23796,6 +23811,8 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
     rejectionReason: cleanText(application.rejectionReason || '', 1000),
     credentialMaintenanceActive:
       application.credentialMaintenanceActive === true,
+    credentialMaintenanceProfilePhotoRequested:
+      application.credentialMaintenanceProfilePhotoRequested === true,
     credentialMaintenancePreviousLifecycleStatus: cleanText(
       application.credentialMaintenancePreviousLifecycleStatus || '',
       40
@@ -24412,8 +24429,13 @@ app.post(
         if (!['pending','approved','needs_supplement'].includes(photoStatus)) {
           return res.status(400).json({success:false,message:'大頭照審核狀態不正確。'});
         }
-        if (photoStatus === 'needs_supplement' && !reason) {
-          return res.status(400).json({success:false,message:'要求補件必須填寫原因。'});
+        // V4.0.1: requests for photo supplements must use the unified request_supplement
+        // workflow so official riders receive the same qualification lock and audit events.
+        if (photoStatus === 'needs_supplement') {
+          return res.status(409).json({
+            success:false,
+            message:'大頭照補件請使用「批次要求補件」，確保正式小U資格與通知同步。',
+          });
         }
         await applicationDoc.ref.update({
           'profilePhoto.reviewStatus':photoStatus,
@@ -24424,7 +24446,21 @@ app.post(
           updatedAtMs:nowMs,
           updatedAt:admin.firestore.FieldValue.serverTimestamp(),
         });
-        const freshDoc = await applicationDoc.ref.get();
+        let freshDoc = await applicationDoc.ref.get();
+        const freshPhotoApplication = freshDoc.data() || {};
+        if (photoStatus === 'approved' &&
+            String(freshPhotoApplication.status || '').toLowerCase() === 'needs_supplement') {
+          const remaining = summarizeRiderApplicationDocuments(freshPhotoApplication);
+          if (!remaining.hasSupplementRequest) {
+            await applicationDoc.ref.set({
+              status:'under_review', reviewStatus:'under_review',
+              documentReviewStatus:remaining.allApproved ? 'approved' : 'pending',
+              supplementReason:'',
+              updatedAt:admin.firestore.FieldValue.serverTimestamp(), updatedAtMs:Date.now(),
+            }, {merge:true});
+            freshDoc = await applicationDoc.ref.get();
+          }
+        }
         await writeRiderApplicationReviewEvent({
           application:freshDoc.data() || {}, type:'mark_profile_photo', operator,
           reason:photoStatus === 'needs_supplement' ? reason : `大頭照審核：${photoStatus}`,
@@ -24490,20 +24526,27 @@ app.post(
         let freshDoc = await applicationDoc.ref.get();
         let freshApplication = freshDoc.data() || {};
         const summary = summarizeRiderApplicationDocuments(freshApplication);
+        const photoStillNeedsSupplement =
+          freshApplication.profilePhotoRequired === true &&
+          String(freshApplication.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement';
+        const outstandingSupplement = summary.hasSupplementRequest || photoStillNeedsSupplement;
+        const officialMaintenance = freshApplication.credentialMaintenanceActive === true;
         const overallUpdate = {
           documentReviewStatus: summary.allApproved
             ? 'approved'
             : summary.hasSupplementRequest
               ? 'needs_supplement'
               : 'pending',
-          status: summary.hasSupplementRequest
+          status: outstandingSupplement
             ? 'needs_supplement'
             : 'under_review',
-          reviewStatus: summary.hasSupplementRequest
+          reviewStatus: outstandingSupplement
             ? 'needs_supplement'
             : 'under_review',
-          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
-          approved: false,
+          lifecycleStatus: officialMaintenance
+            ? RIDER_V4_LIFECYCLE.RESTRICTED
+            : RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: officialMaintenance,
           canAcceptOrders: false,
           reviewStartedAt:
             application.reviewStartedAtMs
@@ -24517,7 +24560,7 @@ app.post(
           updatedAtMs: Date.now(),
         };
 
-        if (summary.hasSupplementRequest) {
+        if (outstandingSupplement) {
           const reasons = summary.documents
             .filter(
               item =>
@@ -24525,6 +24568,9 @@ app.post(
                 RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
             )
             .map(item => `${item.label}：${item.reviewReason || '請重新上傳'}`);
+          if (photoStillNeedsSupplement) {
+            reasons.push(`小U大頭照：${cleanText(freshApplication.profilePhoto?.reviewReason || '請重新上傳',500)}`);
+          }
           overallUpdate.supplementReason = reasons.join('\n');
           overallUpdate.supplementRequestedAt =
             admin.firestore.FieldValue.serverTimestamp();
@@ -24814,25 +24860,47 @@ app.post(
 
         const reasonLines = [];
         const normalizedRequestedKeys = [];
+        const requestedAllowedKeys = new Set(getRequiredRiderDocumentKeys(
+          application.vehicle, application.requiredDocumentKeys
+        ));
 
         for (const [rawKey, rawReason] of Object.entries(requestedDocuments)) {
           const documentKey = normalizeRiderDocumentKey(rawKey);
           const documentReason = cleanText(rawReason || reason, 500);
-          if (!documentKey || !RIDER_REQUIRED_DOCUMENTS[documentKey]) continue;
+          // V4.0.1: old or already-active riders can be asked for a missing headshot.
+          // The new requirement is opt-in per request, never a bulk retroactive migration.
+          const isProfilePhoto = documentKey === RIDER_PROFILE_PHOTO_KEY;
+          if (!isProfilePhoto && (!documentKey || !requestedAllowedKeys.has(documentKey))) {
+            return res.status(400).json({
+              success:false, message:'補件項目不適用於這位小U的配送工具。',
+            });
+          }
           if (!documentReason) {
             return res.status(400).json({
               success: false,
-              message: `${RIDER_DOCUMENT_LABELS[documentKey]}缺少補件原因。`,
+              message: `${isProfilePhoto ? '小U大頭照' : RIDER_DOCUMENT_LABELS[documentKey]}缺少補件原因。`,
             });
           }
-          update[`documents.${documentKey}.reviewStatus`] =
-            RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT;
-          update[`documents.${documentKey}.reviewReason`] = documentReason;
-          update[`documents.${documentKey}.reviewedBy`] = operator;
-          update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
+          if (isProfilePhoto) {
+            update.profilePhotoRequired = true;
+            update['profilePhoto.reviewStatus'] = 'needs_supplement';
+            update['profilePhoto.reviewReason'] = documentReason;
+            update['profilePhoto.reviewedBy'] = operator;
+            update['profilePhoto.reviewedAtMs'] = nowMs;
+            if (maintenanceActive) {
+              update.credentialMaintenanceProfilePhotoRequested = true;
+              update.credentialMaintenanceProfilePhotoRequestedAtMs = nowMs;
+            }
+          } else {
+            update[`documents.${documentKey}.reviewStatus`] =
+              RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT;
+            update[`documents.${documentKey}.reviewReason`] = documentReason;
+            update[`documents.${documentKey}.reviewedBy`] = operator;
+            update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
+          }
           normalizedRequestedKeys.push(documentKey);
           reasonLines.push(
-            `${RIDER_DOCUMENT_LABELS[documentKey]}：${documentReason}`
+            `${isProfilePhoto ? '小U大頭照' : RIDER_DOCUMENT_LABELS[documentKey]}：${documentReason}`
           );
         }
 
@@ -24843,6 +24911,22 @@ app.post(
           });
         }
 
+        // Photo-only supplement must not downgrade an existing document approval.
+        const documentKeysRequested = normalizedRequestedKeys.filter(key => key !== RIDER_PROFILE_PHOTO_KEY);
+        if (!documentKeysRequested.length) {
+          update.documentReviewStatus = String(application.documentReviewStatus || 'pending').trim().toLowerCase();
+        } else if (String(application.documentReviewStatus || '').toLowerCase() === 'approved') {
+          const originalDocumentSummary = summarizeRiderApplicationDocuments(application);
+          for (const item of originalDocumentSummary.documents) {
+            if (documentKeysRequested.includes(item.documentKey)) continue;
+            if (item.reviewStatus !== RIDER_DOCUMENT_REVIEW_STATUS.APPROVED || !item.storagePath) continue;
+            const storedStatus = String(application.documents?.[item.documentKey]?.reviewStatus || '').toLowerCase();
+            if (storedStatus !== RIDER_DOCUMENT_REVIEW_STATUS.APPROVED) {
+              update[`documents.${item.documentKey}.reviewStatus`] = RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+              update[`documents.${item.documentKey}.reviewReason`] = '';
+            }
+          }
+        }
         update.supplementReason = reasonLines.join('\n');
         await applicationDoc.ref.update(update);
 
@@ -25221,6 +25305,20 @@ app.post(
             restoredLifecycle === RIDER_V4_LIFECYCLE.ACTIVE &&
             canRestoreActive;
 
+          const photoRequestedDuringMaintenance =
+            application.credentialMaintenanceProfilePhotoRequested === true;
+          const maintenancePhoto = application.profilePhoto || {};
+          if (photoRequestedDuringMaintenance &&
+              (!String(maintenancePhoto.storagePath || '').trim() ||
+               String(maintenancePhoto.reviewStatus || '').toLowerCase() !== 'approved' ||
+               Number(maintenancePhoto.resubmittedAtMs || 0) <
+                 Number(application.credentialMaintenanceProfilePhotoRequestedAtMs || 0))) {
+            return res.status(409).json({
+              success:false,
+              message:'本次要求補交的大頭照尚未完成重新上傳及獨立審核，不能恢復資格。',
+            });
+          }
+
           const officialUpdate = {
             status: restoredStatus,
             lifecycleStatus: restoredLifecycle,
@@ -25256,7 +25354,27 @@ app.post(
             updatedAtMs: nowMs,
           };
 
+          if (photoRequestedDuringMaintenance) {
+            officialUpdate.profilePhoto = {
+              ...maintenancePhoto,
+              source:'credential_maintenance_approved',
+              updatedAtMs:nowMs,
+            };
+            officialUpdate.profilePhotoUpdatedAtMs = nowMs;
+          }
           await officialRiderDoc.ref.set(officialUpdate, { merge: true });
+          if (photoRequestedDuringMaintenance && RIDER_V2_MIRROR_TO_LEGACY_RIDERS) {
+            try {
+              await db.collection('riders').doc(officialRiderDoc.id).set({
+                profilePhoto:officialUpdate.profilePhoto,
+                profilePhotoUpdatedAtMs:nowMs,
+                updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs:nowMs,
+              }, {merge:true});
+            } catch (mirrorError) {
+              console.warn('⚠️ 證件複審大頭照舊資料鏡像失敗：', mirrorError?.message || mirrorError);
+            }
+          }
           try {
             const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
             riders[officialRiderDoc.id] = {
@@ -25275,6 +25393,8 @@ app.post(
               documentReviewStatus: 'approved',
               supplementReason: '',
               credentialMaintenanceActive: false,
+              credentialMaintenanceProfilePhotoRequested: false,
+              credentialMaintenanceProfilePhotoRequestedAtMs:0,
               credentialMaintenanceCompletedAt:
                 admin.firestore.FieldValue.serverTimestamp(),
               credentialMaintenanceCompletedAtMs: nowMs,
@@ -25688,31 +25808,35 @@ app.post('/api/rider/application-supplement', async (req, res) => {
     let freshDoc = await applicationDoc.ref.get();
     let freshApplication = freshDoc.data() || {};
     const freshSummary = summarizeRiderApplicationDocuments(freshApplication);
+    const photoStillNeedsSupplement =
+      freshApplication.profilePhotoRequired === true &&
+      String(freshApplication.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement';
+    const anySupplementOutstanding = freshSummary.hasSupplementRequest || photoStillNeedsSupplement;
 
     await applicationDoc.ref.set(
       {
-        status: freshSummary.hasSupplementRequest
+        status: anySupplementOutstanding
           ? 'needs_supplement'
           : 'under_review',
-        reviewStatus: freshSummary.hasSupplementRequest
+        reviewStatus: anySupplementOutstanding
           ? 'needs_supplement'
           : 'under_review',
         documentReviewStatus: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
-          : 'pending',
+          : freshSummary.allApproved ? 'approved' : 'pending',
         lifecycleStatus: maintenanceActive
           ? RIDER_V4_LIFECYCLE.RESTRICTED
           : RIDER_V4_LIFECYCLE.UNDER_REVIEW,
         approved: maintenanceActive,
         canAcceptOrders: false,
-        supplementReason: freshSummary.documents
-          .filter(
-            item =>
-              item.reviewStatus ===
-              RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
-          )
-          .map(item => `${item.label}：${item.reviewReason}`)
-          .join('\n'),
+        supplementReason: [
+          ...freshSummary.documents
+            .filter(item => item.reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT)
+            .map(item => `${item.label}：${item.reviewReason}`),
+          ...(photoStillNeedsSupplement
+            ? [`小U大頭照：${cleanText(freshApplication.profilePhoto?.reviewReason || '',500)}`]
+            : []),
+        ].join('\n'),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAtMs: Date.now(),
       },
