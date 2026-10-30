@@ -1306,6 +1306,8 @@ async function handleRiderDocumentUpload(req, res) {
     }
 
 
+    if(!(await verifyOfficialRiderSupplementOwner(req,res,phone)))return;
+
     if (!documentKey || !RIDER_UPLOAD_TYPES[documentKey]) {
       return res.status(400).json({
         success: false,
@@ -4390,7 +4392,23 @@ app.get('/rider-app-login', (req, res) => {
 
 // UBee 小U資料庫 V2：使用 multipart/form-data 上傳單一證件。
 // 欄位名稱固定為 file；其他欄位為 phone、lineUserId、documentType。
-app.post('/api/rider/documents/upload', (req, res) => {
+// V4.1.1 RC2：補件專用請求如有標示本人手機，先驗證正式小U，再接收 multipart。
+// 非補件申請的既有上傳契約保留；處理函式在收到 phone 後再次進行強制驗證。
+async function ubeePreAuthorizeDeclaredRiderDocumentUpload(req,res,next){
+  try {
+    const declaredPhone=normalizePhone(req.headers['x-ubee-rider-phone']||'');
+    if(!declaredPhone)return next();
+    if(!/^09\d{8}$/.test(declaredPhone)){
+      return res.status(400).json({success:false,code:'SUPPLEMENT_PHONE_INVALID',message:'補件手機號碼格式不正確。'});
+    }
+    if(!(await verifyOfficialRiderSupplementOwner(req,res,declaredPhone)))return;
+    return next();
+  }catch(error){
+    console.error('Rider pre-upload supplement authorization:',error);
+    return res.status(500).json({success:false,message:'目前無法驗證小U補件身分，請稍後再試。'});
+  }
+}
+app.post('/api/rider/documents/upload', ubeePreAuthorizeDeclaredRiderDocumentUpload, (req, res) => {
   riderDocumentUpload.single('file')(req, res, error => {
     if (error) {
       const isSizeError =
@@ -25335,6 +25353,21 @@ app.post(
   }
 );
 
+// Rider Review V4.1.1 RC1: 正式小U補件必須持有本人 Firebase ID Token。
+// 尚未核准的新申請者沿用現有申請通道，後續需另設 OTP/短效補件憑證。
+async function verifyOfficialRiderSupplementOwner(req,res,phone){
+  const official=await db.collection(RIDER_V2_COLLECTIONS.riders).doc(phone).get();
+  if(!official.exists)return true;
+  const verified=await verifyRiderFirebaseIdToken(req);
+  if(!verified.ok){res.status(verified.statusCode).json({success:false,code:verified.code,message:'正式小U請先登入本人帳號再進行補件。'});return false;}
+  const claims=verified.decodedToken||{};
+  if(String(claims.role||'')!=='rider' || String(claims.riderDocId||'')!==phone ||
+     String(claims.uid||'')!==buildRiderFirebaseUid(phone)){
+    res.status(403).json({success:false,code:'SUPPLEMENT_RIDER_MISMATCH',message:'補件帳號與目前登入的小U不一致。'});return false;
+  }
+  return true;
+}
+
 app.post('/api/rider/application-supplement', async (req, res) => {
   try {
     const phone = normalizePhone(req.body?.phone || '');
@@ -25355,6 +25388,8 @@ app.post('/api/rider/application-supplement', async (req, res) => {
         message: '請輸入申請時使用的正確手機號碼。',
       });
     }
+
+    if(!(await verifyOfficialRiderSupplementOwner(req,res,phone)))return;
 
     const applicationDoc = await getRiderApplicationDocumentById(phone);
     if (!applicationDoc) {
@@ -25534,24 +25569,43 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       };
     }
 
-    // 照片補件只在管理端明確標記為 needs_supplement 時才可寫入。
-    // 使用交易防止審核人員在拍照期間已核准／變更狀態後舊請求覆蓋新照片。
-    if (profilePhotoResult?.ok) {
-      let photoConflict=false;
-      await db.runTransaction(async tx=>{
-        const latest=await tx.get(applicationDoc.ref);
-        const current=latest.exists ? (latest.data() || {}) : {};
-        if (!latest.exists || String(current.profilePhoto?.reviewStatus || '').toLowerCase()!=='needs_supplement' ||
-            ['approved','training','active','rejected'].includes(String(current.status || '').toLowerCase())) {
-          photoConflict=true;
+    // V4.1.1 RC2：證件與照片都必須在交易中再次核對補件請求版本。
+    // 避免管理員在上傳途中已更改/核准文件，而舊請求覆蓋新的審核狀態。
+    const requestDocumentKeys=Object.keys(validation.documents);
+    let supplementConflict=false;
+    await db.runTransaction(async tx=>{
+      const latest=await tx.get(applicationDoc.ref);
+      const current=latest.exists ? (latest.data() || {}) : {};
+      if(!latest.exists || ['approved','training','active','rejected'].includes(String(current.status||'').toLowerCase())){
+        supplementConflict=true;
+        return;
+      }
+      for(const key of requestDocumentKeys){
+        const expected=application.documents?.[key]||{};
+        const actual=current.documents?.[key]||{};
+        if(String(actual.reviewStatus||'').toLowerCase()!==RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT ||
+           String(actual.storagePath||'')!==String(expected.storagePath||'') ||
+           Number(actual.supplementRequestedAtMs||0)!==Number(expected.supplementRequestedAtMs||0)){
+          supplementConflict=true;
           return;
         }
-        tx.update(applicationDoc.ref,update);
-      });
-      if (photoConflict) return res.status(409).json({success:false,code:'PHOTO_SUPPLEMENT_REVIEW_CHANGED',message:'大頭照審核狀態已變更，請重新整理申請進度。'});
-    } else {
-      await applicationDoc.ref.update(update);
-    }
+      }
+      if(profilePhotoResult?.ok){
+        const expected=application.profilePhoto||{};
+        const actual=current.profilePhoto||{};
+        if(current.profilePhotoRequired!==true || String(actual.reviewStatus||'').toLowerCase()!=='needs_supplement' ||
+           String(actual.storagePath||'')!==String(expected.storagePath||'') ||
+           Number(actual.supplementRequestedAtMs||0)!==Number(expected.supplementRequestedAtMs||0)){
+          supplementConflict=true;
+          return;
+        }
+      }
+      tx.update(applicationDoc.ref,update);
+    });
+    if(supplementConflict)return res.status(409).json({
+      success:false,code:'SUPPLEMENT_REVIEW_CHANGED',
+      message:'補件要求或審核狀態已更新，請重新整理後再送件。'
+    });
     let freshDoc = await applicationDoc.ref.get();
     let freshApplication = freshDoc.data() || {};
     const freshSummary = summarizeRiderApplicationDocuments(freshApplication);
