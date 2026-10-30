@@ -1,4 +1,4 @@
-// UBee Rider Review V4.1.0 (includes V4.0.2 fixes) — candidate shared backend; original Driver header below
+// UBee Rider Review V4.0.1 supplement extension — shared backend; original Driver header below
 // UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
 // ============================================================
 // UBee Backend｜會員安全增量 2026-10-17（以 2026-10-08 後端正式基準為底）
@@ -1305,8 +1305,6 @@ async function handleRiderDocumentUpload(req, res) {
       });
     }
 
-
-    if(!(await verifyOfficialRiderSupplementOwner(req,res,phone)))return;
 
     if (!documentKey || !RIDER_UPLOAD_TYPES[documentKey]) {
       return res.status(400).json({
@@ -4392,23 +4390,7 @@ app.get('/rider-app-login', (req, res) => {
 
 // UBee 小U資料庫 V2：使用 multipart/form-data 上傳單一證件。
 // 欄位名稱固定為 file；其他欄位為 phone、lineUserId、documentType。
-// V4.1.1 RC2：補件專用請求如有標示本人手機，先驗證正式小U，再接收 multipart。
-// 非補件申請的既有上傳契約保留；處理函式在收到 phone 後再次進行強制驗證。
-async function ubeePreAuthorizeDeclaredRiderDocumentUpload(req,res,next){
-  try {
-    const declaredPhone=normalizePhone(req.headers['x-ubee-rider-phone']||'');
-    if(!declaredPhone)return next();
-    if(!/^09\d{8}$/.test(declaredPhone)){
-      return res.status(400).json({success:false,code:'SUPPLEMENT_PHONE_INVALID',message:'補件手機號碼格式不正確。'});
-    }
-    if(!(await verifyOfficialRiderSupplementOwner(req,res,declaredPhone)))return;
-    return next();
-  }catch(error){
-    console.error('Rider pre-upload supplement authorization:',error);
-    return res.status(500).json({success:false,message:'目前無法驗證小U補件身分，請稍後再試。'});
-  }
-}
-app.post('/api/rider/documents/upload', ubeePreAuthorizeDeclaredRiderDocumentUpload, (req, res) => {
+app.post('/api/rider/documents/upload', (req, res) => {
   riderDocumentUpload.single('file')(req, res, error => {
     if (error) {
       const isSizeError =
@@ -23357,28 +23339,6 @@ function summarizeRiderApplicationDocuments(application = {}) {
   };
 }
 
-// Rider Review V4.0.2 — 申報審查僅屬「自述資料核對」，不可宣稱查證銀行警示名單。
-// 對於原已核准且正處於證件維護中的歷史小U，不以缺少新版申報欄位直接撤銷既有資格。
-function riderReviewDeclarationGate(application = {}) {
-  const declaration = application.financialRiskDeclaration || {};
-  const status = String(declaration.warningAccountStatus || 'UNKNOWN').trim().toUpperCase();
-  const reconfirmed = declaration.reconfirmed === true;
-  const hasDeclaration = !!declaration.declarationVersion && declaration.declarationVersion !== 'legacy-missing';
-  const legacyMaintenance = !hasDeclaration && (application.credentialMaintenanceActive === true ||
-    (application.approved === true && ['training','approved','active'].includes(String(application.status || '').toLowerCase())));
-  const eligible = status === 'NO' && reconfirmed;
-  const hold = !eligible && !legacyMaintenance;
-  return {
-    status, reconfirmed, eligible: eligible || legacyMaintenance, hold,
-    reason: status === 'YES' ? '申請人自行申報目前為警示帳戶，須由管理人員依規範專案處理，不可自動核准。'
-      : '警示帳戶申報尚未完成或尚未再次確認，不能直接核准。',
-    reviewStatus: String(declaration.reviewStatus || 'pending'),
-    reviewedAtMs: Number(declaration.reviewedAtMs || 0),
-    reviewedBy: String(declaration.reviewedBy || ''),
-    reviewNote: String(declaration.reviewNote || ''),
-  };
-}
-
 function buildRiderApplicationRiskChecks(application = {}, summary = null) {
   const documentSummary =
     summary || summarizeRiderApplicationDocuments(application);
@@ -23401,11 +23361,6 @@ function buildRiderApplicationRiskChecks(application = {}, summary = null) {
         add('critical', 'UNDERAGE', '未滿 18 歲', `依出生年月日推算目前約 ${age} 歲。`);
       }
     }
-  }
-
-  const declarationGate = riderReviewDeclarationGate(application);
-  if (declarationGate.hold) {
-    add('critical', 'FINANCIAL_DECLARATION_REVIEW', '警示帳戶申報待處理', declarationGate.reason);
   }
 
   const missingDocuments = documentSummary.documents
@@ -23836,15 +23791,6 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
     emergencyContact: application.emergencyContact || {},
     profilePhoto,
     profilePhotoRequired: application.profilePhotoRequired === true,
-    declarationGate: riderReviewDeclarationGate(application),
-    financialRiskDeclaration: {
-      warningAccountStatus: String(application.financialRiskDeclaration?.warningAccountStatus || 'UNKNOWN'),
-      reconfirmed: application.financialRiskDeclaration?.reconfirmed === true,
-      reviewStatus: String(application.financialRiskDeclaration?.reviewStatus || 'pending'),
-      reviewedBy: String(application.financialRiskDeclaration?.reviewedBy || ''),
-      reviewedAtMs: Number(application.financialRiskDeclaration?.reviewedAtMs || 0),
-      reviewNote: String(application.financialRiskDeclaration?.reviewNote || ''),
-    },
     applicationStage: application.applicationStage || '',
     applicationFlowVersion: application.applicationFlowVersion || '',
     status: application.status || 'submitted',
@@ -24001,7 +23947,7 @@ async function validateRiderApplicationDocumentSubset(
       storagePath,
       reviewStatus: RIDER_DOCUMENT_REVIEW_STATUS.PENDING,
       reviewReason: '',
-      uploadedAtMs: Date.parse(String(metadata.timeCreated || '')) || 0,
+      uploadedAtMs: Number(item.uploadedAtMs || Date.now()),
       resubmittedAtMs: Date.now(),
     };
   }
@@ -24254,121 +24200,162 @@ async function notifyRiderApplicationReviewUpdate(
   };
 }
 
-// V4.1.0：以 document ID 進行穩定 cursor 分頁，避免固定 2,000 筆上限；
-// 搜尋/篩選由後端逐頁掃描，絕不把「這一頁」誤稱整庫統計。
-app.get('/api/admin/rider-review/applications', requireRiderV4AdminKey, async (req,res)=>{
-  try {
-    const q=cleanText(req.query?.q||'',100).toLowerCase();
-    const filter=String(req.query?.status||'all').toLowerCase().trim();
-    const pageSize=Math.max(10,Math.min(80,Number(req.query?.pageSize||60)||60));
-    const cursor=String(req.query?.cursor||'').trim();
-    if (cursor.length>200 || /[\x00-\x1f]/.test(cursor)) return res.status(400).json({success:false,message:'分頁游標格式不正確。'});
-    const source=db.collection(RIDER_V2_COLLECTIONS.applications);
-    let currentCursor=cursor;
-    let more=false;
-    const applications=[];
-    let scannedCount=0;
-    for(let round=0;round<12 && applications.length<pageSize;round++){
-      let query=source.orderBy(admin.firestore.FieldPath.documentId()).limit(150);
-      if(currentCursor)query=query.startAfter(currentCursor);
-      const snap=await query.get();
-      if(snap.empty){more=false;break;}
-      more=snap.size===150;
-      for(const doc of snap.docs){
-        currentCursor=doc.id;
-        scannedCount++;
-        const a=doc.data()||{};
-        const summary=summarizeRiderApplicationDocuments(a);
-        const risks=buildRiderApplicationRiskChecks(a,summary);
-        const item={
-          id:doc.id,riderId:a.riderId||doc.id,name:a.name||'',phone:a.phone||doc.id,
-          district:a.district||'',vehicle:a.vehicle||'',plateNumber:a.plateNumber||'',
-          serviceArea:a.serviceArea||a.area||'',status:a.status||'pending',
-          reviewStatus:a.reviewStatus||a.status||'pending',
-          lifecycleStatus:a.lifecycleStatus||RIDER_V4_LIFECYCLE.UNDER_REVIEW,
-          documentReviewStatus:a.documentReviewStatus||'pending',approved:a.approved===true,
-          submittedAtMs:Number(a.submittedAtMs||a.createdAtMs||0),updatedAtMs:Number(a.updatedAtMs||0),
-          supplementRequestedAtMs:Number(a.supplementRequestedAtMs||0),
-          supplementSubmittedAtMs:Number(a.supplementSubmittedAtMs||0),
-          credentialMaintenanceActive:a.credentialMaintenanceActive===true,
-          compulsoryInsuranceExpiryDate:String(a.compulsoryInsuranceExpiryDate||''),
-          declarationGate:riderReviewDeclarationGate(a),
-          documentSummary:{totalCount:summary.totalCount,approvedCount:summary.approvedCount,
-            supplementCount:summary.supplementCount,pendingCount:summary.pendingCount,
-            allApproved:summary.allApproved,requiredGroupCount:summary.requiredGroupCount,
-            approvedGroupCount:summary.approvedGroupCount,supplementGroupCount:summary.supplementGroupCount,
-            allGroupsApproved:summary.allGroupsApproved},
-          verificationGroups:summary.verificationGroups,
-          riskCount:Number(risks.criticalCount||0)+Number(risks.warningCount||0),
-          criticalRiskCount:Number(risks.criticalCount||0)
-        };
-        if(q && ![item.riderId,item.name,item.phone,item.district,item.plateNumber].join(' ').toLowerCase().includes(q))continue;
-        const s=String(item.status||'').toLowerCase();
-        const lifecycle=String(item.lifecycleStatus||'').toLowerCase();
-        const isPending=['submitted','pending','under_review'].includes(s) || lifecycle==='under_review';
-        const isSupplement=s==='needs_supplement'||item.documentSummary.supplementCount>0||
-          String(a.profilePhoto?.reviewStatus||'')==='needs_supplement';
-        const isApproved=['training','approved','active'].includes(s)||['training','active'].includes(lifecycle);
-        const isRejected=s==='rejected'||lifecycle==='rejected';
-        const match=filter==='all'||(filter==='pending'&&isPending)||
-          (filter==='needs_supplement'&&isSupplement)||(filter==='approved'&&isApproved)||
-          (filter==='rejected'&&isRejected)||(filter==='active'&&lifecycle==='active')||
-          (filter==='training'&&lifecycle==='training')||
-          (filter==='review_submitted'&&s==='under_review')||
-          (filter==='risk'&&item.riskCount>0)||(filter==='declaration_hold'&&item.declarationGate.hold)||
-          s===filter||lifecycle===filter;
-        if(!match)continue;
-        applications.push(item);
-        if(applications.length===pageSize){
-          // 若一批 150 筆尚有未處理的文件，仍應提供下一頁。
-          more=more || doc.id!==snap.docs[snap.docs.length-1].id;
-          break;
-        }
-      }
-      if(snap.size<150)break;
-    }
-    // cursor 是上次實際掃描到的 document id；不得在前端使用日期排序後推算游標。
-    const stats={scope:'page',total:applications.length,
-      pending:applications.filter(x=>['submitted','pending','under_review'].includes(String(x.status||'').toLowerCase())).length,
-      needsSupplement:applications.filter(x=>x.documentSummary.supplementCount>0||x.status==='needs_supplement').length,
-      approved:applications.filter(x=>['training','approved','active'].includes(String(x.status||'').toLowerCase())).length,
-      rejected:applications.filter(x=>x.status==='rejected').length,
-      riskApplications:applications.filter(x=>x.riskCount>0).length,
-      active:applications.filter(x=>String(x.lifecycleStatus).toLowerCase()==='active').length,
-      declarationHold:applications.filter(x=>x.declarationGate.hold).length};
-    return res.json({success:true,applications,count:applications.length,stats,
-      nextCursor:more?currentCursor:null,scannedCount,pageSize,
-      // hasMore=true 只代表下一頁可能有資料，搜尋到尾端才知道是否仍有符合項目。
-      hasMore:more,statsScope:'current_page'});
-  }catch(error){
-    console.error('❌ 讀取小U審核分頁資料失敗：',error);
-    return res.status(500).json({success:false,message:'讀取小U審核分頁資料失敗。'});
-  }
-});
+app.get(
+  '/api/admin/rider-review/applications',
+  requireRiderV4AdminKey,
+  async (req, res) => {
+    try {
+      const queryText = cleanText(req.query?.q || '', 100).toLowerCase();
+      const statusFilter = String(req.query?.status || 'all')
+        .trim()
+        .toLowerCase();
+      const snap = await db
+        .collection(RIDER_V2_COLLECTIONS.applications)
+        .limit(2000)
+        .get();
 
-// V4.1.0：正式騎士 V2 與申請層唯讀對帳，不回寫/補造申請紀錄。
-app.get('/api/admin/rider-review/legacy-audit',requireRiderV4AdminKey,async(req,res)=>{
-  try{
-    const cursor=String(req.query?.cursor||'').trim();
-    if(cursor.length>200)return res.status(400).json({success:false,message:'分頁游標格式不正確。'});
-    let query=db.collection(RIDER_V2_COLLECTIONS.riders)
-      .orderBy(admin.firestore.FieldPath.documentId()).limit(60);
-    if(cursor)query=query.startAfter(cursor);
-    const snap=await query.get();
-    const checked=await Promise.all(snap.docs.map(async doc=>{
-      const rider=doc.data()||{};
-      const applicationRef=db.collection(RIDER_V2_COLLECTIONS.applications).doc(doc.id);
-      const applicationDoc=await applicationRef.get();
-      return {riderId:doc.id,name:cleanText(rider.name||'',100),
-        lifecycleStatus:String(rider.lifecycleStatus||rider.status||''),
-        hasApplication:applicationDoc.exists};
-    }));
-    return res.json({success:true,checked,missing:checked.filter(item=>!item.hasApplication),
-      count:checked.length,nextCursor:snap.size===60?snap.docs[snap.docs.length-1].id:null,
-      scope:'current_page_only',readOnly:true});
-  }catch(error){console.error('小U歷史資料對帳失敗',error);
-    return res.status(500).json({success:false,message:'對帳失敗，未更動任何正式騎士資料。'});}
-});
+      let applications = snap.docs.map(doc => {
+        const application = doc.data() || {};
+        const summary = summarizeRiderApplicationDocuments(application);
+        const riskChecks = buildRiderApplicationRiskChecks(
+          application,
+          summary
+        );
+        return {
+          id: doc.id,
+          riderId: application.riderId || doc.id,
+          name: application.name || '',
+          phone: application.phone || doc.id,
+          district: application.district || '',
+          vehicle: application.vehicle || '',
+          plateNumber: application.plateNumber || '',
+          serviceArea: application.serviceArea || application.area || '',
+          status: application.status || 'pending',
+          reviewStatus:
+            application.reviewStatus || application.status || 'pending',
+          lifecycleStatus:
+            application.lifecycleStatus || RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          documentReviewStatus:
+            application.documentReviewStatus || 'pending',
+          approved: application.approved === true,
+          submittedAtMs: Number(
+            application.submittedAtMs || application.createdAtMs || 0
+          ),
+          updatedAtMs: Number(application.updatedAtMs || 0),
+          documentSummary: {
+            totalCount: summary.totalCount,
+            approvedCount: summary.approvedCount,
+            supplementCount: summary.supplementCount,
+            pendingCount: summary.pendingCount,
+            allApproved: summary.allApproved,
+            requiredGroupCount: summary.requiredGroupCount,
+            approvedGroupCount: summary.approvedGroupCount,
+            supplementGroupCount: summary.supplementGroupCount,
+            allGroupsApproved: summary.allGroupsApproved,
+          },
+          verificationGroups: summary.verificationGroups,
+          riskCount:
+            Number(riskChecks.criticalCount || 0) +
+            Number(riskChecks.warningCount || 0),
+          criticalRiskCount: Number(riskChecks.criticalCount || 0),
+        };
+      });
+
+      const dashboardStats = {
+        total: applications.length,
+        submitted: applications.filter(item =>
+          ['submitted'].includes(String(item.status || '').toLowerCase())
+        ).length,
+        pending: applications.filter(item =>
+          ['submitted', 'pending', 'under_review'].includes(
+            String(item.status || '').toLowerCase()
+          ) ||
+          String(item.lifecycleStatus || '').toLowerCase() === 'under_review'
+        ).length,
+        needsSupplement: applications.filter(item =>
+          String(item.status || '').toLowerCase() === 'needs_supplement' ||
+          Number(item.documentSummary?.supplementCount || 0) > 0
+        ).length,
+        approved: applications.filter(item =>
+          ['training', 'approved', 'active'].includes(
+            String(item.status || '').toLowerCase()
+          ) ||
+          ['training', 'active'].includes(
+            String(item.lifecycleStatus || '').toLowerCase()
+          )
+        ).length,
+        rejected: applications.filter(item =>
+          String(item.status || '').toLowerCase() === 'rejected' ||
+          String(item.lifecycleStatus || '').toLowerCase() === 'rejected'
+        ).length,
+        riskApplications: applications.filter(item =>
+          Number(item.riskCount || 0) > 0
+        ).length,
+      };
+
+      if (queryText) {
+        applications = applications.filter(item =>
+          [
+            item.riderId,
+            item.name,
+            item.phone,
+            item.district,
+            item.plateNumber,
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(queryText)
+        );
+      }
+
+      if (statusFilter !== 'all') {
+        applications = applications.filter(item => {
+          const status = String(item.status || '').toLowerCase();
+          const lifecycle = String(item.lifecycleStatus || '').toLowerCase();
+          if (statusFilter === 'pending') {
+            return ['submitted', 'pending', 'under_review'].includes(status) ||
+              ['submitted', 'under_review'].includes(
+                String(item.reviewStatus || '').toLowerCase()
+              ) ||
+              lifecycle === 'under_review';
+          }
+          if (statusFilter === 'needs_supplement') {
+            return status === 'needs_supplement' ||
+              item.documentSummary.supplementCount > 0;
+          }
+          if (statusFilter === 'approved') {
+            return ['training', 'approved', 'active'].includes(status) ||
+              ['training', 'active'].includes(lifecycle);
+          }
+          if (statusFilter === 'rejected') {
+            return status === 'rejected' || lifecycle === 'rejected';
+          }
+          return status === statusFilter || lifecycle === statusFilter;
+        });
+      }
+
+      applications.sort(
+        (a, b) =>
+          Number(b.updatedAtMs || b.submittedAtMs || 0) -
+          Number(a.updatedAtMs || a.submittedAtMs || 0)
+      );
+
+      return res.json({
+        success: true,
+        applications,
+        count: applications.length,
+        stats: dashboardStats,
+      });
+    } catch (error) {
+      console.error('❌ 讀取小U申請審核名單失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '讀取小U申請審核名單失敗。',
+        error: error.message,
+      });
+    }
+  }
+);
 
 app.get(
   '/api/admin/rider-review/applications/:riderId',
@@ -24430,29 +24417,6 @@ app.post(
       const status = String(application.status || 'pending').toLowerCase();
       const nowMs = Date.now();
 
-      // V4.0.2：人工追蹤申報；此操作不能將警示帳戶自述變成已解除警示。
-      if (action === 'review_financial_declaration') {
-        const gate = riderReviewDeclarationGate(application);
-        if (!reason || reason.length < 6) {
-          return res.status(400).json({success:false,message:'請填寫至少 6 字的人工審查紀錄與後續處理方式。'});
-        }
-        if (!gate.hold) {
-          return res.status(409).json({success:false,message:'目前申報資料完整或屬歷史資格維護，不需此人工待處理標記。'});
-        }
-        await applicationDoc.ref.update({
-          'financialRiskDeclaration.reviewStatus':'manual_review_hold',
-          'financialRiskDeclaration.reviewNote':reason,
-          'financialRiskDeclaration.reviewedBy':operator,
-          'financialRiskDeclaration.reviewedAtMs':nowMs,
-          applicationDeclarationReviewRequired:true,
-          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-          updatedAtMs:nowMs,
-        });
-        const freshDoc=await applicationDoc.ref.get();
-        await writeRiderApplicationReviewEvent({application:freshDoc.data()||{},type:'review_financial_declaration',operator,reason});
-        return res.json({success:true,message:'已記錄人工審查與待處理原因；此動作不會解除核准限制。',application:await serializeRiderApplicationForAdmin(freshDoc)});
-      }
-
       // Review V4: explicit profile-photo review, independent of document review.
       if (action === 'mark_profile_photo') {
         if (['training','approved','active','rejected'].includes(status)) {
@@ -24472,10 +24436,6 @@ app.post(
             success:false,
             message:'大頭照補件請使用「批次要求補件」，確保正式小U資格與通知同步。',
           });
-        }
-        if (photoStatus === 'approved' && Number(application.profilePhoto?.supplementRequestedAtMs || 0) > 0 &&
-          Number(application.profilePhoto?.resubmittedAtMs || 0) < Number(application.profilePhoto?.supplementRequestedAtMs || 0)) {
-          return res.status(409).json({success:false,message:'此大頭照補件尚未重新上傳，不能審核通過。'});
         }
         await applicationDoc.ref.update({
           'profilePhoto.reviewStatus':photoStatus,
@@ -24539,9 +24499,6 @@ app.post(
             message: '證件類型不正確。',
           });
         }
-        if (documentStatus === RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT) {
-          return res.status(409).json({success:false,message:'請統一使用「要求補件」，才能記錄補件版本及正式小U資格限制。'});
-        }
         if (
           documentStatus === RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT &&
           !reason
@@ -24550,20 +24507,6 @@ app.post(
             success: false,
             message: '要求補件時必須填寫補件原因。',
           });
-        }
-
-        const currentDocument = application.documents?.[documentKey] || {};
-        if (documentStatus === RIDER_DOCUMENT_REVIEW_STATUS.APPROVED) {
-          if (!String(currentDocument.storagePath || '').trim()) {
-            return res.status(409).json({success:false,message:'此證件尚未上傳，不能標記通過。'});
-          }
-          const requestedAt = Number(currentDocument.supplementRequestedAtMs || 0);
-          if (requestedAt > 0 && (
-            Number(currentDocument.resubmittedAtMs || 0) < requestedAt ||
-            String(currentDocument.storagePath || '') === String(currentDocument.supplementPreviousStoragePath || '')
-          )) {
-            return res.status(409).json({success:false,message:'本次指定補件尚未有重新上傳的不同檔案，不能通過。'});
-          }
         }
 
         await applicationDoc.ref.update({
@@ -24712,7 +24655,132 @@ app.post(
         return res.status(409).json({success:false,message:'V4 已停用整組／一鍵通過，請逐份審核必要文件與大頭照。'});
       }
 
-      // V4.0.2：已刪除不可達的舊版整組一鍵通過程式。
+      if (action === 'approve_group') {
+        if (['training', 'approved', 'active'].includes(status)) {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已通過審核，不能再修改驗證狀態。',
+          });
+        }
+        if (status === 'rejected') {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已拒絕，請先重新開啟申請。',
+          });
+        }
+
+        const groupKey = String(req.body?.groupKey || '').trim();
+        const group = RIDER_VERIFICATION_GROUPS[groupKey];
+        if (!group) {
+          return res.status(400).json({
+            success: false,
+            message: '驗證區塊不正確。',
+          });
+        }
+
+        const requiredKeys = getRequiredRiderDocumentKeys(
+          application.vehicle,
+          application.requiredDocumentKeys
+        );
+        const groupDocumentKeys = group.documentKeys.filter(key =>
+          requiredKeys.includes(key)
+        );
+
+        if (!groupDocumentKeys.length) {
+          return res.status(409).json({
+            success: false,
+            message: `${group.label}不適用於此配送工具。`,
+          });
+        }
+
+        const missing = groupDocumentKeys.filter(key =>
+          !String(application.documents?.[key]?.storagePath || '').trim()
+        );
+
+        if (missing.length) {
+          return res.status(409).json({
+            success: false,
+            message:
+              `${group.label}仍缺少：` +
+              missing.map(key => RIDER_DOCUMENT_LABELS[key]).join('、'),
+          });
+        }
+
+        const update = {
+          status: 'under_review',
+          reviewStatus: 'under_review',
+          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: false,
+          canAcceptOrders: false,
+          reviewStartedAt:
+            application.reviewStartedAtMs
+              ? application.reviewStartedAt || null
+              : admin.firestore.FieldValue.serverTimestamp(),
+          reviewStartedAtMs: Number(application.reviewStartedAtMs || nowMs),
+          reviewStartedBy: application.reviewStartedBy || operator,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+        };
+
+        for (const documentKey of groupDocumentKeys) {
+          update[`documents.${documentKey}.reviewStatus`] =
+            RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+          update[`documents.${documentKey}.reviewReason`] = '';
+          update[`documents.${documentKey}.reviewedBy`] = operator;
+          update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
+        }
+
+        await applicationDoc.ref.set(update, { merge: true });
+        let freshDoc = await applicationDoc.ref.get();
+        let freshApplication = freshDoc.data() || {};
+        const freshSummary =
+          summarizeRiderApplicationDocuments(freshApplication);
+
+        await applicationDoc.ref.set(
+          {
+            documentReviewStatus: freshSummary.allApproved
+              ? 'approved'
+              : freshSummary.hasSupplementRequest
+                ? 'needs_supplement'
+                : 'pending',
+            supplementReason: freshSummary.documents
+              .filter(
+                item =>
+                  item.reviewStatus ===
+                  RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
+              )
+              .map(item => `${item.label}：${item.reviewReason}`)
+              .join('\n'),
+          },
+          { merge: true }
+        );
+
+        freshDoc = await applicationDoc.ref.get();
+        freshApplication = freshDoc.data() || {};
+        await writeRiderApplicationReviewEvent({
+          application: freshApplication,
+          type: 'approve_group',
+          operator,
+          reason: `${group.label}已整組確認通過。`,
+          metadata: {
+            groupKey,
+            documentKeys: groupDocumentKeys,
+          },
+        });
+
+        if (!application.reviewStartedAtMs) {
+          await notifyRiderApplicationReviewUpdate(
+            freshApplication,
+            'under_review'
+          );
+        }
+
+        return res.json({
+          success: true,
+          message: `${group.label}已全部標記為通過。`,
+          application: await serializeRiderApplicationForAdmin(freshDoc),
+        });
+      }
 
       if (action === 'request_supplement') {
         if (status === 'rejected') {
@@ -24815,7 +24883,6 @@ app.post(
           }
           if (isProfilePhoto) {
             update.profilePhotoRequired = true;
-            update['profilePhoto.supplementRequestedAtMs'] = nowMs;
             update['profilePhoto.reviewStatus'] = 'needs_supplement';
             update['profilePhoto.reviewReason'] = documentReason;
             update['profilePhoto.reviewedBy'] = operator;
@@ -24825,9 +24892,6 @@ app.post(
               update.credentialMaintenanceProfilePhotoRequestedAtMs = nowMs;
             }
           } else {
-            update[`documents.${documentKey}.supplementRequestedAtMs`] = nowMs;
-            update[`documents.${documentKey}.supplementPreviousStoragePath`] =
-              String(application.documents?.[documentKey]?.storagePath || '');
             update[`documents.${documentKey}.reviewStatus`] =
               RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT;
             update[`documents.${documentKey}.reviewReason`] = documentReason;
@@ -24864,8 +24928,7 @@ app.post(
           }
         }
         update.supplementReason = reasonLines.join('\n');
-        const maintenanceBatch = db.batch();
-        maintenanceBatch.update(applicationDoc.ref, update);
+        await applicationDoc.ref.update(update);
 
         if (officialRiderDoc) {
           const riderUpdate = {
@@ -24887,15 +24950,7 @@ app.post(
             riderUpdate.lifecycleStatus = RIDER_V4_LIFECYCLE.RESTRICTED;
           }
 
-          maintenanceBatch.set(officialRiderDoc.ref,riderUpdate,{merge:true});
-          maintenanceBatch.set(db.collection(RIDER_V2_COLLECTIONS.presence).doc(officialRiderDoc.id),{
-            online:false,acceptingOrders:false,dispatchPresenceState:'PAUSED',
-            credentialReviewRequired:true,updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs,
-          },{merge:true});
-        }
-        // V4.0.2: three central qualification documents are committed together.
-        await maintenanceBatch.commit();
-        if (officialRiderDoc) {
+          await officialRiderDoc.ref.set(riderUpdate, { merge: true });
           try {
             const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
             riders[officialRiderDoc.id] = {
@@ -24904,7 +24959,27 @@ app.post(
             };
           } catch (_) {}
 
-          // presence 已與騎士資格、申請狀態同批提交。
+          try {
+            await db
+              .collection(RIDER_V2_COLLECTIONS.presence)
+              .doc(officialRiderDoc.id)
+              .set(
+                {
+                  online: false,
+                  acceptingOrders: false,
+                  dispatchPresenceState: 'PAUSED',
+                  credentialReviewRequired: true,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAtMs: nowMs,
+                },
+                { merge: true }
+              );
+          } catch (presenceError) {
+            console.warn(
+              '⚠️ 證件補件期間暫停小U presence 失敗：',
+              presenceError?.message || presenceError
+            );
+          }
         }
 
         const freshDoc = await applicationDoc.ref.get();
@@ -24939,7 +25014,182 @@ app.post(
         });
       }
 
-      // V4.0.2：已刪除不可達的一鍵完成全案舊版程式。
+      if (action === 'approve_all') {
+        if (application.credentialMaintenanceActive === true) {
+          return res.status(409).json({
+            success: false,
+            message: '此為正式小U證件複審，請使用「確認補件並恢復資格」，不要重新建立入職資料。',
+          });
+        }
+
+        if (
+          !confirmationName ||
+          confirmationName !== String(application.name || '').trim()
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: '請正確輸入申請者姓名，才能確認所有驗證並通過。',
+          });
+        }
+
+        if (['training', 'approved', 'active'].includes(status)) {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已經通過審核，不需要重複操作。',
+          });
+        }
+        if (status === 'rejected') {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已拒絕，請先重新開啟後再審核。',
+          });
+        }
+
+        if (application.profilePhotoRequired === true && !String(application.profilePhoto?.storagePath || '').trim()) {
+          return res.status(409).json({ success:false, message:'缺少小U大頭照，不能正式通過。' });
+        }
+
+        const storedDocuments =
+          application.documents && typeof application.documents === 'object'
+            ? application.documents
+            : {};
+
+        const requiredDocumentKeys = getRequiredRiderDocumentKeys(
+          application.vehicle,
+          application.requiredDocumentKeys
+        );
+
+        const missingDocuments = requiredDocumentKeys
+          .filter(documentKey => {
+            const document = storedDocuments[documentKey];
+            return (
+              !document ||
+              typeof document !== 'object' ||
+              !String(document.storagePath || '').trim()
+            );
+          })
+          .map(documentKey => RIDER_DOCUMENT_LABELS[documentKey]);
+
+        if (missingDocuments.length) {
+          return res.status(409).json({
+            success: false,
+            message: `以下證件尚未上傳完整，不能確認通過：${missingDocuments.join('、')}`,
+          });
+        }
+
+        const documentApprovalUpdate = {
+          documentReviewStatus: 'approved',
+          status: 'pending',
+          reviewStatus: 'pending',
+          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: false,
+          canAcceptOrders: false,
+          supplementReason: '',
+          reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+          reviewedAtMs: nowMs,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+        };
+
+        for (const documentKey of requiredDocumentKeys) {
+          documentApprovalUpdate[`documents.${documentKey}.reviewStatus`] =
+            RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+          documentApprovalUpdate[`documents.${documentKey}.reviewReason`] = '';
+          documentApprovalUpdate[`documents.${documentKey}.reviewedBy`] =
+            operator;
+          documentApprovalUpdate[`documents.${documentKey}.reviewedAtMs`] =
+            nowMs;
+        }
+
+        await applicationDoc.ref.set(documentApprovalUpdate, { merge: true });
+
+        const approvedApplicationDoc = await applicationDoc.ref.get();
+        const approvedApplication = approvedApplicationDoc.data() || {};
+        const summary =
+          summarizeRiderApplicationDocuments(approvedApplication);
+
+        if (
+          summary.totalCount !== requiredDocumentKeys.length ||
+          !summary.allApproved
+        ) {
+          return res.status(409).json({
+            success: false,
+            message: '必要驗證狀態更新不完整，系統已停止正式通過流程，請重新整理後再試。',
+          });
+        }
+
+        const riskChecks = buildRiderApplicationRiskChecks(
+          approvedApplication,
+          summary
+        );
+        if (riskChecks.criticalCount > 0) {
+          return res.status(409).json({
+            success: false,
+            message:
+              '仍有高風險項目未處理：' +
+              riskChecks.items
+                .filter(item => item.level === 'critical')
+                .map(item => item.label)
+                .join('、'),
+          });
+        }
+
+        const approvedRider =
+          buildApprovedRiderV2(approvedApplication, operator);
+
+        await saveRiderV2(approvedRider, { mirrorLegacy: true });
+
+        await applicationDoc.ref.set(
+          {
+            status: 'training',
+            reviewStatus: 'approved',
+            lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
+            canAcceptOrders: false,
+            onboardingRequired: true,
+            approved: true,
+            documentReviewStatus: 'approved',
+            officialRiderCollection: RIDER_V2_COLLECTIONS.riders,
+            officialRiderId: approvedRider.riderId,
+            approvedAt: approvedRider.approvedAt,
+            approvedBy: operator,
+            quickApproved: true,
+            quickApprovedAt: admin.firestore.FieldValue.serverTimestamp(),
+            quickApprovedAtMs: nowMs,
+            quickApprovedBy: operator,
+            reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewedAtMs: nowMs,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          },
+          { merge: true }
+        );
+
+        const freshDoc = await applicationDoc.ref.get();
+        const freshApplication = freshDoc.data() || {};
+
+        await writeRiderApplicationReviewEvent({
+          application: freshApplication,
+          type: 'approve_all',
+          operator,
+          reason:
+            reason ||
+            '管理人員已確認所有必要驗證並完成最終通過。',
+          metadata: {
+            approvedDocumentKeys: requiredDocumentKeys,
+          },
+        });
+
+        await notifyRiderApplicationReviewUpdate(
+          freshApplication,
+          'approved'
+        );
+
+        return res.json({
+          success: true,
+          message: '所有必要驗證與小U申請已通過，已進入數位入職階段。',
+          application: await serializeRiderApplicationForAdmin(freshDoc),
+        });
+      }
 
       if (action === 'approve') {
         if (['training', 'approved', 'active'].includes(status)) {
@@ -24964,16 +25214,6 @@ app.post(
         }
 
         const summary = summarizeRiderApplicationDocuments(application);
-        // 即使舊資料整體為 approved，也必須檢查此次有指定補件的檔案版本。
-        const staleSupplements = summary.documents.filter(item => {
-          const d=application.documents?.[item.documentKey] || {};
-          const t=Number(d.supplementRequestedAtMs || 0);
-          return t > 0 && (Number(d.resubmittedAtMs || 0) < t ||
-            String(d.storagePath || '') === String(d.supplementPreviousStoragePath || ''));
-        });
-        if (staleSupplements.length) {
-          return res.status(409).json({success:false,message:'指定補件尚未收到有效的新版本：'+staleSupplements.map(x=>x.label).join('、')});
-        }
         if (!summary.allApproved) {
           const unfinished = summary.documents
             .filter(
@@ -25122,16 +25362,28 @@ app.post(
             };
             officialUpdate.profilePhotoUpdatedAtMs = nowMs;
           }
-          const approveMaintenanceBatch=db.batch();
-          approveMaintenanceBatch.set(officialRiderDoc.ref,officialUpdate,{merge:true});
-          if(photoRequestedDuringMaintenance && RIDER_V2_MIRROR_TO_LEGACY_RIDERS){
-            approveMaintenanceBatch.set(db.collection('riders').doc(officialRiderDoc.id),{
-              profilePhoto:officialUpdate.profilePhoto,profilePhotoUpdatedAtMs:nowMs,
-              updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs,
-            },{merge:true});
+          await officialRiderDoc.ref.set(officialUpdate, { merge: true });
+          if (photoRequestedDuringMaintenance && RIDER_V2_MIRROR_TO_LEGACY_RIDERS) {
+            try {
+              await db.collection('riders').doc(officialRiderDoc.id).set({
+                profilePhoto:officialUpdate.profilePhoto,
+                profilePhotoUpdatedAtMs:nowMs,
+                updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs:nowMs,
+              }, {merge:true});
+            } catch (mirrorError) {
+              console.warn('⚠️ 證件複審大頭照舊資料鏡像失敗：', mirrorError?.message || mirrorError);
+            }
           }
-          approveMaintenanceBatch.set(
-            applicationDoc.ref,
+          try {
+            const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
+            riders[officialRiderDoc.id] = {
+              id: refreshedOfficialRiderDoc.id,
+              ...(refreshedOfficialRiderDoc.data() || {}),
+            };
+          } catch (_) {}
+
+          await applicationDoc.ref.set(
             {
               status: restoredStatus,
               reviewStatus: 'approved',
@@ -25155,16 +25407,27 @@ app.post(
             { merge: true }
           );
 
-          approveMaintenanceBatch.set(db.collection(RIDER_V2_COLLECTIONS.presence).doc(officialRiderDoc.id),{
-            online:false,acceptingOrders:false,dispatchPresenceState:'PAUSED',
-            credentialReviewRequired:false,updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs,
-          },{merge:true});
-          // 資格、申請、presence 與可選 legacy 大頭照鏡像同批提交。
-          await approveMaintenanceBatch.commit();
           try {
-            const refreshed=await officialRiderDoc.ref.get();
-            riders[officialRiderDoc.id]={id:refreshed.id,...(refreshed.data()||{})};
-          } catch (_) {}
+            await db
+              .collection(RIDER_V2_COLLECTIONS.presence)
+              .doc(officialRiderDoc.id)
+              .set(
+                {
+                  online: false,
+                  acceptingOrders: false,
+                  dispatchPresenceState: 'PAUSED',
+                  credentialReviewRequired: false,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAtMs: nowMs,
+                },
+                { merge: true }
+              );
+          } catch (presenceError) {
+            console.warn(
+              '⚠️ 證件複審完成後更新小U presence 失敗：',
+              presenceError?.message || presenceError
+            );
+          }
 
           const freshDoc = await applicationDoc.ref.get();
           const freshApplication = freshDoc.data() || {};
@@ -25353,21 +25616,6 @@ app.post(
   }
 );
 
-// Rider Review V4.1.1 RC1: 正式小U補件必須持有本人 Firebase ID Token。
-// 尚未核准的新申請者沿用現有申請通道，後續需另設 OTP/短效補件憑證。
-async function verifyOfficialRiderSupplementOwner(req,res,phone){
-  const official=await db.collection(RIDER_V2_COLLECTIONS.riders).doc(phone).get();
-  if(!official.exists)return true;
-  const verified=await verifyRiderFirebaseIdToken(req);
-  if(!verified.ok){res.status(verified.statusCode).json({success:false,code:verified.code,message:'正式小U請先登入本人帳號再進行補件。'});return false;}
-  const claims=verified.decodedToken||{};
-  if(String(claims.role||'')!=='rider' || String(claims.riderDocId||'')!==phone ||
-     String(claims.uid||'')!==buildRiderFirebaseUid(phone)){
-    res.status(403).json({success:false,code:'SUPPLEMENT_RIDER_MISMATCH',message:'補件帳號與目前登入的小U不一致。'});return false;
-  }
-  return true;
-}
-
 app.post('/api/rider/application-supplement', async (req, res) => {
   try {
     const phone = normalizePhone(req.body?.phone || '');
@@ -25388,8 +25636,6 @@ app.post('/api/rider/application-supplement', async (req, res) => {
         message: '請輸入申請時使用的正確手機號碼。',
       });
     }
-
-    if(!(await verifyOfficialRiderSupplementOwner(req,res,phone)))return;
 
     const applicationDoc = await getRiderApplicationDocumentById(phone);
     if (!applicationDoc) {
@@ -25454,31 +25700,12 @@ app.post('/api/rider/application-supplement', async (req, res) => {
         message: validation.message,
       });
     }
-    for (const [key,file] of Object.entries(validation.documents)) {
-      const old=application.documents?.[key] || {};
-      const requestedAt=Number(old.supplementRequestedAtMs || 0);
-      if (String(file.storagePath || '') === String(old.storagePath || '') ||
-        (requestedAt > 0 && Number(file.uploadedAtMs || 0) < requestedAt)) {
-        return res.status(409).json({success:false,message:`${RIDER_DOCUMENT_LABELS[key]}必須在本次補件要求後上傳新的檔案。`});
-      }
-    }
     // 經過原有 storagePath／bucket／metadata／檔案存在性驗證，不直接信任前端的照片路徑。
     const profilePhotoResult = requestedProfilePhoto
       ? await validateRiderProfilePhoto(requestedProfilePhoto, phone)
       : null;
     if (profilePhotoResult && !profilePhotoResult.ok) {
       return res.status(400).json({success:false, code:'PROFILE_PHOTO_SUPPLEMENT_INVALID', message:profilePhotoResult.message});
-    }
-    if (profilePhotoResult?.ok) {
-      const photoPath=String(profilePhotoResult.profilePhoto?.storagePath || '');
-      const oldPhoto=application.profilePhoto || {};
-      const requestedAt=Number(oldPhoto.supplementRequestedAtMs || 0);
-      const photoBucket=admin.storage().bucket(String(profilePhotoResult.profilePhoto?.storageBucket || RIDER_DOCUMENT_STORAGE_BUCKET));
-      const [photoMeta]=await photoBucket.file(photoPath).getMetadata();
-      const createdAt=Date.parse(String(photoMeta.timeCreated || '')) || 0;
-      if (photoPath === String(oldPhoto.storagePath || '') || (requestedAt>0 && createdAt<requestedAt)) {
-        return res.status(409).json({success:false,message:'大頭照必須在本次補件要求後重新上傳新照片。'});
-      }
     }
 
     const includesInsurance = Object.prototype.hasOwnProperty.call(
@@ -25529,13 +25756,8 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       validation.documents
     )) {
       const previous = application.documents?.[documentKey] || {};
-      if (String(document.storagePath || '') === String(previous.storagePath || '')) {
-        return res.status(409).json({success:false,message:`${RIDER_DOCUMENT_LABELS[documentKey]}不能重複提交同一份補件檔案。`});
-      }
       update[`documents.${documentKey}`] = {
         ...document,
-        supplementRequestedAtMs:Number(previous.supplementRequestedAtMs || 0),
-        supplementPreviousStoragePath:String(previous.supplementPreviousStoragePath || previous.storagePath || '').trim(),
         previousStoragePath: String(previous.storagePath || '').trim(),
         previousReviewReason: cleanText(previous.reviewReason || '', 500),
         supplementVersion: Number(previous.supplementVersion || 0) + 1,
@@ -25543,12 +25765,8 @@ app.post('/api/rider/application-supplement', async (req, res) => {
     }
     if (profilePhotoResult?.ok) {
       const oldPhoto = application.profilePhoto || {};
-      if (String(profilePhotoResult.profilePhoto?.storagePath || '') === String(oldPhoto.storagePath || '')) {
-        return res.status(409).json({success:false,message:'小U大頭照必須重新上傳新檔案，不能直接使用原圖。'});
-      }
       update.profilePhoto = {
         ...profilePhotoResult.profilePhoto,
-        supplementRequestedAtMs:Number(oldPhoto.supplementRequestedAtMs || 0),
         reviewStatus:'pending',
         reviewReason:'',
         reviewedBy:'',
@@ -25569,43 +25787,24 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       };
     }
 
-    // V4.1.1 RC2：證件與照片都必須在交易中再次核對補件請求版本。
-    // 避免管理員在上傳途中已更改/核准文件，而舊請求覆蓋新的審核狀態。
-    const requestDocumentKeys=Object.keys(validation.documents);
-    let supplementConflict=false;
-    await db.runTransaction(async tx=>{
-      const latest=await tx.get(applicationDoc.ref);
-      const current=latest.exists ? (latest.data() || {}) : {};
-      if(!latest.exists || ['approved','training','active','rejected'].includes(String(current.status||'').toLowerCase())){
-        supplementConflict=true;
-        return;
-      }
-      for(const key of requestDocumentKeys){
-        const expected=application.documents?.[key]||{};
-        const actual=current.documents?.[key]||{};
-        if(String(actual.reviewStatus||'').toLowerCase()!==RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT ||
-           String(actual.storagePath||'')!==String(expected.storagePath||'') ||
-           Number(actual.supplementRequestedAtMs||0)!==Number(expected.supplementRequestedAtMs||0)){
-          supplementConflict=true;
+    // 照片補件只在管理端明確標記為 needs_supplement 時才可寫入。
+    // 使用交易防止審核人員在拍照期間已核准／變更狀態後舊請求覆蓋新照片。
+    if (profilePhotoResult?.ok) {
+      let photoConflict=false;
+      await db.runTransaction(async tx=>{
+        const latest=await tx.get(applicationDoc.ref);
+        const current=latest.exists ? (latest.data() || {}) : {};
+        if (!latest.exists || String(current.profilePhoto?.reviewStatus || '').toLowerCase()!=='needs_supplement' ||
+            ['approved','training','active','rejected'].includes(String(current.status || '').toLowerCase())) {
+          photoConflict=true;
           return;
         }
-      }
-      if(profilePhotoResult?.ok){
-        const expected=application.profilePhoto||{};
-        const actual=current.profilePhoto||{};
-        if(current.profilePhotoRequired!==true || String(actual.reviewStatus||'').toLowerCase()!=='needs_supplement' ||
-           String(actual.storagePath||'')!==String(expected.storagePath||'') ||
-           Number(actual.supplementRequestedAtMs||0)!==Number(expected.supplementRequestedAtMs||0)){
-          supplementConflict=true;
-          return;
-        }
-      }
-      tx.update(applicationDoc.ref,update);
-    });
-    if(supplementConflict)return res.status(409).json({
-      success:false,code:'SUPPLEMENT_REVIEW_CHANGED',
-      message:'補件要求或審核狀態已更新，請重新整理後再送件。'
-    });
+        tx.update(applicationDoc.ref,update);
+      });
+      if (photoConflict) return res.status(409).json({success:false,code:'PHOTO_SUPPLEMENT_REVIEW_CHANGED',message:'大頭照審核狀態已變更，請重新整理申請進度。'});
+    } else {
+      await applicationDoc.ref.update(update);
+    }
     let freshDoc = await applicationDoc.ref.get();
     let freshApplication = freshDoc.data() || {};
     const freshSummary = summarizeRiderApplicationDocuments(freshApplication);
