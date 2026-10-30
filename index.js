@@ -21786,6 +21786,10 @@ app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res
       });
     }
 
+    if (String(req.body?.declarationVersion || '') === 'rider-application-declarations-v1' &&
+        req.body?.photoAuthenticityDeclared !== true) {
+      return res.status(400).json({success:false,code:'PHOTO_AUTHENTICITY_DECLARATION_REQUIRED',message:'請確認本人照片真實性聲明。'});
+    }
     const validated = await validateRiderProfilePhoto(req.body?.profilePhoto, phone);
     if (!validated.ok) return res.status(400).json({ success:false, message:validated.message });
     const nowMs=Date.now();
@@ -21793,6 +21797,9 @@ app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res
       ...validated.profilePhoto,
       source:'existing_rider_supplement',
       authSource:tokenPhone?'firebase_bearer':'compat_phone_session',
+      photoAuthenticityDeclared:req.body?.photoAuthenticityDeclared===true ? true : null,
+      photoAuthenticityDeclaredAtMs:req.body?.photoAuthenticityDeclared===true ? nowMs : null,
+      photoAuthenticityDeclarationVersion:String(req.body?.declarationVersion||'legacy-missing'),
       updatedAtMs:nowMs
     };
     const riderRef=db.collection(RIDER_V2_COLLECTIONS.riders).doc(phone);
@@ -22471,6 +22478,9 @@ app.post('/api/rider/register', async (req, res) => {
       emergencyContactPhone,
       documents,
       profilePhoto,
+      photoAuthenticityDeclared,
+      warningAccountStatus,
+      declarationVersion,
 
       driverLicenseConfirmed,
       vehicleLicenseConfirmed,
@@ -22795,6 +22805,18 @@ app.post('/api/rider/register', async (req, res) => {
       return res.status(400).json({ success:false, code:'RIDER_PROFILE_PHOTO_REQUIRED', message:profilePhotoValidation.message });
     }
 
+    // V5.23.5.4 RC2: 新版申請必填；舊版 Web Clip 快取採補件標記，不預設「否」。
+    const declarationV1 = String(declarationVersion || '') === 'rider-application-declarations-v1';
+    const warningAccountValue = String(warningAccountStatus || '').trim().toUpperCase();
+    if (declarationV1 && photoAuthenticityDeclared !== true) {
+      return res.status(400).json({ success:false, code:'PHOTO_DECLARATION_REQUIRED', message:'請確認大頭照真實性聲明。' });
+    }
+    if (declarationV1 && !['YES','NO'].includes(warningAccountValue)) {
+      return res.status(400).json({ success:false, code:'WARNING_ACCOUNT_DECLARATION_REQUIRED', message:'請選擇是否有銀行或郵局警示帳戶。' });
+    }
+    const declarationComplete = declarationV1 && photoAuthenticityDeclared === true && ['YES','NO'].includes(warningAccountValue);
+    const declarationManualReview = !declarationComplete || warningAccountValue === 'YES';
+
     const riderId = cleanPhone;
     const incomingGrowthReferral = referralCode
       ? await resolveGrowthReferralCode(referralCode)
@@ -22868,6 +22890,20 @@ app.post('/api/rider/register', async (req, res) => {
       profilePhotoUploadedAtMs: Number(profilePhotoValidation.profilePhoto?.uploadedAtMs || nowMs),
       applicationStage: 'SUBMITTED',
       applicationFlowVersion: 'native-onboarding-v1-9-step',
+      photoAuthenticity: {
+        declaredGenuine: declarationComplete ? true : null,
+        declarationVersion: declarationV1 ? 'rider-application-declarations-v1' : 'legacy-missing',
+        reviewStatus: 'pending',
+        declaredAtMs: declarationComplete ? nowMs : null,
+      },
+      financialRiskDeclaration: {
+        warningAccountStatus: declarationComplete ? warningAccountValue : 'UNKNOWN',
+        verificationStatus: 'self_declared_not_verified',
+        declarationVersion: declarationV1 ? 'rider-application-declarations-v1' : 'legacy-missing',
+        reviewStatus: declarationManualReview ? 'manual_review_required' : 'pending',
+        declaredAtMs: declarationComplete ? nowMs : null,
+      },
+      applicationDeclarationReviewRequired: declarationManualReview,
 
       documents: documentValidation.documents,
       requiredDocumentKeys,
@@ -23387,7 +23423,10 @@ function getRiderApplicationLifecyclePresentation(application = {}, officialRide
   const active = lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
   const training = lifecycle === RIDER_V4_LIFECYCLE.TRAINING || status === 'training';
   const rejected = lifecycle === RIDER_V4_LIFECYCLE.REJECTED || status === 'rejected';
+  const photoNeedsSupplement = application.profilePhotoRequired === true &&
+    String(application.profilePhoto?.reviewStatus || '').trim().toLowerCase() === 'needs_supplement';
   const needsSupplement =
+    photoNeedsSupplement ||
     status === 'needs_supplement' ||
     String(application.reviewStatus || '').trim().toLowerCase() === 'needs_supplement' ||
     documentSummary.hasSupplementRequest;
@@ -24381,6 +24420,9 @@ app.post(
           reason:photoStatus === 'needs_supplement' ? reason : `大頭照審核：${photoStatus}`,
           metadata:{photoStatus},
         });
+        if (photoStatus === 'needs_supplement') {
+          await notifyRiderApplicationReviewUpdate(freshDoc.data() || {}, 'needs_supplement', `小U大頭照：${reason}`, {documentKeys:['profilePhoto']});
+        }
         return res.json({success:true,message:'大頭照審核狀態已更新。',application:await serializeRiderApplicationForAdmin(freshDoc)});
       }
 
@@ -25454,6 +25496,9 @@ app.post('/api/rider/application-supplement', async (req, res) => {
     const compulsoryInsuranceExpiryDate = String(
       req.body?.compulsoryInsuranceExpiryDate || ''
     ).trim();
+    const requestedProfilePhoto = req.body?.profilePhoto && typeof req.body.profilePhoto === 'object'
+      ? req.body.profilePhoto
+      : null;
 
     if (!/^09\d{8}$/.test(phone)) {
       return res.status(400).json({
@@ -25488,23 +25533,49 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       )
       .map(item => item.documentKey);
 
-    if (!allowedKeys.length) {
+    const photoNeedsSupplement = application.profilePhotoRequired === true &&
+      String(application.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement';
+    if (!allowedKeys.length && !photoNeedsSupplement) {
       return res.status(409).json({
         success: false,
-        message: '目前沒有需要補交的證件。',
+        message: '目前沒有需要補交的證件或大頭照。',
+      });
+    }
+    // 大頭照審核是 V4 獨立項目，禁止任意替換尚未被要求補件的照片。
+    if (requestedProfilePhoto && !photoNeedsSupplement) {
+      return res.status(409).json({
+        success:false, code:'PROFILE_PHOTO_SUPPLEMENT_NOT_REQUESTED',
+        message:'目前沒有要求重新拍攝大頭照，請重新整理申請進度。'
+      });
+    }
+    if (requestedProfilePhoto && req.body?.photoAuthenticityDeclared !== true) {
+      return res.status(400).json({
+        success:false, code:'PHOTO_AUTHENTICITY_DECLARATION_REQUIRED',
+        message:'補拍大頭照時必須確認照片為本人真實照片，且未使用 AI 生成或變造。'
+      });
+    }
+    if (!requestedProfilePhoto && !Object.keys(documents).length) {
+      return res.status(400).json({
+        success:false, message:'請先選擇需要補交的資料。'
       });
     }
 
-    const validation = await validateRiderApplicationDocumentSubset(
-      documents,
-      phone,
-      allowedKeys
-    );
+    // Only-photo supplement must bypass the old document validator, which rejects empty documents.
+    const validation = Object.keys(documents).length
+      ? await validateRiderApplicationDocumentSubset(documents,phone,allowedKeys)
+      : {ok:true,documents:{}};
     if (!validation.ok) {
       return res.status(400).json({
         success: false,
         message: validation.message,
       });
+    }
+    // 經過原有 storagePath／bucket／metadata／檔案存在性驗證，不直接信任前端的照片路徑。
+    const profilePhotoResult = requestedProfilePhoto
+      ? await validateRiderProfilePhoto(requestedProfilePhoto, phone)
+      : null;
+    if (profilePhotoResult && !profilePhotoResult.ok) {
+      return res.status(400).json({success:false, code:'PROFILE_PHOTO_SUPPLEMENT_INVALID', message:profilePhotoResult.message});
     }
 
     const includesInsurance = Object.prototype.hasOwnProperty.call(
@@ -25562,8 +25633,48 @@ app.post('/api/rider/application-supplement', async (req, res) => {
         supplementVersion: Number(previous.supplementVersion || 0) + 1,
       };
     }
+    if (profilePhotoResult?.ok) {
+      const oldPhoto = application.profilePhoto || {};
+      update.profilePhoto = {
+        ...profilePhotoResult.profilePhoto,
+        reviewStatus:'pending',
+        reviewReason:'',
+        reviewedBy:'',
+        reviewedAtMs:0,
+        previousStoragePath:String(oldPhoto.storagePath || '').trim(),
+        previousReviewReason:cleanText(oldPhoto.reviewReason || '', 500),
+        supplementVersion:Number(oldPhoto.supplementVersion || 0) + 1,
+        resubmittedAtMs:nowMs,
+        source:'application_profile_photo_supplement',
+      };
+      update.profilePhotoUploadedAtMs=nowMs;
+      update.photoAuthenticity={
+        declaredGenuine:true,
+        declarationVersion:'rider-application-declarations-v1',
+        reviewStatus:'pending',
+        declaredAtMs:nowMs,
+        declarationSource:'profile_photo_supplement',
+      };
+    }
 
-    await applicationDoc.ref.update(update);
+    // 照片補件只在管理端明確標記為 needs_supplement 時才可寫入。
+    // 使用交易防止審核人員在拍照期間已核准／變更狀態後舊請求覆蓋新照片。
+    if (profilePhotoResult?.ok) {
+      let photoConflict=false;
+      await db.runTransaction(async tx=>{
+        const latest=await tx.get(applicationDoc.ref);
+        const current=latest.exists ? (latest.data() || {}) : {};
+        if (!latest.exists || String(current.profilePhoto?.reviewStatus || '').toLowerCase()!=='needs_supplement' ||
+            ['approved','training','active','rejected'].includes(String(current.status || '').toLowerCase())) {
+          photoConflict=true;
+          return;
+        }
+        tx.update(applicationDoc.ref,update);
+      });
+      if (photoConflict) return res.status(409).json({success:false,code:'PHOTO_SUPPLEMENT_REVIEW_CHANGED',message:'大頭照審核狀態已變更，請重新整理申請進度。'});
+    } else {
+      await applicationDoc.ref.update(update);
+    }
     let freshDoc = await applicationDoc.ref.get();
     let freshApplication = freshDoc.data() || {};
     const freshSummary = summarizeRiderApplicationDocuments(freshApplication);
@@ -25642,7 +25753,7 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       type: 'supplement_submitted',
       operator: 'applicant',
       metadata: {
-        documentKeys: Object.keys(validation.documents),
+        documentKeys: [...Object.keys(validation.documents), ...(profilePhotoResult?.ok ? ['profilePhoto'] : [])],
         compulsoryInsuranceExpiryDate: includesInsurance
           ? compulsoryInsuranceExpiryDate
           : '',
@@ -25654,7 +25765,7 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       'supplement_submitted',
       '',
       {
-        documentKeys: Object.keys(validation.documents),
+        documentKeys: [...Object.keys(validation.documents), ...(profilePhotoResult?.ok ? ['profilePhoto'] : [])],
         compulsoryInsuranceExpiryDate: includesInsurance
           ? compulsoryInsuranceExpiryDate
           : '',
@@ -25670,8 +25781,8 @@ app.post('/api/rider/application-supplement', async (req, res) => {
             `📎 小U補件已送出\n\n` +
             `姓名：${freshApplication.name || '-'}\n` +
             `申請編號：${freshApplication.riderId || phone}\n` +
-            `補件項目：${Object.keys(validation.documents)
-              .map(key => RIDER_DOCUMENT_LABELS[key])
+            `補件項目：${[...Object.keys(validation.documents), ...(profilePhotoResult?.ok ? ['profilePhoto'] : [])]
+              .map(key => RIDER_DOCUMENT_LABELS[key] || RIDER_UPLOAD_LABELS[key] || key)
               .join('、')}\n` +
             (includesInsurance
               ? `新強制險到期日：${compulsoryInsuranceExpiryDate}\n`
@@ -25776,6 +25887,14 @@ app.get('/api/rider/application-status', async (req, res) => {
           ''
         ).trim(),
         credentialMaintenanceActive: maintenanceActive,
+        profilePhotoReview: application.profilePhotoRequired === true ? {
+          required: true,
+          reviewStatus: String(application.profilePhoto?.reviewStatus || 'pending').trim().toLowerCase(),
+          reviewReason: cleanText(application.profilePhoto?.reviewReason || '', 500),
+          originalName: cleanText(application.profilePhoto?.originalName || '', 180),
+          uploadedAtMs: Number(application.profilePhoto?.uploadedAtMs || 0),
+          resubmittedAtMs: Number(application.profilePhoto?.resubmittedAtMs || 0),
+        } : null,
         documents: serializeRiderApplicationDocumentsForClient(application),
         documentSummary: {
           totalCount: presentation.documentSummary.totalCount,
@@ -25880,6 +25999,14 @@ app.get('/api/rider/application-status', async (req, res) => {
         ).trim(),
         credentialMaintenanceActive:
           application.credentialMaintenanceActive === true,
+        profilePhotoReview: application.profilePhotoRequired === true ? {
+          required: true,
+          reviewStatus: String(application.profilePhoto?.reviewStatus || 'pending').trim().toLowerCase(),
+          reviewReason: cleanText(application.profilePhoto?.reviewReason || '', 500),
+          originalName: cleanText(application.profilePhoto?.originalName || '', 180),
+          uploadedAtMs: Number(application.profilePhoto?.uploadedAtMs || 0),
+          resubmittedAtMs: Number(application.profilePhoto?.resubmittedAtMs || 0),
+        } : null,
         documents: serializeRiderApplicationDocumentsForClient(application),
         documentSummary: {
           totalCount: presentation.documentSummary.totalCount,
