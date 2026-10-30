@@ -22480,6 +22480,8 @@ app.post('/api/rider/register', async (req, res) => {
       profilePhoto,
       photoAuthenticityDeclared,
       warningAccountStatus,
+      warningAccountReconfirmed,
+      warningAccountConfirmationVersion,
       declarationVersion,
 
       driverLicenseConfirmed,
@@ -22814,8 +22816,13 @@ app.post('/api/rider/register', async (req, res) => {
     if (declarationV1 && !['YES','NO'].includes(warningAccountValue)) {
       return res.status(400).json({ success:false, code:'WARNING_ACCOUNT_DECLARATION_REQUIRED', message:'請選擇是否有銀行或郵局警示帳戶。' });
     }
+    const confirmationV1 = String(warningAccountConfirmationVersion || '') === 'warning-account-confirm-v1';
+    if(confirmationV1 && warningAccountReconfirmed !== true){
+      return res.status(400).json({success:false,code:'WARNING_ACCOUNT_RECONFIRM_REQUIRED',message:'請再次確認警示帳戶申報狀態。'});
+    }
+    const warningAccountReconfirmedValid = confirmationV1 && warningAccountReconfirmed === true;
     const declarationComplete = declarationV1 && photoAuthenticityDeclared === true && ['YES','NO'].includes(warningAccountValue);
-    const declarationManualReview = !declarationComplete || warningAccountValue === 'YES';
+    const declarationManualReview = !declarationComplete || !warningAccountReconfirmedValid || warningAccountValue === 'YES';
 
     const riderId = cleanPhone;
     const incomingGrowthReferral = referralCode
@@ -22902,6 +22909,9 @@ app.post('/api/rider/register', async (req, res) => {
         declarationVersion: declarationV1 ? 'rider-application-declarations-v1' : 'legacy-missing',
         reviewStatus: declarationManualReview ? 'manual_review_required' : 'pending',
         declaredAtMs: declarationComplete ? nowMs : null,
+        reconfirmed: warningAccountReconfirmedValid,
+        confirmationVersion: confirmationV1 ? 'warning-account-confirm-v1' : 'legacy-no-reconfirmation',
+        reconfirmedAtMs: warningAccountReconfirmedValid ? nowMs : null,
       },
       applicationDeclarationReviewRequired: declarationManualReview,
 
