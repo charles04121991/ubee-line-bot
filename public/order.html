@@ -4,7 +4,7 @@
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261101-customer-native-service-home-rc3
+  PWA: 20261101-customer-native-service-home-rc3-1
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -29,7 +29,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261101-customer-native-service-home-rc3" rel="manifest"/>
+<link href="/manifest-order.json?v=20261101-customer-native-service-home-rc3-1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18822,7 +18822,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="ubee-rc3-order-heading" id="ubeeRC3OrderHeading"><span>建立跑腿任務</span><strong>填寫地點與需求</strong></div>
 </section>
 <div class="flow-card">
-<div class="flow-home-action-head"><strong>選擇服務類型</strong><span>可隨時切換服務</span></div>
+<!-- RC3.1: single visible service selection. The existing flowServiceTabs remains as a hidden controller adapter. -->
+<div class="ubee-rc31-choice" aria-label="目前選擇的跑腿服務">
+  <span class="ubee-rc31-choice-copy"><small>目前選擇</small><strong id="ubeeRC31SelectedService">幫我送</strong></span>
+  <button type="button" id="ubeeRC31ChangeService">更換服務 <span aria-hidden="true">↗</span></button>
+</div>
+<div class="ubee-rc31-step-hint" id="ubeeRC31StepHint" aria-live="polite">先選擇取件地點，再填寫送達地點。</div>
+<div class="flow-home-action-head ubee-rc31-controller-heading"><strong>選擇服務類型</strong><span>可隨時切換服務</span></div>
 <div aria-label="選擇跑腿服務" class="flow-service-tabs" id="flowServiceTabs" role="tablist">
 <button aria-selected="true" class="flow-service-tab active" data-service="send" role="tab" type="button">
 <span aria-hidden="true" class="flow-service-icon">
@@ -18902,7 +18908,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 <button class="flow-text-link" id="flowClearDropoff2" type="button" hidden style="margin-top:8px">移除送達點 2</button>
 <div class="flow-task-preview" id="flowTaskPreview"><div class="flow-task-preview-text" id="flowTaskPreviewText"></div><button class="flow-text-link" id="flowEditTaskButton" type="button">修改</button></div>
-<div class="flow-status" id="flowHomeStatus"></div>
+<div class="flow-status" id="flowHomeStatus" role="status" aria-live="polite"></div>
 <button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步：填寫任務內容</button>
 <section class="flow-home-supply-strip" aria-label="即時小U運力">
   <div aria-live="polite" class="flow-live-supply-status" data-rider-count="0" data-scope="loading" id="flowLiveSupplyStatus">
@@ -19885,6 +19891,21 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   function updateHome(){
     const p=state.pickup,d=state.dropoff,d2=state.dropoff2;
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+
+    // RC3.1: render the same service state in the compact selector, not a second set of tabs.
+    const rc31Choice=$('ubeeRC31SelectedService');
+    if(rc31Choice)rc31Choice.textContent=serviceLabels[state.service]||serviceLabels.send;
+    const rc31Hint=$('ubeeRC31StepHint');
+    if(rc31Hint)rc31Hint.textContent=!p
+      ? `第一步：填寫${copy.pickupLabel}。`
+      : !d
+        ? `第二步：填寫${copy.dropoffLabel}。`
+        : '地點已填寫，請繼續填寫任務內容。';
+    root.querySelectorAll('.ubee-rc3-service-card').forEach(button=>{
+      const selected=button.dataset.homeService===state.service;
+      button.classList.toggle('is-selected',selected);
+      button.setAttribute('aria-pressed',selected?'true':'false');
+    });
 
     if($('flowPickupLabel')) $('flowPickupLabel').textContent=copy.pickupLabel;
     if($('flowDropoffLabel')) $('flowDropoffLabel').textContent=copy.dropoffLabel;
@@ -21203,6 +21224,17 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   function bind(){
     $('flowServiceTabs').addEventListener('click',event=>{const btn=event.target.closest('[data-service]');if(btn){setService(btn.dataset.service);updateHome()}});
+
+    // RC3.1 change-service returns to the single visible six-service grid.
+    $('ubeeRC31ChangeService')?.addEventListener('click',()=>{
+      const grid=root.querySelector('#flowPageHome .ubee-rc3-service-grid');
+      if(!grid)return;
+      const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      grid.scrollIntoView({block:'start',behavior:reduced?'auto':'smooth'});
+      const active=grid.querySelector('.ubee-rc3-service-card.is-selected')||grid.querySelector('.ubee-rc3-service-card');
+      // Avoid focus scrolling away from the animated grid, while keeping keyboard navigation accessible.
+      try{active?.focus({preventScroll:true})}catch(_){active?.focus()}
+    });
     root.querySelectorAll('[data-home-service]').forEach(button=>button.addEventListener('click',()=>{
       const service=button.dataset.homeService;
       setService(service);
@@ -21219,7 +21251,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowHomeNext').addEventListener('click',()=>{
       if(!state.pickup||!state.dropoff){
         const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
-        status('flowHomeStatus',`請先完成${copy.pickupLabel}與${copy.dropoffLabel}。`,true);
+        const missingPickup=!state.pickup;
+        const target=missingPickup?$('flowPickupButton'):$('flowDropoffButton');
+        status('flowHomeStatus',`請先填寫${missingPickup?copy.pickupLabel:copy.dropoffLabel}，再繼續下一步。`,true);
+        // Focus the first missing address control; never silently open an address modal.
+        try{target?.scrollIntoView({block:'center',behavior:'smooth'});target?.focus({preventScroll:true})}catch(_){target?.focus()}
         return;
       }
       status('flowHomeStatus','');
@@ -21243,7 +21279,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
     $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
     $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn)setTiming(btn.dataset.timing)});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn)setSpeed(btn.dataset.speed)});$('flowOptionsNext').addEventListener('click',()=>{if(validateOptions())openConfirm()});
-    $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
+    $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(!btn)return;const target=btn.dataset.summaryGo;showPage(target);if(target==='home')requestAnimationFrame(()=>root.querySelector('#flowPageHome .flow-card')?.scrollIntoView({block:'start',behavior:'auto'}))});
     $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];status('flowSearchStatus','');$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;$('flowSearchResults').innerHTML='';setQuickAddressTab(state.quickAddressTab)});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);root.querySelectorAll('[data-address-tab]').forEach(btn=>btn.addEventListener('click',()=>setQuickAddressTab(btn.dataset.addressTab)));
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
     $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.addressTarget==='dropoff2'?(state.dropoff||state.pickup):state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
@@ -21488,8 +21524,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     window.UBeePrimaryNavigation?.activate('home');
     showFlow({fresh:true});
     requestAnimationFrame(()=>{
-      const serviceList=$('flowServiceTabs');
-      try{serviceList?.scrollIntoView({block:'start',behavior:'auto'});}catch(_){ }
+      const orderForm=root.querySelector('#flowPageHome .flow-card');
+      try{orderForm?.scrollIntoView({block:'start',behavior:'auto'});}catch(_){ }
     });
     return true;
   };
@@ -21574,7 +21610,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261101-customer-native-service-home-rc3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261101-customer-native-service-home-rc3-1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -28859,5 +28895,21 @@ body:not(.flow-active) .app select,
   },false);
 })();
 </script>
+
+<style id="ubeeRC31CheckoutFlowStyle">
+/* RC3.1 — optimize home-to-checkout navigation, keeping the legacy service controller mounted. */
+#productionOrderFlow #flowPageHome .flow-service-tabs,
+#productionOrderFlow #flowPageHome .ubee-rc31-controller-heading{display:none!important}
+#productionOrderFlow #flowPageHome .ubee-rc31-choice{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 13px;margin:0 0 7px;border-radius:14px;background:#fff8df;border:1px solid #ffe49c}
+#productionOrderFlow #flowPageHome .ubee-rc31-choice-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+#productionOrderFlow #flowPageHome .ubee-rc31-choice-copy small{color:#826315;font-size:11px;font-weight:750}
+#productionOrderFlow #flowPageHome .ubee-rc31-choice-copy strong{color:#1b1b1b;font-size:16px;font-weight:950}
+#productionOrderFlow #flowPageHome #ubeeRC31ChangeService{padding:9px 12px;border-radius:12px;background:white;border:1px solid #e9c56e;color:#5c4609;font-size:12px;font-weight:850;white-space:nowrap;cursor:pointer;min-height:42px}
+#productionOrderFlow #flowPageHome .ubee-rc31-step-hint{margin:0 2px 13px;color:#6b707a;font-size:12px;line-height:1.55;font-weight:650}
+#productionOrderFlow #flowPageHome .ubee-rc3-service-card.is-selected .ubee-rc3-service-icon{outline:2px solid #da9900;outline-offset:3px}
+#productionOrderFlow #flowPageHome .ubee-rc3-service-card.is-selected strong{color:#745600!important}
+#productionOrderFlow #flowPageHome #ubeeRC31ChangeService:focus-visible{outline:3px solid #1a1a1a;outline-offset:2px}
+#productionOrderFlow #flowPageHome .ubee-rc3-service-grid{scroll-margin-top:16px}
+</style>
 </body>
 </html>
