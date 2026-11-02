@@ -1,11 +1,11 @@
-<!-- UBee Customer RC3.2-HF3｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
+<!-- UBee Customer TC V1.5 — Clean RC1｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261102-customer-rc3-2-hf3-single-service-flow
+  PWA: 20261102-customer-tc-v1-5-clean-rc1
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -29,8 +29,8 @@
 ========================================================= -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
-<!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261102-customer-rc3-2-hf3-single-service-flow" rel="manifest"/>
+<!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
+<link href="/manifest-order.json?v=20261102-customer-tc-v1-5-clean-rc1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -42,7 +42,7 @@
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
 <!-- UBee 用戶端 V2.12 + Password Reset V3：2026-08-14｜LINE Messaging API Bot 全自動核對；不使用 LIFF／不需客服 -->
-<!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
+<!-- UBee 客戶端：文字化地址、後端計價、訂單進度及 ETA；不載入可視地圖 SDK。 -->
 <style>
     :root{
   --bg:#f5f6f7;
@@ -4899,7 +4899,7 @@ body{background:#eef0f2;}
     /* =====================================================
        UBee V4 客戶端首頁重建
        - 首頁先顯示五大服務
-       - 首頁不顯示 Google Map
+       - 首頁不顯示可視地圖
        - 地圖保留到後續路線確認步驟
        ===================================================== */
     #step1{
@@ -7304,7 +7304,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 <div class="uca-heading">
 <div class="uca-kicker">MEMBER LOGIN</div>
 <h2>既有會員登入</h2>
-<p class="uca-subtitle">已經有 UBee 會員帳號時，可使用原有手機號碼與密碼登入。新客不需要先註冊，直接回到首頁即可開始估價與下單。</p>
+<p class="uca-subtitle">已有帳號請登入；新客可免註冊直接下單。</p>
 </div>
 <form class="uca-panel" id="ucaLoginForm" novalidate="">
 <div class="uca-field">
@@ -7319,13 +7319,13 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 </div>
 <div class="uca-status" id="ucaLoginStatus"></div>
 <div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaLoginSubmit" type="submit">登入 UBee</button><button class="uca-btn uca-btn-secondary" data-uca-go="register" type="button">建立新會員</button><button class="uca-btn uca-btn-secondary" id="ucaContinueOrder" type="button">直接回到下單</button></div>
-<div class="uca-security">新客第一次真正送出任務時，系統只會要求下單人姓名與手機，不需要先建立密碼或完成傳統註冊流程。</div>
+<div class="uca-security">首次送單只需建立下單身分，不強制註冊會員。</div>
 </form>
 </div>
 </section>
 <section class="uca-view" data-uca-view="register">
 <header class="uca-topbar"><button aria-label="返回登入" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="關閉" class="uca-icon-btn" data-uca-home="" type="button">×</button></header>
-<div class="uca-scroll"><div class="uca-heading"><div class="uca-kicker">MEMBER REGISTRATION</div><h2>建立 UBee 會員</h2><p class="uca-subtitle">可先註冊再下單，也可返回首頁免註冊估價。無簡訊驗證；填寫手機不代表已完成門號持有人驗證。</p></div>
+<div class="uca-scroll"><div class="uca-heading"><div class="uca-kicker">MEMBER REGISTRATION</div><h2>建立 UBee 會員</h2><p class="uca-subtitle">註冊非下單必要條件；手機號碼尚未經簡訊驗證。</p></div>
 <form class="uca-panel" id="ucaRegisterForm" novalidate>
 <div class="uca-field"><label class="uca-label" for="ucaRegisterName">本人姓名</label><input class="uca-input" id="ucaRegisterName" autocomplete="name" maxlength="40" placeholder="請填寫本人姓名" required></div>
 <div class="uca-field"><label class="uca-label" for="ucaRegisterPhone">聯絡手機號碼</label><input class="uca-input" id="ucaRegisterPhone" inputmode="numeric" type="tel" maxlength="10" autocomplete="tel" placeholder="09xxxxxxxx" required></div>
@@ -7359,7 +7359,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
   const root=document.getElementById('ubeeCustomerAuthRoot');if(!root)return;
   const $=id=>root.querySelector(`#${id}`);const views=[...root.querySelectorAll('[data-uca-view]')];
   const resetTokenFromUrl=String(new URLSearchParams(location.search).get('passwordResetToken')||'').trim();
-  const state={view:'login',history:[],customer:null,resetToken:resetTokenFromUrl,resetExpiresAtMs:0};
+  const state={view:'login',history:[],customer:null,resetToken:resetTokenFromUrl,resetExpiresAtMs:0,loginBusy:false,registerBusy:false};
   window.UBeeCustomerPasswordResetActive=Boolean(resetTokenFromUrl);
   const normalizePhone=v=>String(v||'').replace(/\D/g,'').slice(0,10);const validPhone=v=>/^09\d{8}$/.test(normalizePhone(v));
   function setError(id,message=''){const el=$(id);if(!el)return;el.textContent=message;el.classList.toggle('show',Boolean(message))}
@@ -7367,22 +7367,23 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
   function loading(show,text='處理中'){const label=$('ucaLoadingText'),layer=$('ucaLoading');if(label)label.textContent=text;if(layer){layer.classList.toggle('active',show);layer.setAttribute('aria-hidden',show?'false':'true')}}
   async function api(url,options={}){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);try{const response=await fetch(url,{...options,credentials:'include',cache:'no-store',headers:{Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})},signal:controller.signal});const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false){const error=new Error(data.message||data.error||`系統暫時無法處理（${response.status}）`);error.code=data.code||'';error.status=response.status;throw error}return data}catch(error){if(error.name==='AbortError')throw new Error('連線逾時，請檢查網路後再試。');throw error}finally{clearTimeout(timer)}}
   function showView(name,{push=true}={}){if(push&&state.view&&state.view!==name)state.history.push(state.view);state.view=name;views.forEach(view=>view.classList.toggle('active',view.dataset.ucaView===name));root.querySelectorAll('.uca-scroll').forEach(el=>el.scrollTop=0);setTimeout(()=>{if(name==='login')$('ucaLoginPhone')?.focus();if(name==='reset')$('ucaResetPassword')?.focus()},80)}
-  function hide(){root.classList.remove('active');root.setAttribute('aria-hidden','true');document.body.classList.remove('ubee-customer-auth-open')}
+  function hide(){root.classList.remove('active');root.setAttribute('aria-hidden','true');document.body.classList.remove('ubee-customer-auth-open');for(const id of ['ucaLoginPassword','ucaRegisterPassword','ucaRegisterPasswordConfirm']){const input=$(id);if(input)input.value=''}}
   function show(mode='login',options={}){root.classList.add('active');root.setAttribute('aria-hidden','false');document.body.classList.add('ubee-customer-auth-open');if(state.resetToken){state.history=[];showView('reset',{push:false});return}const targetView=['forgot','register'].includes(mode)?mode:'login';state.history=[];showView(targetView,{push:false});if(options?.phone){$('ucaLoginPhone').value=normalizePhone(options.phone);$('ucaForgotPhone').value=normalizePhone(options.phone);updateForgotSupportState()}if(options?.message)setStatus(targetView==='forgot'?'ucaForgotStatus':'ucaLoginStatus',String(options.message),'info')}
   function goBack(){if(['forgot','register'].includes(state.view)){showView('login',{push:false});return}hide()}
   function resetPasswordState(){const value=$('ucaResetPassword')?.value||'';const rules={length:value.length>=8&&value.length<=72,letter:/[A-Za-z]/.test(value),number:/\d/.test(value)};root.querySelectorAll('#ucaResetPasswordRules [data-rule]').forEach(el=>el.classList.toggle('ok',Boolean(rules[el.dataset.rule])));return Object.values(rules).every(Boolean)}
   async function validatePasswordResetToken(){if(!state.resetToken)return false;show('reset');$('ucaResetSubmit').disabled=true;setStatus('ucaResetStatus');loading(true,'正在驗證重設連結');try{const data=await api('/api/customer-auth/password-reset/validate',{method:'POST',body:JSON.stringify({token:state.resetToken})});state.resetExpiresAtMs=Number(data.expiresAtMs||0);const expiresText=state.resetExpiresAtMs?new Date(state.resetExpiresAtMs).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false}):'15 分鐘內';$('ucaResetLinkInfo').textContent=`已驗證 ${data.maskedPhone||'你的 UBee 帳號'}。此連結將於 ${expiresText} 失效，且只能使用一次。`;$('ucaResetSubmit').disabled=false;return true}catch(error){$('ucaResetLinkInfo').textContent='這個重設連結目前無法使用。';setStatus('ucaResetStatus',error.message,'error');return false}finally{loading(false)}}
   async function submitPasswordReset(){if(!state.resetToken)return;const password=$('ucaResetPassword').value,confirm=$('ucaResetPasswordConfirm').value;setError('ucaResetPasswordError');setError('ucaResetPasswordConfirmError');setStatus('ucaResetStatus');if(!resetPasswordState()){setError('ucaResetPasswordError','密碼需至少 8 個字元，並包含英文字母與數字。');return}if(password!==confirm){setError('ucaResetPasswordConfirmError','兩次輸入的新密碼不一致。');return}$('ucaResetSubmit').disabled=true;loading(true,'正在重設密碼');try{const data=await api('/api/customer-auth/password-reset/complete',{method:'POST',body:JSON.stringify({token:state.resetToken,password})});state.resetToken='';state.resetExpiresAtMs=0;window.UBeeCustomerPasswordResetActive=false;try{history.replaceState(null,'',location.pathname)}catch(_){}$('ucaResetPassword').value='';$('ucaResetPasswordConfirm').value='';$('ucaLoginPassword').value='';showView('login',{push:false});setStatus('ucaLoginStatus',data.message||'密碼設定完成，請使用新密碼登入。','success')}catch(error){setStatus('ucaResetStatus',error.message,'error');$('ucaResetSubmit').disabled=false}finally{loading(false)}}
   async function finish(customer,target='order'){state.customer=customer||null;loading(true,'登入成功，正在開啟 UBee');try{if(typeof window.onUBeeCustomerAuthenticated==='function'){const ready=await window.onUBeeCustomerAuthenticated(state.customer,target);if(ready===false)throw new Error('會員資料已驗證，但用戶端尚未完成載入。')}else{window.location.replace('/order.html');return}hide()}catch(error){console.error('UBee 會員登入後初始化失敗：',error);show('login');setStatus('ucaLoginStatus','登入已完成，但用戶端載入失敗，請再試一次。','error')}finally{loading(false)}}
-  async function submitLogin(event){event.preventDefault();const phone=normalizePhone($('ucaLoginPhone').value),password=$('ucaLoginPassword').value;$('ucaLoginPhone').value=phone;setError('ucaLoginPhoneError');setError('ucaLoginPasswordError');setStatus('ucaLoginStatus');let ok=true;if(!validPhone(phone)){setError('ucaLoginPhoneError','請輸入正確的台灣手機號碼。');ok=false}if(!password){setError('ucaLoginPasswordError','請輸入登入密碼。');ok=false}if(!ok)return;loading(true,'正在登入 UBee');try{const data=await api('/api/customer-auth/login',{method:'POST',body:JSON.stringify({phone,password})});await finish(data.customer||null,'order')}catch(error){setStatus('ucaLoginStatus',error.message,'error')}finally{loading(false)}}
+  async function submitLogin(event){event.preventDefault();if(state.loginBusy)return;const phone=normalizePhone($('ucaLoginPhone').value),password=$('ucaLoginPassword').value;$('ucaLoginPhone').value=phone;setError('ucaLoginPhoneError');setError('ucaLoginPasswordError');setStatus('ucaLoginStatus');let ok=true;if(!validPhone(phone)){setError('ucaLoginPhoneError','請輸入正確的台灣手機號碼。');ok=false}if(!password){setError('ucaLoginPasswordError','請輸入登入密碼。');ok=false}if(!ok)return;state.loginBusy=true;$('ucaLoginSubmit').disabled=true;loading(true,'正在登入 UBee');try{await api('/api/customer-auth/login',{method:'POST',body:JSON.stringify({phone,password})});const me=await api('/api/customer-auth/me');if(!me?.customer?.customerId)throw new Error('登入成功，但尚未確認本裝置登入狀態。');await finish(me.customer,'order')}catch(error){setStatus('ucaLoginStatus',error.message,'error')}finally{state.loginBusy=false;$('ucaLoginSubmit').disabled=false;loading(false)}}
   async function submitRegister(event){
     event.preventDefault();
+    if(state.registerBusy)return;
     const name=String($('ucaRegisterName').value||'').trim(),phone=normalizePhone($('ucaRegisterPhone').value),
       password=$('ucaRegisterPassword').value, confirm=$('ucaRegisterPasswordConfirm').value;
     if(name.length<2 || !validPhone(phone)){setStatus('ucaRegisterStatus','請輸入本人姓名及 09 開頭 10 碼手機號碼。','error');return}
     if(password.length<8 || password.length>72 || !/[A-Za-z]/.test(password) || !/\d/.test(password) || password===phone){setStatus('ucaRegisterStatus','密碼必須為 8～72 字元、包含英文字母及數字，且不能等於手機號碼。','error');return}
     if(password!==confirm || !$('ucaRegisterAgree').checked){setStatus('ucaRegisterStatus','請確認密碼一致並同意服務條款。','error');return}
-    const button=$('ucaRegisterSubmit');button.disabled=true;loading(true,'正在建立 UBee 會員');setStatus('ucaRegisterStatus');
+    state.registerBusy=true;const button=$('ucaRegisterSubmit');button.disabled=true;loading(true,'正在建立 UBee 會員');setStatus('ucaRegisterStatus');
     try{
       const data=await api('/api/customer-auth/register',{method:'POST',body:JSON.stringify({name,phone,password,
         agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})});
@@ -7393,7 +7394,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
       $('ucaRegisterPassword').value='';$('ucaRegisterPasswordConfirm').value='';
       await finish(me.customer,'order');
     }catch(error){setStatus('ucaRegisterStatus',error.message,'error')}
-    finally{button.disabled=false;loading(false)}
+    finally{state.registerBusy=false;button.disabled=false;loading(false)}
   }
   function updateForgotSupportState(){const phone=normalizePhone($('ucaForgotPhone').value);$('ucaForgotPhone').value=phone;const valid=validPhone(phone);$('ucaForgotSupport').disabled=!valid;$('ucaForgotCommandPreview').textContent=valid?`忘記密碼 ${phone}`:'忘記密碼 09xxxxxxxx';if(valid)setError('ucaForgotPhoneError');return valid}
   async function startAutomatedLinePasswordReset(){const phone=normalizePhone($('ucaForgotPhone').value);$('ucaForgotPhone').value=phone;if(!validPhone(phone)){setError('ucaForgotPhoneError','請輸入完整的 09 開頭 10 碼會員手機號碼。');$('ucaForgotPhone').focus();return}const command=`忘記密碼 ${phone}`;let copied=false;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(command);copied=true}}catch(_){}if(!copied){try{const temp=document.createElement('textarea');temp.value=command;temp.setAttribute('readonly','');temp.style.position='fixed';temp.style.opacity='0';document.body.appendChild(temp);temp.select();copied=document.execCommand('copy');temp.remove()}catch(_){}}setStatus('ucaForgotStatus',copied?`已複製「${command}」。進入 LINE 後貼上並送出。`:`進入 LINE 後請送出：「${command}」。`,'success');setTimeout(()=>window.openUBeeOfficialAccount?.(),180)}
@@ -8353,14 +8354,7 @@ let homeServiceLocationError = '';
 let isStepTransitioning = false;
 let stepTransitionUnlockTimer = null;
 
-// ==============================
-// UBee Google Maps 前端狀態
-// ==============================
-let googleMapsApiKey = '';
-let googleMapsMapId = '';
-let googleMapsLoadPromise = null;
-let googleMapsLibraries = null;
-
+// Customer keeps route distance, ETA, quote, and coordinate state. No SDK is loaded.
 let customerMap = null;
 let reviewMap = null;
 let trackingMap = null;
@@ -8488,268 +8482,6 @@ function clearMapObject(object){
   return null;
 }
 
-function createMarkerContent(type, text){
-  const el = document.createElement('div');
-  el.className = `ubee-map-pin ${type}`;
-  el.textContent = text;
-  return el;
-}
-
-function createMapMarker(map, position, type, title){
-  if(!map || !hasValidLatLng(position?.lat, position?.lng)){
-    return null;
-  }
-
-  const label = type === 'pickup' ? '取' : '送';
-
-  if(
-    googleMapsMapId &&
-    googleMapsLibraries?.marker?.AdvancedMarkerElement
-  ){
-    return new googleMapsLibraries.marker.AdvancedMarkerElement({
-      map,
-      position,
-      title,
-      content:createMarkerContent(type, label)
-    });
-  }
-
-  if(window.google?.maps?.Marker){
-    return new google.maps.Marker({
-      map,
-      position,
-      title,
-      label:{
-        text:label,
-        color:type === 'pickup' ? '#ffffff' : '#111111',
-        fontWeight:'900'
-      },
-      icon:{
-        path:google.maps.SymbolPath.CIRCLE,
-        scale:14,
-        fillColor:type === 'pickup' ? '#111111' : '#f4bd00',
-        fillOpacity:1,
-        strokeColor:'#ffffff',
-        strokeWeight:2
-      }
-    });
-  }
-
-  return null;
-}
-
-async function loadGoogleMapsLibraries(){
-  if(googleMapsLibraries){
-    return googleMapsLibraries;
-  }
-
-  if(
-    !window.google ||
-    !window.google.maps ||
-    typeof window.google.maps.importLibrary !== 'function'
-  ){
-    throw new Error('Google Maps JavaScript API 尚未完成載入');
-  }
-
-  const [mapsLibrary, geometryLibrary, markerLibrary] = await Promise.all([
-    window.google.maps.importLibrary('maps'),
-    window.google.maps.importLibrary('geometry'),
-    window.google.maps.importLibrary('marker')
-  ]);
-
-  googleMapsLibraries = {
-    maps:mapsLibrary,
-    geometry:geometryLibrary,
-    marker:markerLibrary
-  };
-
-  return googleMapsLibraries;
-}
-
-function loadGoogleMapsApi(){
-  if(
-    window.google &&
-    window.google.maps &&
-    typeof window.google.maps.importLibrary === 'function'
-  ){
-    return loadGoogleMapsLibraries();
-  }
-
-  if(googleMapsLoadPromise){
-    return googleMapsLoadPromise;
-  }
-
-  if(!googleMapsApiKey){
-    return Promise.reject(
-      new Error('Google Maps API Key 尚未取得')
-    );
-  }
-
-  googleMapsLoadPromise = new Promise((resolve, reject) => {
-    const callbackName = '__ubeeGoogleMapsReady';
-
-    const oldScript = document.querySelector(
-      'script[data-ubee-google-maps="true"]'
-    );
-
-    if(oldScript){
-      oldScript.remove();
-    }
-
-    window[callbackName] = async function(){
-      try{
-        delete window[callbackName];
-
-        const libraries = await loadGoogleMapsLibraries();
-
-        console.log(
-          '✅ UBee Google Maps JavaScript API 已完成載入'
-        );
-
-        resolve(libraries);
-
-      }catch(err){
-        googleMapsLoadPromise = null;
-        reject(err);
-      }
-    };
-
-    const script = document.createElement('script');
-
-    script.dataset.ubeeGoogleMaps = 'true';
-
-    script.src =
-      'https://maps.googleapis.com/maps/api/js' +
-      `?key=${encodeURIComponent(googleMapsApiKey)}` +
-      '&v=weekly' +
-      '&loading=async' +
-      `&callback=${encodeURIComponent(callbackName)}` +
-      '&language=zh-TW' +
-      '&region=TW';
-
-    script.async = true;
-
-    script.onerror = () => {
-      delete window[callbackName];
-
-      googleMapsLoadPromise = null;
-
-      script.remove();
-
-      reject(
-        new Error('Google Maps JavaScript API 載入失敗')
-      );
-    };
-
-    document.head.appendChild(script);
-  });
-
-  return googleMapsLoadPromise;
-}
-
-async function ensureCustomerMapReady(){
-  // Customer No-Map V1.4：用戶端不建立可視地圖。
-  // Google Maps JS 僅保留 Places / Geocode 等地址能力。
-  return null;
-}
-
-// ==============================
-// Step 4 確認訂單頁地圖初始化
-// ==============================
-async function ensureReviewMapReady(){
-  // Customer No-Map V1.4：確認訂單只顯示距離／時間／費用，不建立地圖。
-  return null;
-}
-
-async function ensureTrackingMapReady(){
-  // Customer No-Map V1.4：進行中任務改以 ETA + 狀態進度呈現，不建立地圖。
-  return null;
-}
-
-function renderCurrentLocationMarker(){
-  if(
-    !customerMap ||
-    !hasValidLatLng(
-      currentLocationLat,
-      currentLocationLng
-    )
-  ){
-    return;
-  }
-
-  currentLocationMarker =
-    clearMapObject(currentLocationMarker);
-
-  const personSvg = `
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="48"
-      height="48"
-      viewBox="0 0 48 48"
-    >
-      <circle
-        cx="24"
-        cy="24"
-        r="20"
-        fill="#facc15"
-        stroke="#ffffff"
-        stroke-width="3"
-      />
-
-      <circle
-        cx="24"
-        cy="17"
-        r="6"
-        fill="#111111"
-      />
-
-      <path
-        d="M13 36
-           C14.8 28,
-           19.2 24,
-           24 24
-           C28.8 24,
-           33.2 28,
-           35 36
-           Z"
-        fill="#111111"
-      />
-    </svg>
-  `;
-
-  currentLocationMarker =
-    new google.maps.Marker({
-      map:customerMap,
-
-      position:{
-        lat:currentLocationLat,
-        lng:currentLocationLng
-      },
-
-      title:"你的目前位置",
-
-      icon:{
-        url:
-          "data:image/svg+xml;charset=UTF-8," +
-          encodeURIComponent(personSvg),
-
-        scaledSize:
-          new google.maps.Size(
-            44,
-            44
-          ),
-
-        anchor:
-          new google.maps.Point(
-            22,
-            22
-          )
-      },
-
-      zIndex:999
-    });
-}
-
 async function requestCurrentLocationForMap(){
   try{
     setHomeLocationUiState('定位中…','正在確認目前位置與服務地區');
@@ -8766,8 +8498,8 @@ async function requestCurrentLocationForMap(){
     currentLocationLng = lng;
     currentLocationResolvedAt = Date.now();
 
-    // 座標一拿到就先解除「定位中」狀態，地圖可立即使用這組座標建立；
-    // 縣市／行政區名稱在背景同步，避免反向地理編碼延遲拖住首頁地圖。
+    // 座標一拿到就先解除「定位中」狀態，定位狀態可立即更新；
+    // 縣市／行政區名稱在背景同步，避免位置判斷延遲拖住首頁。
     setHomeLocationUiState('目前位置','已取得目前位置，正在辨識服務地區');
     syncCurrentLocationHomeUi(lat, lng).catch(error => {
       console.warn('首頁服務地區背景同步失敗：', error);
@@ -8842,35 +8574,8 @@ async function detectServiceCityFromCurrentLocation(){
     currentLocationLat = lat;
     currentLocationLng = lng;
 
-    let detectedCity = '';
-
-    if(window.google?.maps?.Geocoder){
-      try{
-        const geocoder = new google.maps.Geocoder();
-        const result = await geocoder.geocode({ location:{ lat, lng } });
-        const addressComponents = result?.results?.[0]?.address_components || [];
-
-        const level1 = addressComponents.find((component) =>
-          Array.isArray(component.types) &&
-          component.types.includes('administrative_area_level_1')
-        );
-
-        const locality = addressComponents.find((component) =>
-          Array.isArray(component.types) &&
-          component.types.includes('locality')
-        );
-
-        detectedCity = normalizeTaiwanCityName(
-          level1?.long_name || locality?.long_name || ''
-        );
-      }catch(err){
-        console.warn('目前縣市反向地理編碼失敗，改用最近城市判斷：', err);
-      }
-    }
-
-    if(!detectedCity){
-      detectedCity = getNearestServiceCityByCoordinates(lat, lng);
-    }
+    // Device position remains available without loading a map SDK.
+    const detectedCity = getNearestServiceCityByCoordinates(lat, lng);
 
     if(detectedCity){
       selectServiceCity(detectedCity);
@@ -8921,195 +8626,7 @@ function getRouteDestinationLocation(data){
   return hasValidLatLng(lat, lng) ? { lat, lng } : null;
 }
 
-function drawRouteOnMap(map, data, target){
-  if(!map || !data?.encodedPolyline || !googleMapsLibraries?.geometry?.encoding){
-    return;
-  }
-
-    if(target === 'review'){
-
-  reviewRoutePolyline =
-    clearMapObject(
-      reviewRoutePolyline
-    );
-
-  reviewPickupMarker =
-    clearMapObject(
-      reviewPickupMarker
-    );
-
-  reviewDropoffMarker =
-    clearMapObject(
-      reviewDropoffMarker
-    );
-
-  reviewDropoff2Marker = clearMapObject(reviewDropoff2Marker);
-
-}else if(target === 'tracking'){
-
-  trackingRoutePolyline =
-    clearMapObject(
-      trackingRoutePolyline
-    );
-
-  trackingPickupMarker =
-    clearMapObject(
-      trackingPickupMarker
-    );
-
-  trackingDropoffMarker =
-    clearMapObject(
-      trackingDropoffMarker
-    );
-
-}else{
-
-  routePolyline =
-    clearMapObject(
-      routePolyline
-    );
-
-  pickupMarker =
-    clearMapObject(
-      pickupMarker
-    );
-
-  dropoffMarker =
-    clearMapObject(
-      dropoffMarker
-    );
-
-  dropoff2Marker = clearMapObject(dropoff2Marker);
-
-}
-
-  const path = googleMapsLibraries.geometry.encoding.decodePath(data.encodedPolyline);
-
-  const newPolyline = new google.maps.Polyline({
-    map,
-    path,
-    geodesic:true,
-    strokeColor:'#111111',
-    strokeOpacity:.92,
-    strokeWeight:6
-  });
-
-  const origin = getRouteOriginLocation(data);
-  const destination = getRouteDestinationLocation(data);
-  const primaryDropoff = data?.multiDropoff ? getRoutePrimaryDropoffLocation(data) : destination;
-
-  const newPickupMarker = origin
-    ? createMapMarker(map, origin, 'pickup', '取件地點')
-    : null;
-
-  const newDropoffMarker = primaryDropoff
-    ? createMapMarker(map, primaryDropoff, 'dropoff', data?.multiDropoff ? '送達點 1' : '送達地點')
-    : null;
-
-  const newDropoff2Marker = data?.multiDropoff && destination
-    ? createMapMarker(map, destination, 'dropoff', '送達點 2')
-    : null;
-
-  if(target === 'review'){
-
-  reviewRoutePolyline =
-    newPolyline;
-
-  reviewPickupMarker =
-    newPickupMarker;
-
-  reviewDropoffMarker = newDropoffMarker;
-  reviewDropoff2Marker = newDropoff2Marker;
-
-}else if(target === 'tracking'){
-
-  trackingRoutePolyline =
-    newPolyline;
-
-  trackingPickupMarker =
-    newPickupMarker;
-
-  trackingDropoffMarker =
-    newDropoffMarker;
-
-}else{
-
-  routePolyline =
-    newPolyline;
-
-  pickupMarker =
-    newPickupMarker;
-
-  dropoffMarker = newDropoffMarker;
-  dropoff2Marker = newDropoff2Marker;
-
-}
-
-    const bounds =
-    new google.maps.LatLngBounds();
-
-
-  // 加入完整道路路線
-  path.forEach(point => {
-
-    bounds.extend(
-      point
-    );
-
-  });
-
-
-  // 加入取件點
-  if(origin){
-
-    bounds.extend(
-      origin
-    );
-
-  }
-
-
-  // 加入送達點
-  if(primaryDropoff){ bounds.extend(primaryDropoff); }
-  if(destination){ bounds.extend(destination); }
-
-
-  // 依目前傳入的地圖調整完整路線視野
-  if(!bounds.isEmpty()){
-
-    map.fitBounds(
-      bounds,
-      48
-    );
-
-  }
-}
-
-function renderRouteOnCustomerMap(data){
-  if(!customerMap || !data) return;
-  drawRouteOnMap(customerMap, data, 'customer');
-}
-
-function renderRouteOnReviewMap(data){
-  if(!reviewMap || !data) return;
-  drawRouteOnMap(reviewMap, data, 'review');
-}
-
-function renderRouteOnTrackingMap(data){
-
-  if(
-    !trackingMap ||
-    !data
-  ){
-    return;
-  }
-
-  drawRouteOnMap(
-    trackingMap,
-    data,
-    'tracking'
-  );
-}
+// Text-only tracking: no route drawing code is loaded.
 
 function getTrackingRouteDestination(order){
 
@@ -10074,10 +9591,9 @@ async function refreshTrackingRoute(
 
   try{
 
-    await ensureTrackingMapReady();
 
 
-    // 等待地圖初始化期間，
+    // 等待更新資料期間，
     // 如果已經有更新的路線請求，
     // 這一筆舊請求直接停止。
     if(
@@ -10090,7 +9606,7 @@ async function refreshTrackingRoute(
 
     // 正式記錄這次送出的路線請求。
     // 後面的節流系統會依這些資料判斷，
-    // 是否真的需要再次呼叫 Google Routes API。
+    // 是否需要再次呼叫後端路線估算服務。
     trackingRouteLastRequestedAt =
       requestedAt;
 
@@ -10161,7 +9677,7 @@ async function refreshTrackingRoute(
 
     // API 回來後再次確認。
     // 只要期間已經產生新的路線請求，
-    // 這一筆舊結果就不能顯示到地圖。
+    // 這一筆舊結果就不能覆蓋最新距離與 ETA。
     if(
       requestId !==
       trackingRouteRequestSequence
@@ -10188,9 +9704,6 @@ async function refreshTrackingRoute(
     }
 
 
-    renderRouteOnTrackingMap(
-  data
-);
 
 
 trackingRouteLastData =
@@ -10779,7 +10292,7 @@ function swapPickupAndDropoff(){
   swapInputValues('pickupAddressNote', 'dropoffAddressNote');
   swapInputValues('pickupPhone', 'dropoffPhone');
 
-  // 交換 Google Maps 對應的座標與 Place ID。
+  // 交換取送點座標及地址 Place ID。
   [pickupLat, dropoffLat] = [dropoffLat, pickupLat];
   [pickupLng, dropoffLng] = [dropoffLng, pickupLng];
   [pickupPlaceId, dropoffPlaceId] = [dropoffPlaceId, pickupPlaceId];
@@ -12391,112 +11904,7 @@ function showOnlyStep(step){
 
   /* Step 1 可視地圖已於 No-Map 架構移除；首頁只保留定位、地址與即時運力資料。 */
 
-  /* ==============================
-     Step 4：確認頁地圖
-     ============================== */
-
-  if(step === 4){
-
-    setTimeout(() => {
-
-      ensureReviewMapReady()
-
-        .then(() => {
-
-          if(
-            window.google?.maps?.event &&
-            reviewMap
-          ){
-
-            google.maps.event.trigger(
-              reviewMap,
-              'resize'
-            );
-
-          }
-
-
-          if(lastRouteData){
-
-            renderRouteOnReviewMap(
-              lastRouteData
-            );
-
-          }
-
-        })
-
-        .catch(err => {
-
-          console.warn(
-            '確認頁地圖顯示失敗:',
-            err
-          );
-
-        });
-
-    }, 80);
-
-  }
-
-
-  /* ==============================
-     Step 5：即時任務地圖
-     ============================== */
-
-  if(step === 5){
-
-    setTimeout(() => {
-
-      qs('step5TrackingMapSection')
-        ?.classList
-        .remove('hidden');
-
-
-      ensureTrackingMapReady()
-
-        .then(() => {
-
-          if(
-            window.google?.maps?.event &&
-            trackingMap
-          ){
-
-            google.maps.event.trigger(
-              trackingMap,
-              'resize'
-            );
-
-          }
-
-
-          /*
-           * 尚未有小U接單時，
-           * 先顯示任務原始路線。
-           */
-
-          if(lastRouteData){
-
-            renderRouteOnTrackingMap(
-              lastRouteData
-            );
-
-          }
-
-        })
-
-        .catch(err => {
-
-          console.warn(
-            'Step 5 地圖顯示失敗:',
-            err
-          );
-
-        });
-
-    }, 80);
-
-  }
+  // No visual maps: textual quote, tracking and task status are rendered elsewhere.
 
 }
 
@@ -13084,11 +12492,6 @@ function renderSummary(){
 
   renderEstimate();
 
-  ensureReviewMapReady()
-    .then(() => {
-      if(lastRouteData) renderRouteOnReviewMap(lastRouteData);
-    })
-    .catch(err => console.warn('確認頁地圖準備失敗:', err));
 }
 
 async function renderEstimate(){
@@ -15333,182 +14736,8 @@ function clearTrackedRiderMarker(){
 // 建立或更新小U Marker
 // ==============================
 
-function updateTrackedRiderMarker(position){
-
-  if(
-    !position ||
-    !hasValidLatLng(
-      position.lat,
-      position.lng
-    )
-  ){
-    return;
-  }
-
-if(!trackingMap){
-
-  console.log(
-    '⏳ Step 5 追蹤地圖尚未完成初始化，正在準備地圖'
-  );
-
-  ensureTrackingMapReady()
-    .then(() => {
-
-      if(trackingMap){
-
-        updateTrackedRiderMarker(
-          position
-        );
-
-      }
-
-    })
-    .catch(err => {
-
-      console.warn(
-        'Step 5 追蹤地圖初始化失敗，暫時無法顯示小U:',
-        err
-      );
-
-    });
-
-  return;
-}
-
-  const safePosition = {
-    lat:Number(position.lat),
-    lng:Number(position.lng)
-  };
-
-
-  // 每次收到小U最新定位，
-  // 追蹤地圖同步跟到小U位置。
-  trackingMap.panTo(
-    safePosition
-  );
-
-
-  // Marker 已存在，只更新位置
-  if(trackedRiderMarker){
-
-    try{
-
-      if(
-        typeof trackedRiderMarker.setPosition ===
-        'function'
-      ){
-
-        trackedRiderMarker.setPosition(
-          safePosition
-        );
-
-      }else{
-
-        trackedRiderMarker.position =
-          safePosition;
-
-      }
-
-      console.log(
-        '🛵 客人地圖已更新小U位置',
-        safePosition
-      );
-
-      return;
-
-    }catch(err){
-
-      console.warn(
-        '更新小U Marker 失敗，重新建立:',
-        err
-      );
-
-      clearTrackedRiderMarker();
-    }
-  }
-
-
-  // 優先使用 Advanced Marker
-  if(
-    googleMapsMapId &&
-    googleMapsLibraries
-      ?.marker
-      ?.AdvancedMarkerElement
-  ){
-
-    trackedRiderMarker =
-      new googleMapsLibraries
-        .marker
-        .AdvancedMarkerElement({
-
-          map:trackingMap,
-
-          position:safePosition,
-
-          title:'你的小U目前位置',
-
-          content:
-            createTrackedRiderMarkerContent()
-
-        });
-
-    console.log(
-      '✅ 已建立小U Advanced Marker',
-      safePosition
-    );
-
-    return;
-  }
-
-
-  // 一般 Google Marker 相容模式
-  if(
-    window.google
-      ?.maps
-      ?.Marker
-  ){
-
-    trackedRiderMarker =
-      new google.maps.Marker({
-
-        map:trackingMap,
-
-        position:safePosition,
-
-        title:'你的小U目前位置',
-
-        zIndex:999,
-
-        label:{
-          text:'U',
-          color:'#111111',
-          fontSize:'15px',
-          fontWeight:'900'
-        },
-
-        icon:{
-          path:
-            google.maps
-              .SymbolPath
-              .CIRCLE,
-
-          scale:19,
-
-          fillColor:'#facc15',
-          fillOpacity:1,
-
-          strokeColor:'#111111',
-          strokeWeight:4
-        }
-
-      });
-
-    console.log(
-      '✅ 已建立小U一般 Marker',
-      safePosition
-    );
-  }
-}
+// Rider position is retained for textual ETA/status, not rendered on a map.
+function updateTrackedRiderMarker(_position){}
 
 function stopTrackedRiderListener(){
 
@@ -15745,60 +14974,6 @@ const activeTrackingStatuses = [
     stopTrackedRiderListener();
 
   }
-
-
-  /*
-   * 不論是否已有小U，
-   * Step 5 地圖都必須初始化。
-   */
-
-  requestAnimationFrame(() => {
-
-    ensureTrackingMapReady()
-
-      .then(() => {
-
-        if(
-          window.google?.maps?.event &&
-          trackingMap
-        ){
-
-          google.maps.event.trigger(
-            trackingMap,
-            'resize'
-          );
-
-        }
-
-
-        /*
-         * 尚未有小U接單：
-         * 顯示取件點 → 送達點。
-         */
-
-        if(
-          !shouldTrackRider &&
-          lastRouteData
-        ){
-
-          renderRouteOnTrackingMap(
-            lastRouteData
-          );
-
-        }
-
-      })
-
-      .catch(err => {
-
-        console.warn(
-          '❌ Step 5 追蹤地圖初始化失敗:',
-          err
-        );
-
-      });
-
-  });
 
 
   /*
@@ -17121,7 +16296,7 @@ async function initPage(options = {}){
     const authResponse=await fetch('/api/customer-auth/me',{credentials:'include',cache:'no-store',headers:{Accept:'application/json'}});
     const authData=await authResponse.json().catch(()=>({}));
     if(authResponse.ok&&authData.authenticated&&authData.customer?.customerId){currentCustomer=authData.customer;userId=String(currentCustomer.customerId||'');window.__ubeeCurrentCustomer=currentCustomer}else{window.__ubeeCurrentCustomer=null}
-    const configResponse=await fetch('/api/config',{cache:'no-store',credentials:'include'});const cfg=await configResponse.json().catch(()=>({}));if(!configResponse.ok)throw new Error(cfg.message||'無法載入 UBee 設定。');googleMapsApiKey=String(cfg.googleMapsApiKey||'').trim();googleMapsMapId=String(cfg.googleMapsMapId||'').trim();
+
     window.UBeeCustomerAuthHost?.hide();setSubmitButton('確認並建立任務',false);handleInitialOpenAction();
     ensureCustomerInitialLocationGate();startHomeServiceStatusRefresh();customerPageInitialized=true;return true;
   }catch(error){console.error('UBee 用戶端初始化失敗：',error);setSubmitButton('系統暫時無法連線',true);showUBeeCustomerNativeAlert?.(error.message||'UBee 暫時無法連線，請稍後再試。');return false}
@@ -17619,8 +16794,8 @@ bindOrderInputEvents();
 
 updateStickyEstimate();
 
-// Location Bootstrap V3.3：不等會員／Google Maps 初始化，DOM 一完成就先向裝置取得位置。
-// 地圖本身仍由 ensureCustomerMapReady() 建立，而且會等待同一個 location gate，
+// Location Bootstrap V3.3：不等會員初始化，DOM 一完成就先向裝置取得位置。
+// 定位會等待共用 location gate，
 // 因此第一個真正顯示的地圖中心只能是目前位置，或定位明確失敗後的手動服務區。
 function bootstrapCustomerLocationImmediately(){
   try{
@@ -20115,28 +19290,38 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if($('flowDetailPhoneLabel'))$('flowDetailPhoneLabel').innerHTML=optionalSecond?'聯絡電話（選填）':'聯絡電話 <span class="flow-required">＊</span>';
     $('flowDetailName').placeholder=optionalSecond?'第二點收件人，可留空':'取件聯絡人或收件人';
     $('flowDetailPhone').placeholder=optionalSecond?'可留空，未填則沿用送達點 1':'09xxxxxxxx';
-    $('flowSaveAddress').checked=false;status('flowDetailStatus','');showPage('detail');setTimeout(()=>renderDetailMap(merged),80);
+    $('flowSaveAddress').checked=false;status('flowDetailStatus','');showPage('detail');
   }
 
-  async function ensureMaps(){
-    if(typeof loadGoogleMapsApi==='function')return await loadGoogleMapsApi();
-    if(window.google?.maps){if(typeof loadGoogleMapsLibraries==='function')return await loadGoogleMapsLibraries();return window.google.maps}
-    throw new Error('Google 地圖尚未完成載入');
-  }
-
+  // Resolve manually edited addresses through existing backend endpoints only.
+  // Never pick a loosely matching suggestion: an incorrect geocode is unsafe for delivery.
   async function geocodeAddress(address){
-    await ensureMaps();
-    const geocoder=new google.maps.Geocoder();
-    const result=await geocoder.geocode({address:String(address||''),region:'TW'});
-    const loc=result?.results?.[0]?.geometry?.location;
-    return loc?{lat:loc.lat(),lng:loc.lng()}:null;
+    const input=String(address||'').trim();
+    if(input.length<6)return null;
+    const normalize=value=>String(value||'').replace(/[\s,，、]/g,'').toLowerCase();
+    try{
+      const search=await fetch('/api/address/search',{
+        method:'POST',credentials:'include',cache:'no-store',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({input})
+      });
+      if(!search.ok)return null;
+      const result=await search.json().catch(()=>({}));
+      const exact=(Array.isArray(result.predictions)?result.predictions:[]).find(item=>
+        normalize(item.description)===normalize(input)&&item.placeId
+      );
+      if(!exact)return null;
+      const detail=await fetch('/api/address/detail',{
+        method:'POST',credentials:'include',cache:'no-store',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({placeId:exact.placeId})
+      });
+      if(!detail.ok)return null;
+      const payload=await detail.json().catch(()=>({}));
+      const lat=Number(payload.address?.lat),lng=Number(payload.address?.lng);
+      return Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180?{lat,lng}:null;
+    }catch(_){return null}
   }
-
-  async function renderDetailMap(item){
-  // Customer No-Map V1.4：地址明細不再建立地圖預覽。
-  // 座標缺失時仍由既有 Geocode / Places 流程補齊。
-  return item || null;
-}
 
   async function saveDetail(){
     const base=state.selectedAddress||{};
@@ -20443,8 +19628,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           typeLabel:String(store.typeLabel||'').trim(),
           address:String(store.address||'').trim(),
           phone:String(store.phone||'').trim(),
-          source:String(store.source||'').toLowerCase()==='local'?'ubee_local_catalog':'google_places',
-          sourceLabel:String(store.source||'').toLowerCase()==='local'?'UBee 本地店家目錄':'Google Maps 公開店家資訊'
+          source:String(store.source||'').toLowerCase()==='local'?'ubee_local_catalog':'ubee_local_catalog',
+          sourceLabel:String(store.source||'').toLowerCase()==='local'?'UBee 本地店家目錄':'UBee 本地店家目錄'
         }:null;
         const purchase=state.service==='buy'
           ? normalizePurchaseDetails(state.purchaseDetails)
@@ -21625,7 +20810,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-rc3-2-hf3-single-service-flow';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-5-clean-rc1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26151,43 +25336,12 @@ body.ubee-store-active #productionOrderFlow{
 }
 
 
-/* =====================================================
-   UBee 店家探索 V2：本地目錄優先、按需搜尋 Google、統一底部圖示
-   ===================================================== */
-#productionOrderFlow .ubee-store-source-note,
-#productionOrderFlow .ubee-store-google-attribution{
+/* UBee 店家探索：使用本地店家目錄 */
+#productionOrderFlow .ubee-store-source-note{
   font-size:14px!important;
   line-height:1.65;
-}
-#productionOrderFlow .ubee-store-google-attribution{
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  justify-content:center;
-  gap:5px;
-  margin:14px 2px 0;
+  margin-top:12px;
   color:#74787d;
-  font-weight:800;
-  text-align:center;
-}
-#productionOrderFlow .ubee-store-google-attribution a{
-  color:#3c4043;
-  font-weight:1000;
-  text-decoration:none;
-}
-#productionOrderFlow .ubee-store-google-wordmark{
-  display:inline-flex;
-  align-items:center;
-  min-height:20px;
-  padding:2px 7px;
-  border:1px solid #dadce0;
-  border-radius:5px;
-  background:#fff;
-  color:#3c4043;
-  font-family:Roboto,Arial,sans-serif;
-  font-size:14px;
-  font-weight:600;
-  letter-spacing:0;
 }
 #productionOrderFlow .ubee-store-photo-credit{
   display:flex;
@@ -26222,12 +25376,7 @@ body.ubee-store-active #productionOrderFlow{
 }
 #productionOrderFlow .ubee-store-list-head select option[value="open"]{display:none;}
 
-#productionOrderFlow .ubee-store-source-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 14px;padding:12px;border:1px solid #e5e7e9;border-radius:16px;background:#fff;}
-#productionOrderFlow .ubee-store-source-actions span{color:#74787d;font-size:13px;font-weight:800;line-height:1.5;text-align:right;}
-#productionOrderFlow .ubee-store-google-search-btn{flex:0 0 auto;min-height:40px;padding:0 14px;border:1px solid #111;border-radius:999px;background:#111;color:#fff;font-size:14px!important;font-weight:1000;}
 #productionOrderFlow .ubee-store-source-chip{display:inline-flex;align-items:center;min-height:22px;padding:3px 8px;border-radius:999px;background:#f1f2f3;color:#62676d;font-size:13px;font-weight:1000;}
-#productionOrderFlow .ubee-store-source-chip.google{background:#eef4ff;color:#315d9b;}
-@media(max-width:390px){#productionOrderFlow .ubee-store-source-actions{align-items:stretch;flex-direction:column;}#productionOrderFlow .ubee-store-source-actions span{text-align:left;}}
 </style>
 <script id="ubee-store-discovery-v2">
 (() => {
@@ -26247,20 +25396,12 @@ body.ubee-store-active #productionOrderFlow{
   const storeState={
     category:'all',query:'',area:'',lat:null,lng:null,locationLabel:'',
     stores:[],selectedStore:null,loading:false,initialized:false,sort:'distance',
-    searchTimer:null,requestId:0,requestController:null,localCatalog:[],googleStores:[],sourceMode:'local',catalogLoaded:false
+    searchTimer:null,localCatalog:[],catalogLoaded:false
   };
   const storeCache=new Map();
   const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
   }[ch]));
-
-  function googleAttributionMarkup(extra='',providers=[]){
-    const providerRows=Array.isArray(providers)?providers:[];
-    const providerMarkup=providerRows.length
-      ? `<span>資料提供者：${providerRows.map(item=>item?.providerUri?`<a href="${escape(item.providerUri)}" target="_blank" rel="noopener">${escape(item.provider||'資料來源')}</a>`:escape(item?.provider||'資料來源')).join('、')}</span>`
-      : '';
-    return `<div class="ubee-store-google-attribution"><a class="ubee-store-google-wordmark" href="https://www.google.com/maps" target="_blank" rel="noopener">Google Maps</a><span>${escape(extra||'提供公開店家資料')}；一般搜尋結果不代表店家與 UBee 存在合作關係。</span>${providerMarkup}</div>`;
-  }
 
   function createPages(){
     if($('flowPageStores')) return;
@@ -26301,9 +25442,7 @@ body.ubee-store-active #productionOrderFlow{
             <option value="recommended">推薦排序</option>
           </select>
         </div>
-        <div class="ubee-store-source-actions"><button class="ubee-store-google-search-btn" id="ubeeStoreGoogleSearchButton" type="button">搜尋更多附近店家</button><span>只有按下此按鈕才會使用 Google 店家搜尋。</span></div>
         <div class="ubee-store-list" id="ubeeStoreList"><div class="ubee-store-loading">正在載入 UBee 本地店家目錄…</div></div>
-        <div id="ubeeStoreGoogleAttribution" hidden>${googleAttributionMarkup('提供 Google 即時搜尋結果')}</div>
       </div>
       <div class="ubee-store-permission-modal" id="ubeeStorePermissionModal" hidden>
         <div class="ubee-store-permission-dialog" role="dialog" aria-modal="true" aria-labelledby="ubeeStorePermissionTitle">
@@ -26379,7 +25518,7 @@ body.ubee-store-active #productionOrderFlow{
       distanceMeters:distance,distanceText:distanceText(distance),photoUrl:String(raw?.coverImage||raw?.image||''),customCoverUrl:String(raw?.coverImage||raw?.image||''),
       description:String(raw?.description||'此店家已收錄於 UBee 本地店家目錄，可直接委託小U前往代買。'),
       weekdayDescriptions:Array.isArray(raw?.businessHours)?raw.businessHours:[],purchaseNotes:Array.isArray(raw?.purchaseNotes)?raw.purchaseNotes:['商品依店內實際售價。','請在任務內容填寫品項、數量、規格與缺貨處理方式。'],
-      googleMapsUri:String(raw?.googleMapsUri||''),openNow:typeof raw?.openNow==='boolean'?raw.openNow:null,openStatusLabel:String(raw?.openStatusLabel||'營業狀態請確認'),
+      openNow:typeof raw?.openNow==='boolean'?raw.openNow:null,openStatusLabel:String(raw?.openStatusLabel||'營業狀態請確認'),
       canRequestPurchase:raw?.purchaseEnabled!==false,purchaseLabel:raw?.purchaseEnabled===false?'目前不提供代買':'可委託小U前往代買',
       isFeatured:raw?.featured===true,isSponsored:raw?.sponsored===true,isPartnerStore:raw?.partner===true,sortWeight:Number(raw?.sortWeight||0),photos:[]
     };
@@ -26413,15 +25552,13 @@ body.ubee-store-active #productionOrderFlow{
     }catch(error){
       storeState.localCatalog=[];storeState.catalogLoaded=true;storeState.stores=[];
       $('ubeeStoreResultMeta').textContent='本地目錄尚未建立';
-      $('ubeeStoreList').innerHTML=`<div class="ubee-store-error">${escape(error.message||'本地店家目錄暫時無法讀取。')}<br>仍可按「搜尋更多附近店家」使用即時搜尋。</div>`;
+      $('ubeeStoreList').innerHTML=`<div class="ubee-store-error">${escape(error.message||'本地店家目錄暫時無法讀取。')}，仍可從首頁直接建立代買任務。</div>`;
     }finally{storeState.loading=false;renderStores();}
   }
 
   function applyLocalFilters(){
-    storeState.sourceMode='local';
     storeState.stores=storeState.localCatalog.map(normalizeLocalStore).filter(localStoreMatches);
-    $('ubeeStoreResultMeta').textContent=`本地目錄 ${storeState.stores.length} 家・不使用 Google API`;
-    $('ubeeStoreGoogleAttribution').hidden=true;
+    $('ubeeStoreResultMeta').textContent=`本地目錄 ${storeState.stores.length} 家`;
     renderStores();
   }
 
@@ -26444,7 +25581,7 @@ body.ubee-store-active #productionOrderFlow{
     if(storeState.loading){list.innerHTML='<div class="ubee-store-loading">正在載入店家資料…</div>';return;}
     const stores=getSortedStores();
     if(!stores.length){
-      list.innerHTML=`<div class="ubee-store-empty">${storeState.sourceMode==='local'?'本地目錄目前沒有符合條件的店家。<br>可更換分類，或按「搜尋更多附近店家」。':'Google 即時搜尋目前沒有符合條件的店家。'}</div>`;return;
+      list.innerHTML='<div class="ubee-store-empty">本地目錄目前沒有符合條件的店家，請更換分類或搜尋地區。</div>';return;
     }
     list.innerHTML=stores.map(store=>{
       storeCache.set(store.placeId,store);
@@ -26453,7 +25590,7 @@ body.ubee-store-active #productionOrderFlow{
       const mediaMarkup=photoMarkup?`<div class="ubee-store-card-media">${photoMarkup}${badges?`<div class="ubee-store-badges">${badges}</div>`:''}</div>`:'';
       const inlineBadges=!photoMarkup&&badges?`<div class="ubee-store-card-badges-inline">${badges}</div>`:'';
       const distance=store.distanceText?`・距離 ${escape(store.distanceText)}`:'';
-      const sourceLabel=store.source==='google'?'<span class="ubee-store-source-chip google">Google 即時</span>':'<span class="ubee-store-source-chip">UBee 目錄</span>';
+      const sourceLabel='<span class="ubee-store-source-chip">UBee 目錄</span>';
       return `<article class="ubee-store-card" data-store-id="${escape(store.placeId)}">${mediaMarkup}<div class="ubee-store-card-body">${inlineBadges}<div class="ubee-store-card-title-row"><div class="ubee-store-card-title"><strong>${escape(store.name)}</strong><span>${escape(store.typeLabel||store.categoryLabel||'店家')}${distance}</span></div><span class="ubee-store-open-state ${store.openNow===true?'':'closed'}">${escape(store.openStatusLabel||'營業狀態請確認')}</span></div><div style="margin:6px 0">${sourceLabel}</div><div class="ubee-store-address">${escape(store.address||'地址請確認')}</div><div class="ubee-store-purchase-note">商品依店內實際售價・${escape(store.purchaseLabel||'可委託小U前往代買')}</div><div class="ubee-store-card-actions"><button class="ubee-store-view-btn" type="button" data-store-view="${escape(store.placeId)}">查看店家</button><button class="ubee-store-buy-btn" type="button" data-store-buy="${escape(store.placeId)}" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button></div></div></article>`;
     }).join('');
   }
@@ -26472,29 +25609,6 @@ body.ubee-store-active #productionOrderFlow{
     applyLocalFilters();
   }
 
-  async function loadGoogleStores(){
-    const hasLocation=Number.isFinite(Number(storeState.lat))&&Number.isFinite(Number(storeState.lng));
-    if(!hasLocation&&!storeState.area){setLocationDisplay('請先開啟定位或輸入地區','Google 即時搜尋需要位置或地區條件。',true);return;}
-    if(storeState.requestController)storeState.requestController.abort();
-    const controller=new AbortController();storeState.requestController=controller;const requestId=++storeState.requestId;
-    storeState.loading=true;storeState.sourceMode='google';renderStores();$('ubeeStoreResultMeta').textContent='正在搜尋 Google 即時店家…';
-    try{
-      const params=new URLSearchParams({category:storeState.category,query:storeState.query,area:storeState.area,limit:'20',radius:'6000'});
-      if(hasLocation){params.set('lat',String(storeState.lat));params.set('lng',String(storeState.lng));}
-      const response=await fetch(`/api/customer/stores?${params.toString()}`,{credentials:'include',cache:'no-store',signal:controller.signal});
-      const data=await response.json().catch(()=>({}));
-      if(requestId!==storeState.requestId)return;
-      if(!response.ok||!data.success)throw new Error(data.message||'Google 店家搜尋失敗');
-      storeState.googleStores=(Array.isArray(data.stores)?data.stores:[]).map(item=>({...item,source:'google'}));storeState.stores=storeState.googleStores;
-      $('ubeeStoreResultMeta').textContent=`Google 即時搜尋 ${storeState.stores.length} 家`;
-      $('ubeeStoreGoogleAttribution').hidden=false;
-    }catch(error){
-      if(error?.name==='AbortError')return;
-      storeState.stores=[];$('ubeeStoreResultMeta').textContent='Google 搜尋失敗';
-      $('ubeeStoreList').innerHTML=`<div class="ubee-store-error">${escape(error.message||'Google 即時店家暫時無法搜尋。')}</div>`;
-    }finally{if(requestId===storeState.requestId){storeState.loading=false;storeState.requestController=null;renderStores();}}
-  }
-
   function requestLocation(){
     if(!navigator.geolocation){
       setLocationDisplay('此裝置不支援定位','請手動輸入縣市或行政區搜尋店家。',true);
@@ -26508,7 +25622,7 @@ body.ubee-store-active #productionOrderFlow{
       try{sessionStorage.setItem('ubee_store_location_v2',JSON.stringify({lat:storeState.lat,lng:storeState.lng,savedAt:Date.now()}));}catch(_){ }
       const label=await reverseLocationLabel(storeState.lat,storeState.lng);
       storeState.locationLabel=label;
-      setLocationDisplay(`目前位置：${label}`,'距離由手機直接計算，不使用 Google 路線 API。',false);
+      setLocationDisplay(`目前位置：${label}`,'附近距離為直線估算，實際路程可能不同。',false);
       $('ubeeStoreLocationButton').textContent='重新定位';
       loadStores();
     },error=>{
@@ -26535,7 +25649,7 @@ body.ubee-store-active #productionOrderFlow{
         storeState.lat=Number(saved.lat);storeState.lng=Number(saved.lng);
         const label=await reverseLocationLabel(storeState.lat,storeState.lng);
         storeState.locationLabel=label;
-        setLocationDisplay(`目前位置：${label}`,'距離由手機直接計算，不使用 Google 路線 API。',false);
+        setLocationDisplay(`目前位置：${label}`,'附近距離為直線估算，實際路程可能不同。',false);
         $('ubeeStoreLocationButton').textContent='重新定位';
         loadStores();
         return;
@@ -26563,24 +25677,11 @@ body.ubee-store-active #productionOrderFlow{
   }
 
   async function openStoreDetail(placeId){
-    const basic=storeCache.get(placeId)||storeState.stores.find(item=>item.placeId===placeId)||null;
-    storeState.selectedStore=basic;
+    const store=storeCache.get(placeId)||storeState.stores.find(item=>item.placeId===placeId);
+    if(!store){showUBeeCustomerNativeAlert('找不到此店家，請返回列表重新選擇。');return;}
+    storeState.selectedStore=store;
     activateStorePage('storeDetail');
-    if(basic?.source==='local'||String(placeId).startsWith('local:')){renderStoreDetail(basic);return;}
-    $('ubeeStoreDetailContent').innerHTML='<div class="ubee-store-loading">店家資訊載入中…</div>';
-    try{
-      const params=new URLSearchParams({category:storeState.category});
-      if(Number.isFinite(Number(storeState.lat))&&Number.isFinite(Number(storeState.lng))){params.set('lat',String(storeState.lat));params.set('lng',String(storeState.lng));}
-      const response=await fetch(`/api/customer/stores/${encodeURIComponent(placeId)}?${params.toString()}`,{credentials:'include',cache:'no-store'});
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok||!data.success)throw new Error(data.message||'店家資訊讀取失敗');
-      storeState.selectedStore={...(basic||{}),...(data.store||{})};
-      storeCache.set(placeId,storeState.selectedStore);
-      renderStoreDetail(storeState.selectedStore);
-    }catch(error){
-      $('ubeeStoreDetailContent').innerHTML=`<div class="ubee-store-error">${escape(error.message||'店家資訊暫時無法讀取。')}<br><button class="ubee-store-view-btn" id="ubeeStoreDetailRetry" type="button" style="margin-top:12px;min-height:42px;padding:8px 14px">重新載入</button></div>`;
-      $('ubeeStoreDetailRetry')?.addEventListener('click',()=>openStoreDetail(placeId));
-    }
+    renderStoreDetail(store);
   }
 
   function renderPhotoAttribution(photo){
@@ -26592,38 +25693,37 @@ body.ubee-store-active #productionOrderFlow{
       const author=item.uri?`<a href="${escape(item.uri)}" target="_blank" rel="noopener">${name}</a>`:`<span>${name}</span>`;
       return `${avatar}${author}`;
     }).join('');
-    const source=photo.googleMapsUri?`<a href="${escape(photo.googleMapsUri)}" target="_blank" rel="noopener">在 Google Maps 查看照片</a>`:'';
+    const source='';
     const report=photo.flagContentUri?`<a href="${escape(photo.flagContentUri)}" target="_blank" rel="noopener">回報照片</a>`:'';
     if(!authors&&!source&&!report)return'';
     return `<div class="ubee-store-photo-credit">${authors}${source}${report}</div>`;
   }
 
   function renderStoreDetail(store){
-    const photos=Array.isArray(store.photos)&&store.photos.length?store.photos:(store.photoUrl?[{url:store.photoUrl,authorAttributions:store.photo?.authorAttributions||[],googleMapsUri:store.photo?.googleMapsUri||'',flagContentUri:store.photo?.flagContentUri||''}]:[]);
-    const googleHeroPhoto=!store.customCoverUrl?photos[0]:null;
+    const photos=Array.isArray(store.photos)&&store.photos.length?store.photos:(store.photoUrl?[{url:store.photoUrl,authorAttributions:store.photo?.authorAttributions||[]}]:[]);
+    const firstStorePhoto=!store.customCoverUrl?photos[0]:null;
     const hero=store.photoUrl?`<div class="ubee-store-detail-hero"><img src="${escape(store.photoUrl)}" alt="${escape(store.name)}店家封面" referrerpolicy="no-referrer" onerror="this.closest('.ubee-store-detail-hero')?.remove()"/></div>`:'';
     const hours=Array.isArray(store.weekdayDescriptions)&&store.weekdayDescriptions.length
       ? store.weekdayDescriptions.map(item=>`<li>${escape(item)}</li>`).join('')
-      : '<li>營業時間請向店家或 Google Maps 確認。</li>';
+      : '<li>營業時間請向店家確認。</li>';
     const gallery=photos.length?`<div class="ubee-store-gallery">${photos.map(photo=>`<figure><img src="${escape(photo.url)}" alt="${escape(store.name)}照片" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()"/><figcaption>${renderPhotoAttribution(photo)}</figcaption></figure>`).join('')}</div>`:'<p>目前沒有可顯示的店家照片。</p>';
     $('ubeeStoreDetailContent').innerHTML=`
       ${hero}
-      ${hero&&googleHeroPhoto&&renderPhotoAttribution(googleHeroPhoto)?`<div class="ubee-store-hero-credit">${renderPhotoAttribution(googleHeroPhoto)}</div>`:''}
+      ${hero&&firstStorePhoto&&renderPhotoAttribution(firstStorePhoto)?`<div class="ubee-store-hero-credit">${renderPhotoAttribution(firstStorePhoto)}</div>`:''}
       <section class="ubee-store-detail-card">
         <div class="ubee-store-detail-title-row"><div><h2>${escape(store.name)}</h2><div class="ubee-store-detail-meta">${escape(store.typeLabel||store.categoryLabel||'店家')}${store.distanceText?`・距離 ${escape(store.distanceText)}`:''}</div></div><span class="ubee-store-open-state ${store.openNow===true?'':'closed'}">${escape(store.openStatusLabel||'營業狀態請確認')}</span></div>
         <div class="ubee-store-purchase-note">商品依店內實際售價・可委託小U前往代買</div>
       </section>
       <section class="ubee-store-detail-section"><h3>店家資訊</h3>
-        <div class="ubee-store-info-row"><span>地址</span><strong>${escape(store.address||'請至 Google Maps 確認')}</strong></div>
+        <div class="ubee-store-info-row"><span>地址</span><strong>${escape(store.address||'請向店家確認')}</strong></div>
         <div class="ubee-store-info-row"><span>電話</span><strong>${escape(store.phone||'未提供')}</strong></div>
-        <div class="ubee-store-info-row"><span>導航</span>${store.googleMapsUri?`<a href="${escape(store.googleMapsUri)}" target="_blank" rel="noopener">使用 Google Maps 導航</a>`:'<strong>暫無導航連結</strong>'}</div>
       </section>
       <section class="ubee-store-detail-section"><h3>營業時間</h3><ul>${hours}</ul></section>
       <section class="ubee-store-detail-section"><h3>店家介紹</h3><p>${escape(store.description||'此頁提供公開店家資訊，客人可直接委託小U前往代買。')}</p></section>
       <section class="ubee-store-detail-section"><h3>商品與店家照片</h3>${gallery}</section>
       <section class="ubee-store-detail-section"><h3>代買注意事項</h3><ul>${(Array.isArray(store.purchaseNotes)?store.purchaseNotes:[]).map(item=>`<li>${escape(item)}</li>`).join('')}</ul></section>
       <div class="ubee-store-detail-actions"><button class="ubee-store-detail-buy" id="ubeeStoreDetailBuy" type="button" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button></div>
-      ${store.source==='google'?googleAttributionMarkup('提供本頁店家與照片資料',store.attributions):'<div class="ubee-store-google-attribution"><span>資料來源：UBee 本地店家目錄</span></div>'}`;
+      <div class="ubee-store-source-note">資料來源：UBee 本地店家目錄</div>`;
     $('ubeeStoreDetailBuy')?.addEventListener('click',()=>startPurchase(store));
   }
 
@@ -26643,14 +25743,13 @@ body.ubee-store-active #productionOrderFlow{
   $('ubeeStorePermissionCancel')?.addEventListener('click',()=>{$('ubeeStorePermissionModal').hidden=true;setLocationDisplay('尚未開啟定位','仍可手動輸入縣市或行政區搜尋店家。',true);});
   $('ubeeStorePermissionAllow')?.addEventListener('click',()=>{$('ubeeStorePermissionModal').hidden=true;requestLocation();});
   $('ubeeStorePermissionModal')?.addEventListener('click',event=>{if(event.target===$('ubeeStorePermissionModal'))$('ubeeStorePermissionModal').hidden=true;});
-  $('ubeeStoreAreaButton')?.addEventListener('click',()=>{storeState.area=String($('ubeeStoreAreaInput')?.value||'').trim();if(!storeState.area){$('ubeeStoreAreaInput')?.focus();return;}storeState.lat=null;storeState.lng=null;setLocationDisplay(`篩選地區：${storeState.area}`,'正在篩選 UBee 本地店家目錄；不呼叫 Google API。',true);applyLocalFilters();});
+  $('ubeeStoreAreaButton')?.addEventListener('click',()=>{storeState.area=String($('ubeeStoreAreaInput')?.value||'').trim();if(!storeState.area){$('ubeeStoreAreaInput')?.focus();return;}storeState.lat=null;storeState.lng=null;setLocationDisplay(`篩選地區：${storeState.area}`,'正在篩選 UBee 本地店家目錄。',true);applyLocalFilters();});
   $('ubeeStoreAreaInput')?.addEventListener('keydown',event=>{if(event.key==='Enter')$('ubeeStoreAreaButton')?.click();});
   $('ubeeStoreSearchButton')?.addEventListener('click',()=>{clearTimeout(storeState.searchTimer);storeState.query=String($('ubeeStoreSearchInput')?.value||'').trim();applyLocalFilters();});
   $('ubeeStoreSearchInput')?.addEventListener('input',event=>{storeState.query=String(event.target.value||'').trim();clearTimeout(storeState.searchTimer);storeState.searchTimer=setTimeout(()=>applyLocalFilters(),250);});
   $('ubeeStoreSearchInput')?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('ubeeStoreSearchButton')?.click();}});
   $('ubeeStoreCategories')?.addEventListener('click',event=>{const button=event.target.closest('[data-store-category]');if(!button)return;storeState.category=button.dataset.storeCategory||'all';renderCategories();applyLocalFilters();});
   $('ubeeStoreSort')?.addEventListener('change',event=>{storeState.sort=event.target.value||'distance';renderStores();});
-  $('ubeeStoreGoogleSearchButton')?.addEventListener('click',loadGoogleStores);
   $('ubeeStoreList')?.addEventListener('click',event=>{const view=event.target.closest('[data-store-view]');if(view){openStoreDetail(view.dataset.storeView);return;}const buy=event.target.closest('[data-store-buy]');if(buy){startPurchase(storeCache.get(buy.dataset.storeBuy));}});
   $('ubeeStoreDetailBack')?.addEventListener('click',openStoreList);
   window.openUBeeStorePage=openStoreList;
