@@ -1,7 +1,7 @@
 /* ============================================================
- * UBee 跑腿｜客戶端 Service Worker｜Native Member Experience TC V1.6 RC1.1 2026-11-02
+ * UBee 跑腿｜客戶端 Service Worker｜Native Member Experience TC V1.6 RC1.2 2026-11-02
  * Release: Member Security V1 (optional register + password + LINE recovery) + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261102-customer-tc-v1-6-native-member-rc1-1
+ * Version: 20261102-customer-tc-v1-6-native-member-rc1-2
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；訂單／通知／U幣仍維持內部深層連結）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261102-customer-tc-v1-6-native-member-rc1-1';
+const UBEE_CUSTOMER_SW_VERSION = '20261102-customer-tc-v1-6-native-member-rc1-2';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
