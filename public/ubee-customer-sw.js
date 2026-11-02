@@ -1,7 +1,7 @@
 /* ============================================================
- * UBee 跑腿｜客戶端 Service Worker｜Native Service Home RC3.2-HF1 2026-11-02
+ * UBee 跑腿｜客戶端 Service Worker｜Single Service Flow RC3.2-HF3 2026-11-02
  * Release: Member Security V1 (optional register + password + LINE recovery) + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261102-customer-rc3-2-hf2-service-first
+ * Version: 20261102-customer-rc3-2-hf3-single-service-flow
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；訂單／通知／U幣仍維持內部深層連結）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261102-customer-rc3-2-hf2-service-first';
+const UBEE_CUSTOMER_SW_VERSION = '20261102-customer-rc3-2-hf3-single-service-flow';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
@@ -50,29 +50,8 @@ function isUBeeCustomerClientUrl(clientUrl) {
  * 這些路徑包含登入 Session、會員資料、實名狀態、訂單與即時資訊。
  * 永遠不得由 Service Worker Cache 回傳。
  */
-const NETWORK_ONLY_PATH_PREFIXES = [
-  '/api/',
-  '/api/customer-auth/',
-  '/api/customer-identity/',
-  '/api/customer/',
-  '/api/orders',
-  '/api/order',
-  '/api/quote'
-];
-
 function isSameOrigin(url) {
   return url.origin === self.location.origin;
-}
-
-function isNetworkOnlyRequest(request, url) {
-  if (!isSameOrigin(url)) return false;
-
-  if (request.method !== 'GET') return true;
-
-  return NETWORK_ONLY_PATH_PREFIXES.some(prefix =>
-    url.pathname === prefix ||
-    url.pathname.startsWith(prefix)
-  );
 }
 
 function isNavigationRequest(request) {
@@ -106,14 +85,6 @@ async function putResponse(cacheName, request, response) {
   } catch (error) {
     console.warn('UBee Customer SW cache put failed:', error);
   }
-}
-
-async function networkOnly(request) {
-  /*
-   * API 不經 Service Worker Cache。
-   * 後端實名 API 同時已使用 Cache-Control: no-store。
-   */
-  return fetch(request);
 }
 
 async function networkFirstPage(request) {
