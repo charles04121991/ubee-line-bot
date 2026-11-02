@@ -2,9 +2,9 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee Customer TC V1.6 Native Member Experience RC1.1：精簡帳號與安全頁，移除無效的刪除帳號跳轉入口；保留會員、六大服務、免註冊下單、U幣及訂單追蹤。",
+  "description": "UBee Customer TC V1.6 RC1.2：正式報價不再受路線預覽失敗阻擋；保留會員、六大服務、免註冊下單、自動計價、U幣及訂單追蹤。",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20261102-customer-tc-v1-6-native-member-rc1-1",
+  "start_url": "/order.html?source=pwa&v=20261102-customer-tc-v1-6-native-member-rc1-2",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -37,7 +37,7 @@
       "name": "立即下單",
       "short_name": "下單",
       "description": "先選擇跑腿服務，再建立新的 UBee 任務。",
-      "url": "/order.html?action=new&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-1",
+      "url": "/order.html?action=new&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-2",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png?v=20261016-brand-icons-v3-1",
@@ -50,7 +50,7 @@
       "name": "我的訂單",
       "short_name": "訂單",
       "description": "查看進行中與歷史訂單。",
-      "url": "/order.html?action=tasks&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-1",
+      "url": "/order.html?action=tasks&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-2",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png?v=20261016-brand-icons-v3-1",
@@ -63,7 +63,7 @@
       "name": "我的U幣",
       "short_name": "U幣",
       "description": "查看 U幣餘額、簽到與明細。",
-      "url": "/order.html?action=ucoin&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-1",
+      "url": "/order.html?action=ucoin&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-2",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png?v=20261016-brand-icons-v3-1",
@@ -76,7 +76,7 @@
       "name": "我的",
       "short_name": "我的",
       "description": "開啟個人中心與設定。",
-      "url": "/order.html?action=my&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-1",
+      "url": "/order.html?action=my&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-2",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png?v=20261016-brand-icons-v3-1",
