@@ -32459,40 +32459,48 @@ function safeText(value, fallback = '無') {
   return text || fallback;
 }
 
-// UBee Geo V1: replace legacy Google Distance Matrix; no Google fallback.
-// GEO_SERVICE_URL must be an HTTPS private service endpoint accepting POST /route
-// with {origin,destination,profile:"motorcycle"} and returning {distanceMeters,durationSeconds}.
 async function getDistanceMatrix(origin, destination) {
   const originText = String(origin || '').trim();
   const destinationText = String(destination || '').trim();
-  if (!originText || !destinationText) throw new Error('道路計算需要完整起訖地址');
-  const base = String(process.env.UBEE_GEO_SERVICE_URL || '').trim().replace(/\/$/, '');
-  const token = String(process.env.UBEE_GEO_SERVICE_TOKEN || '').trim();
-  if (!base || !token || !/^https:\/\/[^?#]+$/i.test(base)) {
-    throw new Error('UBee 非 Google 道路服務尚未設定，暫停自動報價');
+
+  const isLatLngOrigin = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(originText);
+
+  const cleanOrigin = isLatLngOrigin
+  ? originText
+  : normalizeTaskAddressForMaps(originText);
+
+  const cleanDestination = normalizeTaskAddressForMaps(destinationText);
+  const url =
+  'https://maps.googleapis.com/maps/api/distancematrix/json' +
+  `?origins=${encodeURIComponent(cleanOrigin)}` +
+  `&destinations=${encodeURIComponent(cleanDestination)}` +
+  `&mode=driving` +
+  `&region=tw` +
+  `&language=zh-TW&units=metric&key=${GOOGLE_MAPS_SERVER_API_KEY}`;
+  
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.status !== 'OK') {
+    throw new Error(`Distance Matrix API 錯誤：${data.status}`);
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(`${base}/route`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':`Bearer ${token}`},
-      body: JSON.stringify({origin:originText,destination:destinationText,profile:'motorcycle'}),
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`UBee 道路服務無法使用 (${response.status})`);
-    const data = await response.json();
-    const meters = Number(data.distanceMeters);
-    const seconds = Number(data.durationSeconds);
-    if (!Number.isFinite(meters) || meters < 0 || !Number.isFinite(seconds) || seconds < 0 || !data.routeValidated) {
-      throw new Error('UBee 道路服務回傳資料未經驗證');
-    }
-    return {distanceMeters:meters,durationSeconds:seconds,distanceText:`${(meters/1000).toFixed(1)} 公里`,durationText:`${Math.ceil(seconds/60)} 分鐘`};
-  } finally { clearTimeout(timer); }
+
+  const element = data.rows?.[0]?.elements?.[0];
+
+  if (!element || element.status !== 'OK') {
+    throw new Error(`距離計算失敗：${element?.status || 'UNKNOWN'}`);
+  }
+
+  return {
+    distanceMeters: element.distance.value,
+    durationSeconds: element.duration.value,
+    distanceText: element.distance.text,
+    durationText: element.duration.text,
+  };
 }
 
 async function getDistanceMatrixCached(origin, destination) {
-  const key = `ubee-geo-v1:${getDistanceCacheKey(origin, destination)}`;
+  const key = getDistanceCacheKey(origin, destination);
   if (distanceCache.has(key)) return distanceCache.get(key);
   const distance = await getDistanceMatrix(origin, destination);
   distanceCache.set(key, distance);
