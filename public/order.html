@@ -1,11 +1,11 @@
-<!-- UBee Customer TC V1.5 — Clean RC4｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
+<!-- UBee Customer TC V1.6 — Native Member Experience RC1｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261102-customer-tc-v1-5-clean-rc4
+  PWA: 20261102-customer-tc-v1-6-native-member-rc1
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -30,7 +30,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261102-customer-tc-v1-5-clean-rc4" rel="manifest"/>
+<link href="/manifest-order.json?v=20261102-customer-tc-v1-6-native-member-rc1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -7233,44 +7233,44 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 </header>
 <div class="uca-scroll">
 <div class="uca-heading">
-<div class="uca-kicker">MEMBER LOGIN</div>
-<h2>既有會員登入</h2>
-<p class="uca-subtitle">已有帳號請登入；新客可免註冊直接下單。</p>
+
+<h2>會員登入</h2>
+
 </div>
 <form class="uca-panel" id="ucaLoginForm" novalidate="">
 <div class="uca-field">
-<div class="uca-label-row"><label class="uca-label" for="ucaLoginPhone">會員手機號碼</label></div>
+<div class="uca-label-row"><label class="uca-label" for="ucaLoginPhone">手機號碼</label></div>
 <input autocomplete="username" class="uca-input" id="ucaLoginPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
 <div class="uca-error" id="ucaLoginPhoneError"></div>
 </div>
 <div class="uca-field">
-<div class="uca-label-row"><label class="uca-label" for="ucaLoginPassword">登入密碼</label><button class="uca-text-btn" data-uca-go="forgot" type="button">忘記密碼</button></div>
+<div class="uca-label-row"><label class="uca-label" for="ucaLoginPassword">密碼</label><button class="uca-text-btn" data-uca-go="forgot" type="button">忘記密碼</button></div>
 <div class="uca-input-wrap"><input autocomplete="current-password" class="uca-input has-action" id="ucaLoginPassword" maxlength="72" placeholder="輸入登入密碼" type="password"/><button class="uca-input-action" data-uca-password="ucaLoginPassword" type="button">顯示</button></div>
 <div class="uca-error" id="ucaLoginPasswordError"></div>
 </div>
 <div class="uca-status" id="ucaLoginStatus"></div>
-<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaLoginSubmit" type="submit">登入 UBee</button><button class="uca-btn uca-btn-secondary" data-uca-go="register" type="button">建立新會員</button><button class="uca-btn uca-btn-secondary" id="ucaContinueOrder" type="button">直接回到下單</button></div>
-<div class="uca-security">首次送單只需建立下單身分，不強制註冊會員。</div>
+<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaLoginSubmit" type="submit">登入</button><button class="uca-btn uca-btn-secondary" data-uca-go="register" type="button">註冊會員</button><button class="uca-btn uca-btn-secondary" id="ucaContinueOrder" type="button">先不登入</button></div>
+
 </form>
 </div>
 </section>
 <section class="uca-view" data-uca-view="register">
 <header class="uca-topbar"><button aria-label="返回登入" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="關閉" class="uca-icon-btn" data-uca-home="" type="button">×</button></header>
-<div class="uca-scroll"><div class="uca-heading"><div class="uca-kicker">MEMBER REGISTRATION</div><h2>建立 UBee 會員</h2><p class="uca-subtitle">註冊非下單必要條件；手機號碼尚未經簡訊驗證。</p></div>
+<div class="uca-scroll"><div class="uca-heading"><h2>註冊會員</h2></div>
 <form class="uca-panel" id="ucaRegisterForm" novalidate>
-<div class="uca-field"><label class="uca-label" for="ucaRegisterName">本人姓名</label><input class="uca-input" id="ucaRegisterName" autocomplete="name" maxlength="40" placeholder="請填寫本人姓名" required></div>
-<div class="uca-field"><label class="uca-label" for="ucaRegisterPhone">聯絡手機號碼</label><input class="uca-input" id="ucaRegisterPhone" inputmode="numeric" type="tel" maxlength="10" autocomplete="tel" placeholder="09xxxxxxxx" required></div>
-<div class="uca-field"><label class="uca-label" for="ucaRegisterPassword">設定登入密碼</label><input class="uca-input" id="ucaRegisterPassword" type="password" maxlength="72" minlength="8" autocomplete="new-password" placeholder="8～72 字元，包含英文字母與數字" required></div>
-<div class="uca-field"><label class="uca-label" for="ucaRegisterPasswordConfirm">再次輸入密碼</label><input class="uca-input" id="ucaRegisterPasswordConfirm" type="password" maxlength="72" autocomplete="new-password" required></div>
-<div class="uca-field"><label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.6"><input style="width:20px;flex:none;min-height:20px;margin-top:3px" type="checkbox" id="ucaRegisterAgree" required><span>我已閱讀並同意 UBee 服務條款、隱私權政策、計價規範與禁止委託事項；也瞭解手機尚未經門號驗證。</span></label></div>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterName">姓名</label><input class="uca-input" id="ucaRegisterName" autocomplete="name" maxlength="40" placeholder="請輸入姓名" required></div>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterPhone">手機號碼</label><input class="uca-input" id="ucaRegisterPhone" inputmode="numeric" type="tel" maxlength="10" autocomplete="tel" placeholder="09xxxxxxxx" required></div>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterPassword">設定密碼</label><div class="uca-input-wrap"><input class="uca-input has-action" id="ucaRegisterPassword" type="password" maxlength="72" minlength="8" autocomplete="new-password" placeholder="至少 8 碼，包含英文字母與數字" required><button class="uca-input-action" data-uca-password="ucaRegisterPassword" type="button" aria-label="顯示或隱藏密碼">顯示</button></div></div>
+<div class="uca-field"><label class="uca-label" for="ucaRegisterPasswordConfirm">確認密碼</label><input class="uca-input" id="ucaRegisterPasswordConfirm" type="password" maxlength="72" autocomplete="new-password" required></div>
+<div class="uca-field"><label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.6"><input style="width:20px;flex:none;min-height:20px;margin-top:3px" type="checkbox" id="ucaRegisterAgree" required><span>我同意服務條款、隱私權政策、計價規範及禁止委託事項，並了解手機尚未驗證。</span></label></div>
 <div class="uca-status" id="ucaRegisterStatus" role="status" aria-live="polite"></div>
-<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaRegisterSubmit" type="submit">建立會員</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">已有會員，返回登入</button><button class="uca-btn uca-btn-secondary" data-uca-home="" type="button">不註冊，繼續下單</button></div>
+<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaRegisterSubmit" type="submit">建立會員</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">已有會員？登入</button><button class="uca-btn uca-btn-secondary" data-uca-home="" type="button">先不註冊</button></div>
 </form></div></section>
 <section class="uca-view" data-uca-view="forgot">
 <header class="uca-topbar"><button aria-label="返回" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="關閉" class="uca-icon-btn" data-uca-home="" type="button">×</button></header>
 <div class="uca-scroll"><div class="uca-heading"><div class="uca-kicker">PASSWORD RESET V3</div><h2>自動重設登入密碼</h2><p class="uca-subtitle">既有會員或首單自動建立身分後需要跨裝置登入時，可透過 UBee LINE Bot 完成身分核對與密碼設定。</p></div>
 <div class="uca-panel"><div class="uca-reset-flow" aria-label="密碼重設流程"><div class="uca-reset-step"><div class="uca-reset-step-no">1</div><div><strong>輸入會員手機號碼</strong><span>輸入 UBee 使用身分綁定的 09 開頭手機號碼。</span></div></div><div class="uca-reset-step"><div class="uca-reset-step-no">2</div><div><strong>前往 UBee LINE 官方帳號</strong><span>系統會先複製「忘記密碼＋手機號碼」指令；進入 LINE 後貼上並送出即可。</span></div></div><div class="uca-reset-step"><div class="uca-reset-step-no">3</div><div><strong>LINE Bot 自動核對並發連結</strong><span>核對成功後會收到 15 分鐘一次性連結。</span></div></div></div>
-<div class="uca-field"><div class="uca-label-row"><label class="uca-label" for="ucaForgotPhone">會員手機號碼</label><span class="uca-optional">必填</span></div><input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/><div class="uca-error" id="ucaForgotPhoneError"></div><div class="uca-help">輸入完整手機號碼後，系統會產生要傳給 LINE Bot 的重設指令。</div></div>
+<div class="uca-field"><div class="uca-label-row"><label class="uca-label" for="ucaForgotPhone">手機號碼</label><span class="uca-optional">必填</span></div><input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/><div class="uca-error" id="ucaForgotPhoneError"></div><div class="uca-help">輸入完整手機號碼後，系統會產生要傳給 LINE Bot 的重設指令。</div></div>
 <div class="uca-security"><strong>LINE 指令</strong><br><span id="ucaForgotCommandPreview">忘記密碼 09xxxxxxxx</span><br><small>這不是密碼；LINE Bot 還會依會員資料或歷史任務做身分核對。</small></div>
 <div class="uca-status" id="ucaForgotStatus"></div><div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaForgotSupport" type="button" disabled>開啟 LINE 自動重設</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">返回登入</button></div></div></div>
 </section>
@@ -20480,7 +20480,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-5-clean-rc4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-6-native-member-rc1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
