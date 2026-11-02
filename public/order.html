@@ -1,11 +1,11 @@
-<!-- UBee Customer TC V1.6 — Native Member Experience RC1.2｜Quote Stability Hotfix｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
+<!-- UBee Customer TC V1.6 — Native Member Experience RC1.3｜Quote Concurrency Hotfix｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261102-customer-tc-v1-6-native-member-rc1-2
+  PWA: 20261102-customer-tc-v1-6-native-member-rc1-3
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -30,7 +30,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261102-customer-tc-v1-6-native-member-rc1-2" rel="manifest"/>
+<link href="/manifest-order.json?v=20261102-customer-tc-v1-6-native-member-rc1-3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19460,7 +19460,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(!validateTask()){showPage('task');return}
     if(!validateOptions()){showPage('options');return}
     const attempt = ++confirmQuoteAttempt;
-    syncLegacy();wrapPayload();renderSummary();
+    syncLegacy();
+    // RC1.3 Quote Concurrency：syncLegacy 內部透過 selectOrderTimingType / selectSpeed
+    // 排程 120ms 後重新估價。若與確認頁正式估價重疊，後者會被 quoteRequestSequence
+    // 判成過時請求，導致金額「—」、送單按鈕永遠停用。確認頁由此處唯一主動估價。
+    if(typeof quoteRefreshTimer !== 'undefined'){
+      clearTimeout(quoteRefreshTimer);
+      quoteRefreshTimer = null;
+    }
+    wrapPayload();renderSummary();
     $('flowAgree').checked=false;
     $('flowSubmitOrder').disabled=true;
     $('flowRetryQuote').classList.add('hidden');
@@ -19496,11 +19504,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       try{await window.UBeeUCoinV1?.refreshCheckout?.()}
       catch(error){console.warn('確認頁 U幣資料刷新失敗（正式報價仍有效）：',error)}
 
-      // 地圖路線僅供座標／狀態補充，不參與本次金額的正確性判斷。
-      // 不等待 Google Routes API，以免無地圖的確認頁被其失敗或逾時阻擋。
-      Promise.resolve().then(()=>renderConfirmMap(null)).catch(error=>{
-        console.warn('確認頁路線補充暫時不可用；已保留後端正式估價：',error);
-      });
+      // RC1.3：不再於確認頁額外啟動 renderConfirmMap()/requestRoute()。
+      // requestRoute() 內部會重新 syncLegacy() 並 invalidateQuote()，
+      // 導致剛取得的 quoteId 和金額狀態被清空。
+      // 正式 /api/quote 已回傳道路距離／時間；保留其它頁原本路線 API 功能。
     }catch(error){
       console.error('確認頁估價流程失敗：',error);
       if(attempt===confirmQuoteAttempt&&state.page==='confirm'){
@@ -19568,7 +19575,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const approvedPricing = captureApprovedCustomerCheckoutPricing();
     if(approvedPricing.base<=0){status('flowConfirmStatus','正式估價尚未完成，請重新估價後再送出。',true);return}
     if(!navigator.onLine){status('flowConfirmStatus','目前網路中斷，請恢復連線後再送出。',true);return}
-    syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
+    syncLegacy();
+    // 送單前將由 createOrder() 進行唯一的再次正式估價；清除上游同步欄位留下的延遲估價。
+    if(typeof quoteRefreshTimer !== 'undefined'){
+      clearTimeout(quoteRefreshTimer);
+      quoteRefreshTimer = null;
+    }
+    wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
     try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
     let uid='';
     submitAuthInProgress=true;
@@ -20529,7 +20542,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-6-native-member-rc1-2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-6-native-member-rc1-3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
