@@ -1,11 +1,11 @@
-<!-- UBee Customer RC3.2-HF2｜Service First｜僅調整下單入口與服務選擇 UI，保留既有訂單 API / 計價 / 派單 / U幣 -->
+<!-- UBee Customer RC3.2-HF3｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261102-customer-rc3-2-hf2-service-first
+  PWA: 20261102-customer-rc3-2-hf3-single-service-flow
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -30,7 +30,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261102-customer-rc3-2-hf2-service-first" rel="manifest"/>
+<link href="/manifest-order.json?v=20261102-customer-rc3-2-hf3-single-service-flow" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18781,7 +18781,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
  <span class="ubee-rc32-watermark" aria-hidden="true">U</span>
  <h2>生活大小事，<br>交給 <em>UBee</em>！</h2>
  <p>代買、代送、代取、代辦，<br>你的生活跑腿好幫手。</p>
- <button class="ubee-rc32-banner-cta" id="ubeeRC32BannerStart" type="button">快速開始下單 <span aria-hidden="true">›</span></button>
+ <button class="ubee-rc32-banner-cta" id="ubeeRC32BannerStart" type="button">選擇跑腿服務 <span aria-hidden="true">›</span></button>
 </div>
 <div class="ubee-rc32-section-head"><h3>UBee 跑腿服務</h3><span>六大服務</span></div>
 <div aria-label="選擇跑腿服務" class="flow-service-tabs" id="flowServiceTabs" role="tablist">
@@ -18847,62 +18847,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   <span class="flow-home-store-shortcut-copy"><strong>附近店家</strong><small>需要代買時再找店家，不佔用主導航</small></span>
   <span class="flow-home-store-shortcut-arrow" aria-hidden="true">›</span>
 </button>
-</section>
-<!-- HF2: 服務選擇為獨立 UI 階段；仍呼叫原有 setService 與單一下單控制器。 -->
-<section id="ubeeRC32ServicePicker" class="ubee-hf2-service-picker" aria-label="選擇跑腿服務" hidden>
-  <button type="button" id="ubeeHF2ServiceBack" class="ubee-hf2-back">‹ <span>返回服務首頁</span></button>
-  <div class="ubee-hf2-progress">建立跑腿任務 <span>先選擇服務</span></div>
-  <h2>你需要什麼服務？</h2>
-  <p class="ubee-hf2-intro">先選擇要請小U協助的事情，再填寫取送地點與任務需求。</p>
-  <div class="ubee-hf2-service-choices" role="group" aria-label="六大跑腿服務">
-<button type="button" class="ubee-hf2-service-choice" data-choose-service="send" aria-pressed="false">
-  <span aria-hidden="true" class="flow-service-icon">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-<path d="m3.3 7 8.7 5 8.7-5M12 22V12"></path>
-</svg>
-</span><span class="ubee-hf2-service-choice-copy"><strong>幫我送</strong><small>文件、包裹與物品配送</small></span><span class="ubee-hf2-choice-check" aria-hidden="true">✓</span>
-</button>
-<button type="button" class="ubee-hf2-service-choice" data-choose-service="pickup" aria-pressed="false">
-  <span aria-hidden="true" class="flow-service-icon">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<path d="M6 8h12l1 13H5L6 8Z"></path>
-<path d="M9 8V6a3 3 0 0 1 6 0v2M12 12v5M9.8 14.8 12 17l2.2-2.2"></path>
-</svg>
-</span><span class="ubee-hf2-service-choice-copy"><strong>幫我取</strong><small>代領包裹、文件與指定物品</small></span><span class="ubee-hf2-choice-check" aria-hidden="true">✓</span>
-</button>
-<button type="button" class="ubee-hf2-service-choice" data-choose-service="buy" aria-pressed="false">
-  <span aria-hidden="true" class="flow-service-icon">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle>
-<path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.9a2 2 0 0 0 2-1.6L21 8H7"></path>
-</svg>
-</span><span class="ubee-hf2-service-choice-copy"><strong>幫我買</strong><small>餐飲、生活用品與指定代購</small></span><span class="ubee-hf2-choice-check" aria-hidden="true">✓</span>
-</button>
-<button type="button" class="ubee-hf2-service-choice" data-choose-service="queue" aria-pressed="false">
-  <span aria-hidden="true" class="flow-service-icon">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>
-</svg>
-</span><span class="ubee-hf2-service-choice-copy"><strong>幫排隊</strong><small>排隊、取號與現場等候</small></span><span class="ubee-hf2-choice-check" aria-hidden="true">✓</span>
-</button>
-<button type="button" class="ubee-hf2-service-choice" data-choose-service="helper" aria-pressed="false">
-  <span aria-hidden="true" class="flow-service-icon">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<path d="m12 3 1.2 3.4L16.5 8l-3.3 1.6L12 13l-1.2-3.4L7.5 8l3.3-1.6L12 3Z"></path>
-<path d="m18 13 .8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8L18 13ZM6 14l.7 1.8L8.5 16.5l-1.8.7L6 19l-.7-1.8-1.8-.7 1.8-.7L6 14Z"></path>
-</svg>
-</span><span class="ubee-hf2-service-choice-copy"><strong>全能跑腿</strong><small>臨時代辦及多元生活協助</small></span><span class="ubee-hf2-choice-check" aria-hidden="true">✓</span>
-</button>
-<button type="button" class="ubee-hf2-service-choice" data-choose-service="drive" aria-pressed="false">
-  <span aria-hidden="true" class="flow-service-icon">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="2.2"></circle><path d="M4.8 10.5h14.4M12 14.2V20M7.5 10.5c.8 2.6 2.2 3.7 4.5 3.7s3.7-1.1 4.5-3.7"></path>
-</svg>
-</span><span class="ubee-hf2-service-choice-copy"><strong>代駕</strong><small>依現行平台服務規則安排</small></span><span class="ubee-hf2-choice-check" aria-hidden="true">✓</span>
-</button>
-  </div>
-  <p class="ubee-hf2-choose-hint" id="ubeeHF2ChooseHint" aria-live="polite">點選服務後，即可繼續填寫地點。</p>
 </section>
 <div class="flow-card" id="ubeeRC32Form">
 <!-- RC3.2 form is a separate view of the SAME home/order controller, not a duplicate checkout. -->
@@ -19617,35 +19561,44 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
   }
 
-  // HF2: discovery / service / form are three VIEWS of the ONE existing order controller.
-  // Never duplicate pricing, order creation, auth state, address logic or checkout handlers.
-  let pendingServiceSelection=null;
-  function renderServicePicker(){
-    const picker=$('ubeeRC32ServicePicker');
-    if(!picker)return;
-    picker.querySelectorAll('[data-choose-service]').forEach(button=>{
-      const chosen=button.dataset.chooseService===pendingServiceSelection;
-      button.classList.toggle('selected',chosen);
-      button.setAttribute('aria-pressed',chosen?'true':'false');
-    });
-    const hint=$('ubeeHF2ChooseHint');
-    if(hint)hint.textContent='點選服務後，即可繼續填寫地點。';
-  }
-  function setHomeMode(mode,options={}){
+  // HF3: 唯一首頁服務入口為 flowServiceTabs。僅保留 discovery/form 雙畫面。
+  // taskName 為系統自動預設，不代表使用者已主動選擇服務或已有草稿。
+  function setHomeMode(mode){
     const home=$('flowPageHome');
     if(!home)return;
-    const isPicker=mode==='service';
-    const isForm=mode==='form';
-    if(isPicker){
-      pendingServiceSelection=options.preserveSelection===true?state.service:null;
-      renderServicePicker();
-    }
-    home.classList.toggle('ubee-hf2-service-open',isPicker);
-    home.classList.toggle('ubee-rc32-form-open',isForm);
-    const picker=$('ubeeRC32ServicePicker');
-    if(picker)picker.hidden=!isPicker;
+    home.classList.toggle('ubee-rc32-form-open',mode==='form');
+    home.classList.toggle('ubee-service-chosen',state.userSelectedService===true);
     const scroller=home.querySelector('.flow-home-scroll');
     if(scroller)scroller.scrollTop=0;
+  }
+
+  function hasMeaningfulEditingState(){
+    return Boolean(state.pickup||state.dropoff||state.dropoff2||
+      String(state.taskNote||'').trim()||
+      String(state.purchaseDetails?.productName||'').trim()||
+      String(state.driveVehicle?.plate||'').trim());
+  }
+
+  async function selectCustomerService(service){
+    if(!serviceLabels[service])return false;
+    if(state.userSelectedService===true && state.service!==service && hasMeaningfulEditingState()){
+      // 舊服務有取送地址、備註或商品資料時，不允許無聲跨服務沿用。
+      const ask=window.showUBeeCustomerNativeConfirm;
+      if(typeof ask!=='function'){
+        status('flowHomeStatus','目前無法確認更換服務，請稍後再試。',true);
+        return false;
+      }
+      const confirmed=await ask('更換跑腿服務','更換服務會清除目前表單已填寫的內容；原有未完成草稿仍可從草稿提示恢復。是否繼續？',{confirmText:'確認更換',cancelText:'繼續編輯'});
+      if(!confirmed)return false;
+      // 重設暫存表單，不在這裡發送雲端 DELETE；只有明確捨棄草稿及建單成功才刪除持久草稿。
+      resetNewTask(true);
+    }
+    state.userSelectedService=true;
+    setService(service);
+    updateHome();
+    status('flowHomeStatus','');
+    setHomeMode('form');
+    return true;
   }
   function showPage(name){
     const previous=state.page;
@@ -19951,6 +19904,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function updateHome(){
+    $('flowPageHome')?.classList.toggle('ubee-service-chosen',state.userSelectedService===true);
     const p=state.pickup,d=state.dropoff,d2=state.dropoff2;
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
     // Single state source: display-only summary on form and address hint.
@@ -20442,6 +20396,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
       root.classList.add('active');
       document.body.classList.add('flow-active');
+      state.userSelectedService=true;
       syncServiceSelectors();
       setTiming(state.timing);
       setSpeed(state.speed);
@@ -20751,8 +20706,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   function resetNewTask(clearLegacy=true){
     window.__ubeeUCoinRedeemWhole=0;
-    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
-    if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','dropoff2','dropoff2AddressNote','dropoff2Contact','dropoff2Phone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=dropoff2Lat=dropoff2Lng=null;pickupPlaceId=dropoffPlaceId=dropoff2PlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;try{UBeeEnhancements.clearDraft()}catch(_){localStorage.removeItem('ubee_order_draft_v2')}}catch(_){ }}
+    Object.assign(state,{page:'home',service:'send',userSelectedService:false,serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
+    if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','dropoff2','dropoff2AddressNote','dropoff2Contact','dropoff2Phone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=dropoff2Lat=dropoff2Lng=null;pickupPlaceId=dropoffPlaceId=dropoff2PlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;/* HF3: 初始化／切換服務不可刪除持久草稿；捨棄與成功建單才調用 UBeeEnhancements.clearDraft()。 */}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
   }
 
@@ -21270,43 +21225,32 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     root.classList.add('active');
     document.body.classList.add('flow-active');
     showPage('home');
-    setHomeMode(options.openForm===true?'form':options.openServicePicker===true?'service':'discovery');
+    setHomeMode(options.openForm===true?'form':'discovery');
     updateHome();
     return true;
   }
 
   function bind(){
-    // The six original RC2 buttons now live on the native home; no hidden second selector.
+    // 唯一的六大服務選擇位於原生首頁；熱門需求也只能呼叫這個 service controller。
     $('flowServiceTabs').addEventListener('click',event=>{
       const btn=event.target.closest('[data-service]');
-      if(!btn)return;
-      setService(btn.dataset.service);
-      updateHome();
-      status('flowHomeStatus','');
-      setHomeMode('form');
+      if(btn)void selectCustomerService(btn.dataset.service);
     });
-    // Popular cases reuse the same state mutation; no second ordering controller.
     root.querySelectorAll('[data-home-service]').forEach(button=>button.addEventListener('click',()=>{
-      setService(button.dataset.homeService);
-      updateHome();
-      status('flowHomeStatus','');
-      setHomeMode('form');
+      void selectCustomerService(button.dataset.homeService);
     }));
-    // Unspecified "start order" first goes to the service-selection step.
-    $('ubeeRC32BannerStart').addEventListener('click',()=>setHomeMode('service'));
-    $('ubeeHF2ServiceBack').addEventListener('click',()=>setHomeMode('discovery'));
-    $('ubeeRC32ServicePicker').addEventListener('click',event=>{
-      const button=event.target.closest('[data-choose-service]');
-      if(!button)return;
-      // 選擇服務即進入填寫地點：保留唯一 setService 與原生下單控制器。
-      pendingServiceSelection=button.dataset.chooseService;
-      setService(pendingServiceSelection);
-      updateHome();
-      status('flowHomeStatus','');
-      setHomeMode('form');
+    // 「開始下單」不能略過六大服務；首頁直接滾至既有的唯一服務選單。
+    $('ubeeRC32BannerStart').addEventListener('click',()=>{
+      setHomeMode('discovery');
+      const target=$('flowServiceTabs');
+      if(target){try{target.scrollIntoView({block:'center',behavior:'smooth'})}catch(_){target.scrollIntoView()}}
     });
-    $('ubeeRC32FormBack').addEventListener('click',()=>setHomeMode('service',{preserveSelection:true}));
-    $('ubeeRC32ChangeService').addEventListener('click',()=>setHomeMode('service',{preserveSelection:true}));
+    // 返回首頁與更換服務都只回到首頁原有的六大服務；不再跳至第二套選擇頁。
+    $('ubeeRC32FormBack').addEventListener('click',()=>setHomeMode('discovery'));
+    $('ubeeRC32ChangeService').addEventListener('click',()=>{
+      setHomeMode('discovery');
+      try{$('flowServiceTabs')?.scrollIntoView({block:'center',behavior:'smooth'})}catch(_){ }
+    });
     root.querySelectorAll('[data-home-nav]').forEach(button=>button.addEventListener('click',()=>{
       const target=button.dataset.homeNav;
       if(window.UBeePrimaryNavigation?.open) window.UBeePrimaryNavigation.open(target,{source:'home-scenario'});
@@ -21439,7 +21383,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
-  buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();
+  buildProgress();bind();wrapPayload();resetNewTask(false);ensureTimeDefaults();
   const runAutoLocationAfterHome = async () => {
     // 與 initPage / 地圖建立共用同一個定位閘門；不再啟動第二條競態定位流程。
     window.setTimeout(()=>detectLocation(),60);
@@ -21456,6 +21400,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     root.classList.add('active');
     document.body.classList.add('flow-active');
     showFlow({fresh:false});
+    setHomeMode('discovery');
     return true;
   };
   window.showHomeTab=window.openUBeeHomePage;
@@ -21582,18 +21527,19 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   window.showProfileTab=window.openUBeeProfilePage;
   window.showCustomerSubPage=window.openUBeeProfilePage;
   window.openUBeeSystemOrderFlow=(options={})=>{
-    const hasExistingDraft=Boolean(state.pickup||state.dropoff||state.taskNote||state.taskName);
-    const resumeExisting=options.fresh===false && hasExistingDraft;
+    const resumeExisting=options.fresh===false &&
+      options.openDiscovery!==true &&
+      (state.userSelectedService===true || hasMeaningfulEditingState());
     return showFlow({
       fresh:options.fresh!==false,
-      openForm:options.openForm===true||resumeExisting,
-      openServicePicker:options.openForm!==true&&!resumeExisting&&options.openDiscovery!==true
+      openForm:options.openForm===true||resumeExisting
     });
   };
 
   window.openUBeeNewTaskPage=function(){
     window.UBeePrimaryNavigation?.activate('home');
-    showFlow({fresh:true,openServicePicker:true});
+    // 新任務快捷：先顯示首頁原有的六大服務，不強制跳地址、不刪雲端草稿。
+    showFlow({fresh:true});
     return true;
   };
 
@@ -21607,6 +21553,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
     showFlow({fresh:true,openForm:true});
     state.storeContext={...store};
+    state.userSelectedService=true;
     setService('buy');
 
     const category=String(store.category||store.categoryLabel||'').trim();
@@ -21652,7 +21599,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   };
 
   showFlow({fresh:false});
-  window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())showFlow({fresh:true})});
+  // BFCache 復原保留目前頁面及未完成編輯，不再次清空表單或草稿。
+  window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())updateHome()});
 })();
 </script>
 <script id="ubee-customer-native-dialog-v1">
@@ -21677,7 +21625,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-rc3-2-hf2-service-first';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-rc3-2-hf3-single-service-flow';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -28778,7 +28726,7 @@ body:not(.flow-active) .app select,
 #productionOrderFlow #flowPageHome .flow-service-tabs .flow-service-tab[data-service="queue"] .flow-service-icon{background:#ebe7ff!important;color:#755fd1!important}
 #productionOrderFlow #flowPageHome .flow-service-tabs .flow-service-tab[data-service="helper"] .flow-service-icon{background:#ffebf3!important;color:#c15f89!important}
 #productionOrderFlow #flowPageHome .flow-service-tabs .flow-service-tab[data-service="drive"] .flow-service-icon{background:#e0f5f3!important;color:#278e8c!important}
-#productionOrderFlow #flowPageHome .flow-service-tabs .flow-service-tab.active .flow-service-icon{outline:2px solid #e1a412!important;outline-offset:2px!important}
+#productionOrderFlow #flowPageHome.ubee-service-chosen .flow-service-tabs .flow-service-tab.active .flow-service-icon{outline:2px solid #e1a412!important;outline-offset:2px!important}
 #productionOrderFlow #flowPageHome .ubee-rc32-scenarios{display:grid;gap:9px}
 #productionOrderFlow #flowPageHome .ubee-rc32-scenario{display:flex;align-items:center;gap:12px;text-align:left;width:100%;min-height:76px;padding:12px 14px;border:1px solid #e9edf0!important;border-radius:17px!important;background:#fff!important;box-shadow:0 3px 10px rgba(0,0,0,.03)!important;cursor:pointer}
 #productionOrderFlow #flowPageHome .ubee-rc32-scenario-icon{flex:0 0 48px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#fff1e2;color:#cc772a}
@@ -28806,40 +28754,6 @@ body:not(.flow-active) .app select,
 #productionOrderFlow #flowPageHome .ubee-rc32-banner-cta:focus-visible,#productionOrderFlow #flowPageHome .flow-service-tab:focus-visible,#productionOrderFlow #flowPageHome .ubee-rc32-scenario:focus-visible,#productionOrderFlow #flowPageHome .ubee-rc32-back:focus-visible,#productionOrderFlow #flowPageHome #ubeeRC32ChangeService:focus-visible{outline:3px solid #161616!important;outline-offset:3px}
 @media(max-width:359px){#productionOrderFlow #flowPageHome .flow-home-scroll{padding-left:10px!important;padding-right:10px!important}#productionOrderFlow #flowPageHome .flow-service-tabs .flow-service-icon{width:57px!important;height:57px!important}#productionOrderFlow #flowPageHome .ubee-rc32-banner h2{font-size:25px!important}}
 @media(prefers-reduced-motion:reduce){#productionOrderFlow #flowPageHome *{scroll-behavior:auto!important;transition:none!important}}
-</style>
-<style id="ubeeCustomerHF2ServiceFirstStyles">
-/* HF2: an intentional service-selection step before addresses, existing controller reused. */
-#productionOrderFlow #flowPageHome .ubee-hf2-service-picker{display:none!important}
-#productionOrderFlow #flowPageHome.ubee-hf2-service-open .ubee-rc32-discovery{display:none!important}
-#productionOrderFlow #flowPageHome.ubee-hf2-service-open .ubee-hf2-service-picker{display:block!important}
-#productionOrderFlow #flowPageHome.ubee-hf2-service-open #ubeeRC32Form{display:none!important}
-#productionOrderFlow #flowPageHome:not(.ubee-rc32-form-open) .flow-service-tab.active .flow-service-icon{outline:none!important}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-picker{padding:5px 1px 35px}
-#productionOrderFlow #flowPageHome .ubee-hf2-back{display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;color:#52565a;padding:7px 2px;font-size:23px;font-weight:650;cursor:pointer}
-#productionOrderFlow #flowPageHome .ubee-hf2-back span{font-size:13px}
-#productionOrderFlow #flowPageHome .ubee-hf2-progress{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 9px;font-size:12px;font-weight:900;color:#725912}
-#productionOrderFlow #flowPageHome .ubee-hf2-progress span{font-weight:800;color:#999}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-picker h2{font-size:27px!important;line-height:1.3;font-weight:1000;color:#161616;margin:0 0 8px}
-#productionOrderFlow #flowPageHome .ubee-hf2-intro{font-size:14px!important;line-height:1.65;font-weight:750;color:#797e87;margin:0 0 19px}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0;min-height:152px;padding:15px 12px;border:1.5px solid #e7e7e9;border-radius:20px;background:#fff;color:#141414;text-align:left;cursor:pointer;box-shadow:0 2px 6px rgba(16,24,40,.025)}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice .flow-service-icon{display:flex;align-items:center;justify-content:center;width:49px;height:49px;border-radius:14px;background:#e6efff;color:#3c7fcf}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice .flow-service-icon svg{width:25px;height:25px;stroke:currentColor;fill:none;stroke-width:1.8}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice[data-choose-service="pickup"] .flow-service-icon{background:#e4f6ea;color:#2b9e76}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice[data-choose-service="buy"] .flow-service-icon{background:#fff0d9;color:#cf772a}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice[data-choose-service="queue"] .flow-service-icon{background:#ebe7ff;color:#755fd1}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice[data-choose-service="helper"] .flow-service-icon{background:#ffebf3;color:#c15f89}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice[data-choose-service="drive"] .flow-service-icon{background:#e0f5f3;color:#278e8c}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice-copy strong{font-size:17px;font-weight:950;line-height:1.3}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice-copy small{font-size:11px;line-height:1.4;color:#858a91;font-weight:700}
-#productionOrderFlow #flowPageHome .ubee-hf2-choice-check{display:none;position:absolute;right:11px;top:11px;width:24px;height:24px;align-items:center;justify-content:center;background:#181818;color:#fff;font-size:15px;font-weight:1000;border-radius:50%}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice.selected{border-color:#ecc100;background:#fffdf1;box-shadow:0 0 0 1px #ecc100}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice.selected .ubee-hf2-choice-check{display:flex}
-#productionOrderFlow #flowPageHome .ubee-hf2-choose-hint{font-size:13px;color:#836813;font-weight:800;margin:18px 2px 11px}
-#productionOrderFlow #flowPageHome .ubee-hf2-service-choice:focus-visible,
-#productionOrderFlow #flowPageHome .ubee-hf2-back:focus-visible{outline:3px solid #161616;outline-offset:3px}
-@media(max-width:359px){#productionOrderFlow #flowPageHome .ubee-hf2-service-choices{gap:8px}#productionOrderFlow #flowPageHome .ubee-hf2-service-choice{padding:12px 9px;min-height:150px}}
 </style>
 </body>
 </html>
