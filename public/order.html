@@ -1,11 +1,11 @@
-<!-- UBee Customer TC V1.5 — Clean RC3｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
+<!-- UBee Customer TC V1.5 — Clean RC4｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261102-customer-tc-v1-5-clean-rc3
+  PWA: 20261102-customer-tc-v1-5-clean-rc4
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -30,7 +30,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261102-customer-tc-v1-5-clean-rc3" rel="manifest"/>
+<link href="/manifest-order.json?v=20261102-customer-tc-v1-5-clean-rc4" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -321,7 +321,7 @@
       margin-bottom:18px;
     }
 
-    .task-path-box,.quick-guide,.nearby-box,.content-card,.info-item,.member-card,.address-display{
+    .task-path-box,.quick-guide,.content-card,.info-item,.member-card,.address-display{
       border:1px solid var(--line);
       background:var(--surface);
       border-radius:20px;
@@ -436,75 +436,6 @@
     select option{
       background:#fff;
       color:#111;
-    }
-
-    .nearby-box{
-      padding:14px;
-      margin:12px 0 18px;
-
-    }
-
-    .nearby-head{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:8px;
-    }
-
-    .nearby-title{
-      font-size:16px;
-      font-weight:1000;
-    }
-
-    .nearby-sub,.nearby-status,.nearby-place-meta{
-      color:var(--muted);
-      font-size:14px;
-      font-weight:800;
-      line-height:1.65;
-    }
-
-    .nearby-sub{
-      margin-top:3px;
-    }
-
-    .nearby-btn{
-      flex:0 0 auto;
-      border:1px solid #b8cdf8;
-      background:#eff5ff;
-      color:#2453b8;
-      border-radius:999px;
-      padding:9px 12px;
-      font-size:14px !important;
-      font-weight:1000;
-    }
-
-    .nearby-list{
-      display:flex;
-      flex-direction:column;
-      gap:9px;
-      margin-top:10px;
-    }
-
-    .nearby-place{
-      width:100%;
-      border:1px solid var(--line);
-      background:var(--surface2);
-      color:#111;
-      border-radius:15px;
-      padding:12px;
-      text-align:left;
-    }
-
-    .nearby-place.active{
-      border-color:#111;
-
-    }
-
-    .nearby-place-name{
-      font-size:15px;
-      font-weight:1000;
-      line-height:1.4;
     }
 
     /* ==============================
@@ -7649,31 +7580,6 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 </div>
 </div>
 <!-- ==============================
-     幫代買：附近店家
-     只有選擇幫代買時才顯示
-     ============================== -->
-<div class="nearby-box hidden" id="nearbyPlacesBox">
-<div class="nearby-head">
-<div>
-<div class="nearby-title">
-        附近店家
-      </div>
-<div class="nearby-sub">
-        依代買分類搜尋附近店家。
-        點選店家後，會自動帶入購買地點與電話。
-      </div>
-</div>
-<button class="nearby-btn" id="nearbyReloadBtn" onclick="searchNearbyPlaces(true)" type="button">
-      搜尋附近
-    </button>
-</div>
-<div class="nearby-status" id="nearbyPlacesStatus">
-    選擇代買分類後，
-    按「搜尋附近」即可搜尋店家。
-  </div>
-<div class="nearby-list" id="nearbyPlacesList"></div>
-</div>
-<!-- ==============================
      正式配送路線
      ============================== -->
 <div class="address-card">
@@ -10845,7 +10751,6 @@ function selectServiceFromTab(el, group){
 
   updateTaskPathText();
   applyDynamicFields();
-  handleServiceSelectionChanged();
 
   invalidateQuote();
   scheduleRouteAndQuoteRefresh(120);
@@ -10891,7 +10796,6 @@ function selectServiceItem(index){
   renderCategoryBox(item);
   updateTaskPathText();
   applyDynamicFields();
-  handleServiceSelectionChanged();
 
   invalidateQuote();
   scheduleQuoteRefresh(120);
@@ -11004,80 +10908,8 @@ function selectCategory(el, cat){
   // 後續衍生更新各自隔離，避免其中一個非核心功能錯誤讓分類按鈕失效。
   try{ updateTaskPathText(); }catch(err){ console.error('更新任務路徑失敗：', err); }
   try{ applyDynamicFields(); }catch(err){ console.error('更新動態欄位失敗：', err); }
-  try{ handleServiceSelectionChanged(); }catch(err){ console.error('處理服務分類變更失敗：', err); }
   try{ invalidateQuote(); }catch(err){ console.error('重設估價失敗：', err); }
   try{ scheduleQuoteRefresh(120); }catch(err){ console.error('重新估價排程失敗：', err); }
-}
-
-function getNearbyKeyword(){
-  const cat = serviceCategory || '';
-  const type = serviceType || '';
-
-  const map = {
-    '便當店':'便當',
-    '小吃店':'小吃',
-    '早餐店':'早餐店',
-    '簡餐店':'簡餐',
-    '麵食館':'麵店',
-    '速食店':'速食',
-    '其他餐點':'餐廳',
-    '手搖飲':'手搖飲',
-    '咖啡廳':'咖啡廳',
-    '果汁店':'果汁店',
-    '連鎖飲料店':'飲料店',
-    '其他飲品':'飲料店',
-    '7-ELEVEN':'7-ELEVEN',
-    '全家':'全家便利商店',
-    '萊爾富':'萊爾富',
-    'OK':'OK超商',
-    '其他超商':'便利商店',
-    '一般藥局':'藥局',
-    '丁丁藥局':'丁丁藥局',
-    '大樹藥局':'大樹藥局',
-    '啄木鳥藥局':'啄木鳥藥局',
-    '其他藥局商品':'藥局',
-    '清潔用品':'清潔用品',
-    '衛生用品':'生活用品',
-    '五金用品':'五金行',
-    '日用品':'日用品',
-    '嬰幼兒用品':'嬰幼兒用品店',
-    '寵物用品':'寵物用品店',
-    '其他生活用品':'生活用品店',
-    '五金耗材':'五金行',
-    '電池燈泡':'五金行',
-    '膠帶黏著':'五金行',
-    '延長線電料':'水電材料行',
-    '簡易工具':'五金行',
-    '其他五金':'五金行',
-    '蔬菜':'市場 蔬菜',
-    '水果':'水果行',
-    '肉品':'肉品',
-    '海鮮':'海鮮',
-    '其他生鮮':'市場',
-    '生日蛋糕':'蛋糕店',
-    '甜點':'甜點店',
-    '麵包':'麵包店',
-    '伴手禮':'伴手禮',
-    '其他甜點':'甜點店',
-    '全聯':'全聯',
-    '康達盛通':'康達盛通',
-    '寶雅':'寶雅',
-    '小北百貨':'小北百貨',
-    '楓康超市':'楓康超市',
-    '美廉社':'美廉社'
-  };
-
-  if(map[cat]) return map[cat];
-  if(type.includes('飲料')) return '飲料店';
-  if(type.includes('超商')) return '便利商店';
-  if(type.includes('藥局')) return '藥局';
-  if(type.includes('生活代買')) return '生活用品店';
-  if(type.includes('五金')) return '五金行';
-  if(type.includes('生鮮')) return '市場';
-  if(type.includes('蛋糕') || type.includes('甜點')) return '甜點店';
-  if(type.includes('花束') || type.includes('禮品')) return '花店';
-  if(type.includes('賣場')) return '賣場';
-  return '餐廳';
 }
 
 function clearNearbyAutoFill(clearFields){
@@ -11122,33 +10954,7 @@ function clearNearbyAutoFill(clearFields){
     invalidateQuote();
   }
 
-  if(qs('nearbyPlacesList')){
-    qs('nearbyPlacesList').innerHTML = '';
-  }
 
-  if(qs('nearbyPlacesStatus')){
-    qs('nearbyPlacesStatus').innerText =
-      '選擇代買分類後，按「搜尋附近店家」開始搜尋。';
-  }
-}
-
-function updateNearbyPlacesVisibility(){
-  const box = qs('nearbyPlacesBox');
-  if(!box) return;
-
-  const shouldShow = serviceGroup === 'buy';
-  box.classList.toggle('hidden', !shouldShow);
-
-  if(!shouldShow){
-    clearNearbyAutoFill(true);
-  }
-}
-
-function handleServiceSelectionChanged(){
-  updateNearbyPlacesVisibility();
-
-  if(serviceGroup !== 'buy') return;
-  setNearbyStatus('已選擇代買分類，按「搜尋附近」即可定位並搜尋店家。');
 }
 
 function setHomeLocationUiState(buttonText, detailText){
@@ -11305,136 +11111,6 @@ async function syncCurrentLocationHomeUi(lat, lng){
 
   return currentLocationUiSyncPromise;
 }
-
-function setNearbyStatus(text){
-  if(qs('nearbyPlacesStatus')){
-    qs('nearbyPlacesStatus').innerText = text;
-  }
-}
-
-function renderNearbyPlaces(){
-  const list = qs('nearbyPlacesList');
-  if(!list) return;
-
-  if(!nearbyPlaces.length){
-    list.innerHTML = '';
-    return;
-  }
-
-  list.innerHTML = nearbyPlaces.map((place, index) => {
-    const ratingText = place.rating ? `評分 ${place.rating}${place.userRatingsTotal ? `（${place.userRatingsTotal}）` : ''}` : '尚無評分';
-    const phoneText = place.phone ? `｜${place.phone}` : '';
-    const isActive = selectedNearbyPlaceId && selectedNearbyPlaceId === String(place.placeId || index);
-
-    return `
-      <button class="nearby-place ${isActive ? 'active' : ''}" type="button" onclick="selectNearbyPlace(${index})">
-        <div class="nearby-place-name">${escapeHtml(place.name || '附近店家')}</div>
-        <div class="nearby-place-meta">${escapeHtml(place.address || '地址未提供')}</div>
-        <div class="nearby-place-meta">${escapeHtml(ratingText + phoneText)}</div>
-      </button>
-    `;
-  }).join('');
-}
-
-async function searchNearbyPlaces(force){
-  updateNearbyPlacesVisibility();
-
-  if(serviceGroup !== 'buy' || isLoadingNearbyPlaces){
-    return;
-  }
-
-  const keyword = getNearbyKeyword();
-
-  try{
-    isLoadingNearbyPlaces = true;
-    setNearbyStatus(`正在搜尋附近「${keyword}」...`);
-
-    const position = await getCurrentPosition();
-    const lat = position.coords.latitude;
-    const lng = position.coords.longitude;
-
-    currentLocationLat = lat;
-    currentLocationLng = lng;
-    const key = `${keyword}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
-
-    if(!force && key === lastNearbySearchKey && nearbyPlaces.length){
-      setNearbyStatus(`已顯示附近「${keyword}」，可直接點選店家。`);
-      renderNearbyPlaces();
-      return;
-    }
-
-    lastNearbySearchKey = key;
-
-    const res = await fetch(`/api/nearby-places?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&keyword=${encodeURIComponent(keyword)}&radius=3000`, {
-      cache:'no-store'
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if(!res.ok || data.success === false){
-      throw new Error(data.error || data.message || '附近店家搜尋失敗');
-    }
-
-    nearbyPlaces = Array.isArray(data.places) ? data.places : [];
-    selectedNearbyPlace = null;
-    selectedNearbyPlaceId = '';
-
-    if(!nearbyPlaces.length){
-      setNearbyStatus(`目前附近沒有找到「${keyword}」結果，你仍可手動填寫購買地點。`);
-      renderNearbyPlaces();
-      return;
-    }
-
-    setNearbyStatus(`已找到 ${nearbyPlaces.length} 間附近店家，點選後會自動帶入購買地點。`);
-    renderNearbyPlaces();
-  }catch(err){
-    console.warn('附近店家搜尋失敗:', err);
-
-    const msg = err && (err.code === 1 || err.message?.includes('permission'))
-      ? '無法取得定位權限。你可以允許定位後重新搜尋，或直接手動填寫購買地點。'
-      : (err.message || '附近店家搜尋失敗，請手動填寫購買地點。');
-
-    nearbyPlaces = [];
-    selectedNearbyPlace = null;
-    selectedNearbyPlaceId = '';
-    setNearbyStatus(msg);
-    renderNearbyPlaces();
-  }finally{
-    isLoadingNearbyPlaces = false;
-  }
-}
-
-function selectNearbyPlace(index){
-  const place = nearbyPlaces[index];
-  if(!place) return;
-
-  selectedNearbyPlace = place;
-  selectedNearbyPlaceId = String(place.placeId || index);
-
-  const pickupText = [place.name, place.address].filter(Boolean).join(' ');
-  const phoneText = place.phone || '';
-
-  if(qs('pickup')){
-    qs('pickup').value = pickupText || place.name || place.address || '';
-    nearbyAutoFilledPickup = qs('pickup').value.trim();
-  }
-
-  if(qs('pickupPhone')){
-    qs('pickupPhone').value = phoneText;
-    nearbyAutoFilledPhone = qs('pickupPhone').value.trim();
-  }
-
-  pickupPlaceId = String(place.placeId || '').trim();
-  pickupLat = toNullableNumber(place.lat);
-  pickupLng = toNullableNumber(place.lng);
-
-  setNearbyStatus(`已選擇：${place.name || '附近店家'}。購買地點已帶入，可再確認地址與電話。`);
-  renderNearbyPlaces();
-
-  invalidateQuote();
-  scheduleRouteAndQuoteRefresh(120);
-}
-
 
 function updateTaskPathText(){
   if(qs('taskPathText')){
@@ -16788,7 +16464,6 @@ updateTaskPathText();
 
 applyDynamicFields();
 
-updateNearbyPlacesVisibility();
 
 bindOrderInputEvents();
 
@@ -20805,7 +20480,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-5-clean-rc3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-5-clean-rc4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
