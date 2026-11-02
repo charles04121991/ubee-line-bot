@@ -1783,44 +1783,46 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ============================================================
-// UBee Same-Index Domain Boundary RC1 (2026-11-02)
-// Customer / Driver remain in ONE Express app and ONE Render service.
-// Request-local contexts are isolated; operational order/finance core stays unique.
-// IMPORTANT: This boundary is NOT a replacement for route-level authentication.
-// Existing authentication, pricing, dispatch, U-Coin and transaction handlers
-// remain authoritative and unchanged. No duplicated handlers are installed.
+// UBee Same-Index Domain Boundary RC2 | 2026-11-02
+// One Render / one Express app; separate request-local domain contexts.
+// IMPORTANT: existing customer/rider authorization and Core transaction
+// handlers remain authoritative. This does not isolate deployments or crashes.
 // ============================================================
-const UBEE_API_DOMAIN_RULES_RC1 = Object.freeze([
+const UBEE_API_DOMAIN_RULES_RC2 = Object.freeze([
   Object.freeze({ prefix: '/api/customer-auth', domain: 'CUSTOMER' }),
   Object.freeze({ prefix: '/api/customer-identity', domain: 'CUSTOMER' }),
   Object.freeze({ prefix: '/api/customer', domain: 'CUSTOMER' }),
+  Object.freeze({ prefix: '/api/rider-distance-to-pickup', domain: 'DRIVER' }),
   Object.freeze({ prefix: '/api/rider', domain: 'DRIVER' }),
+  Object.freeze({ prefix: '/api/dispatch', domain: 'DISPATCH' }),
+  Object.freeze({ prefix: '/api/admin', domain: 'ADMIN' }),
 ]);
 
-function ubeeMatchApiDomainRC1(pathname) {
-  const pathnameOnly = String(pathname || '').split('?')[0];
-  for (const rule of UBEE_API_DOMAIN_RULES_RC1) {
-    if (pathnameOnly === rule.prefix || pathnameOnly.startsWith(rule.prefix + '/')) {
+function ubeeMatchApiDomainRC2(pathname) {
+  const pathOnly = String(pathname || '').split('?')[0];
+  for (const rule of UBEE_API_DOMAIN_RULES_RC2) {
+    if (pathOnly === rule.prefix || pathOnly.startsWith(rule.prefix + '/')) {
       return rule.domain;
     }
   }
-  return null; // /api/orders, /api/quote, dispatch, finance etc: shared core
+  return 'CORE'; // orders, quote, payment, notifications and other shared endpoints
 }
 
-// Mounted before existing routes: does not alter API URLs, route order or body.
-// This is a safe request-context boundary, not full business-logic extraction.
+// The context is immutable and unique to this request. Existing API paths,
+// handlers, auth middleware, body, cookies, and Firestore writes are unchanged.
 app.use((req, res, next) => {
-  const domain = ubeeMatchApiDomainRC1(req.path);
-  if (!domain) return next();
+  const domain = ubeeMatchApiDomainRC2(req.path);
   const context = Object.freeze({
     domain,
-    apiVersion: 'same-index-domain-boundary-rc1',
+    boundaryVersion: 'same-index-domain-boundary-rc2',
+    isCustomer: domain === 'CUSTOMER',
+    isDriver: domain === 'DRIVER',
+    isCore: domain === 'CORE',
   });
-  // Avoid reusing generic auth/session fields or modifying caller headers.
-  Object.defineProperty(req, 'ubeeApiDomainRC1', {
+  Object.defineProperty(req, 'ubeeApiDomain', {
     configurable: false, enumerable: false, writable: false, value: context,
   });
-  res.locals.ubeeApiDomainRC1 = domain;
+  res.locals.ubeeApiDomain = domain;
   return next();
 });
 
