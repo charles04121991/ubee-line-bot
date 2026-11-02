@@ -1,4 +1,4 @@
-<!-- V6.0 RC: requires integration / security / regression tests before production -->
+<!-- V6.3.2 RC: pure-data UI, with no Google Maps SDK or map rendering; production regression testing required -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -12,13 +12,13 @@
 <!-- 2026-09-03｜Dispatch Arrival Photo Proof V1：訂單卡與摘要顯示小U已回傳的到場照片數量，讓調度中心確認每個到場節點都有照片證明。 -->
 <!-- 2026-09-03｜Dispatch Task Contract V3 Full Flow：除任務要求外，顯示小U完成回報是否已齊備、文字／照片／交接確認狀態與單點任務標記。 -->
 <!-- 2026-09-03｜Dispatch Task Contract V2：調度訂單卡與選定訂單摘要正式顯示 serviceType / serviceCategory 與 taskDetails 現場回報、交接要求。 -->
-<!-- 2026-09-02｜Dispatch Rider Visibility V1：以這份調度中心程式為基準，加入待派單「騎士可見性診斷」；對齊騎士端 3km→5km→全區波次，顯示在線、GPS、後端候選與距離阻擋原因。 -->
+<!-- 2026-09-02｜歷史紀錄：舊版使用距離圈診斷；V6.3.1 已改為全區候選診斷，不再限制距離圈。 -->
 <!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>UBee 跑腿｜智慧調度控制塔＋Profit Pricing V1</title>
+<title>UBee Dispatch V6.3.2｜App 化清單調度中心（無 Google 地圖）</title>
 
-<!-- Google Maps JavaScript API：由 /api/config 取得現有 UBee Google Maps 設定後動態載入 -->
+<!-- V6.3.2：調度中心不載入 Google Maps Platform；訂單及小U狀態以 Render 調度 API 為準。 -->
 
 <style>
 :root{
@@ -151,50 +151,12 @@ button{cursor:pointer}
 .wait{font-weight:1000;color:#50555d}
 .empty{padding:28px 10px;text-align:center;color:#9a9ea5;font-size:13px}
 
-.map-wrap{position:relative;height:520px;background:#e9ecef}
-#dispatchMap{width:100%;height:100%;z-index:1}
-.map-toolbar{
-  position:absolute;z-index:500;top:12px;left:12px;right:12px;
-  display:flex;justify-content:space-between;gap:8px;pointer-events:none
-}
-.map-toolbar>*{pointer-events:auto}
-.legend{
-  display:flex;gap:7px;flex-wrap:wrap;background:rgba(255,255,255,.94);
-  backdrop-filter:blur(8px);padding:8px 10px;border:1px solid rgba(0,0,0,.08);
-  border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.08)
-}
-.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:900;color:#535860}
-.legend-dot{width:8px;height:8px;border-radius:50%}
-.map-status{
-  background:rgba(17,17,17,.9);color:#fff;padding:8px 10px;border-radius:11px;
-  font-size:10px;font-weight:900;box-shadow:0 4px 14px rgba(0,0,0,.12)
-}
-.map-note{
-  padding:10px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;
-  gap:10px;align-items:center;font-size:11px;color:var(--muted)
-}
-
-.marker-rider,.marker-order,.marker-dropoff{
-  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.18);font-size:12px;font-weight:1000;
-  letter-spacing:-.2px
-}
-.marker-rider.free{background:var(--green);color:#fff}
-.marker-rider.busy{background:var(--blue);color:#fff}
-.marker-order.waiting{background:var(--orange);color:#fff}
-.marker-order.active{background:var(--blue);color:#fff}
-.marker-order.selected{outline:3px solid rgba(255,204,0,.55);transform:scale(1.10)}
-.marker-dropoff{background:#fff;color:var(--blue);border-color:var(--blue);width:30px;height:30px}
-.ubee-u{font-size:15px;font-weight:1000;line-height:1}
-.map-wrap .leaflet-container{background:#f4f5f7}
-.map-wrap .leaflet-tile{filter:saturate(.68) contrast(.96) brightness(1.02)}
-
 .dispatch-box{display:grid;gap:10px}
 .dispatch-order-summary{
   border:1px solid var(--line);border-radius:13px;padding:12px;background:#fafafa
 }
 .dispatch-order-summary strong{font-size:14px}
-.radius-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dispatch-actions-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .radius-select{
   border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;font-weight:800
 }
@@ -284,7 +246,7 @@ button{cursor:pointer}
   border-left-color:var(--green);
   background:#f4fcf7;
 }
-.rider-visibility-strip.radius{
+.rider-visibility-strip.eligibility{
   border-left-color:var(--yellow);
   background:#fffdf4;
 }
@@ -426,7 +388,6 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 @media(max-width:1150px){
   .kpis{grid-template-columns:repeat(3,1fr)}
   .main-grid{grid-template-columns:1fr}
-  .map-wrap{height:480px}
 }
 @media(max-width:680px){
   .app{padding:10px}
@@ -436,10 +397,6 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   .kpis{grid-template-columns:repeat(2,1fr)}
   .kpi .value{font-size:25px}
   .panel-head{align-items:flex-start}
-  .map-wrap{height:430px}
-  .map-toolbar{top:8px;left:8px;right:8px;flex-direction:column;align-items:flex-start}
-  .legend{max-width:100%}
-  .map-status{align-self:flex-end}
 }
 
 /* ===== V4 + V5 全局控制塔 ===== */
@@ -484,26 +441,58 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 
 
 
-<style id="ubee-ops-v620">
-:root{--ops-sidebar:216px}html{scroll-behavior:auto}body{background:#f4f6f9!important}
-.app{max-width:none!important;margin:0!important;padding:16px 20px 26px calc(var(--ops-sidebar) + 24px)!important;min-height:100vh}
-.topbar{position:relative!important;top:auto!important;z-index:4;background:white!important;box-shadow:none!important;border:1px solid #e7eaf0!important;border-radius:14px!important;padding:14px 18px!important}
-.topbar .brand{font-size:clamp(19px,1.8vw,26px)}.topbar .version{font-size:10px}
-.ops-nav{position:fixed;left:0;top:0;bottom:0;width:var(--ops-sidebar);background:#101722;display:flex;flex-direction:column;gap:7px;padding:88px 12px 18px;z-index:5;box-sizing:border-box;box-shadow:4px 0 22px #18202c12}
-.ops-nav:before{content:'UBee  /  OPS';position:absolute;top:30px;left:22px;color:#f6c344;font-weight:1000;font-size:17px;letter-spacing:.04em}
-.ops-nav button{border:0;border-radius:11px;text-align:left;padding:14px 13px;background:transparent;color:#c8d1df;font-size:13px;font-weight:800;cursor:pointer}
-.ops-nav button:hover,.ops-nav button.is-active{background:#273549;color:#fff}.ops-nav button.is-active{box-shadow:inset 3px 0 #f3bc29}
-.ops-view{display:none!important}.ops-view.is-active{display:block!important}.ops-view.is-active.ops-grid{display:grid!important}
-.ops-main-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 12px}.ops-main-header h1{font-size:21px;margin:0;font-weight:1000}.ops-main-header p{font-size:12px;color:#697586;margin:3px 0 0}
-.kpis.ops-primary-kpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:10px!important;margin:0 0 12px!important}.kpis .kpi{border-radius:13px;box-shadow:none!important}
-.ops-grid{display:grid!important;grid-template-columns:minmax(260px,0.86fr) minmax(380px,1.45fr) minmax(300px,1.02fr)!important;gap:12px!important;align-items:start}
-.ops-grid>.left-stack,.ops-grid>.right-stack,.ops-grid>.ops-dispatch-stack{display:flex!important;flex-direction:column;gap:12px;min-width:0}.ops-grid .panel{border-radius:14px;box-shadow:none!important;min-width:0}.ops-grid .panel-head{padding:12px 14px}.ops-grid .panel-title{font-size:15px}.ops-grid .order-list{max-height:calc(100vh - 310px);min-height:350px;overflow:auto}.ops-grid .map-wrap{height:clamp(430px,61vh,690px)!important;min-height:430px}.ops-grid .candidate-list{max-height:40vh;overflow-y:auto}.ops-grid .filters{flex-wrap:wrap}
-.ops-dispatch-stack{display:flex;flex-direction:column;gap:12px;min-width:0}.ops-grid .panel-body{padding:12px}.ops-page{display:none}.ops-page.is-active{display:block}.ops-page>.panel,.ops-page>.control-tower,.ops-page>.intel-grid{margin-bottom:12px}
-.ops-page .ops-page-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ops-page .intel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.ops-page .ops-secondary-metrics{display:block;margin-bottom:12px}.ops-page .ops-secondary-metrics>summary{cursor:pointer}.ops-page .ops-secondary-metrics[open] .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
-.ops-page .panel{box-shadow:none!important}.ops-page .riders-list{max-height:65vh;overflow-y:auto}.ops-page .alert-list{max-height:65vh;overflow-y:auto}
-@media(max-width:1380px){:root{--ops-sidebar:180px}.ops-grid{grid-template-columns:minmax(250px,.9fr) minmax(360px,1.3fr)!important}.ops-dispatch-stack{grid-column:1/-1;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))}.kpis.ops-primary-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
-@media(max-width:850px){:root{--ops-sidebar:0px}.app{padding:12px!important}.ops-nav{position:relative;width:auto;height:auto;display:flex;flex-direction:row;overflow-x:auto;padding:10px 0;box-shadow:none;background:transparent}.ops-nav:before{display:none}.ops-nav button{white-space:nowrap;background:#fff;color:#263144;border:1px solid #e3e7ec;padding:10px}.ops-nav button.is-active{background:#172131}.ops-grid{grid-template-columns:minmax(0,1fr)!important}.ops-dispatch-stack{grid-column:auto;display:flex!important}.kpis.ops-primary-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}.ops-page .ops-page-grid,.ops-page .intel-grid{grid-template-columns:1fr}.topbar{flex-wrap:wrap}}
+<style id="ubee-v632-pure-data">
+:root{--ubee-orange:#ee754b;--line:#e7e7eb;--ubee-bg:#f5f4f7}
+body{background:var(--ubee-bg)!important}
+.app{max-width:1170px!important;margin:0 auto!important;padding:14px 18px 48px!important}
+.topbar{position:relative!important;top:auto!important;box-shadow:none!important;border:0!important;border-radius:18px!important;background:#fff!important;padding:12px 16px!important}
+.topbar .brand{font-size:22px!important}.topbar .version{background:#1a1b20!important;font-size:10px!important}
+.topbar .actions{gap:8px!important;flex-wrap:wrap}.ops-updated-time{color:#8a8d94;font-size:11px;font-weight:700}
+.ops-nav{position:relative!important;left:auto!important;top:auto!important;bottom:auto!important;width:auto!important;height:auto!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:4px!important;margin:11px 0 16px!important;padding:7px!important;background:#fff!important;border-radius:14px!important;box-shadow:none!important}
+.ops-nav:before{display:none!important}.ops-nav button{background:transparent!important;color:#5d626a!important;padding:10px 13px!important;min-height:39px!important;border:0!important;border-radius:10px!important}
+.ops-nav button.is-active{background:var(--ubee-orange)!important;color:#fff!important}
+.ops-primary-kpis{display:none!important}.ops-view,.ops-page,.ops-home{display:none!important}
+.ops-view.is-active,.ops-page.is-active,.ops-home.is-active{display:block!important}
+.ops-home{max-width:890px;margin:0 auto}.ops-hero{background:var(--ubee-orange);color:#fff;min-height:245px;padding:63px 16px 110px;border-radius:26px 26px 0 0;text-align:center}
+.ops-hero h1{font-size:39px;font-weight:750;letter-spacing:.04em;margin:0}.ops-hero p{font-size:13px;opacity:.9;margin-top:10px}
+.ops-home-content{max-width:760px;margin:-65px auto 20px;position:relative;padding:0 12px}
+.ops-home-card{background:#fff;border-radius:18px;margin:0 0 16px;padding:23px;min-height:155px;border:1px solid #f1f1f2;box-shadow:0 5px 22px #2a2a4309}
+.ops-home-card h2{font-size:17px;font-weight:700;margin:0 0 20px}
+.ops-home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.ops-home-stat{border:0;background:transparent;border-right:1px solid #e5e5e9;text-align:center;cursor:pointer;padding:4px 5px 8px}.ops-home-stat:last-child{border-right:0}
+.ops-home-stat b{display:block;font-weight:700;font-size:32px;color:var(--ubee-orange)}.ops-home-stat span{display:block;color:#666a72;font-size:13px;margin-top:6px}
+.ops-home-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ops-home-link{border:1px solid #ececf0;background:#fff;color:#333;border-radius:15px;min-height:105px;cursor:pointer;font-size:14px;font-weight:700}
+.ops-home-link i{font-style:normal;display:block;color:var(--ubee-orange);font-size:27px;font-weight:800;margin-bottom:8px}
+.ops-home-link:hover,.ops-home-link:focus-visible{border-color:var(--ubee-orange);background:#fff8f4;outline-color:var(--ubee-orange)}
+.ops-mobile-heading{display:none;align-items:center;justify-content:space-between;margin:4px 0 13px;background:#fff;min-height:59px;border-radius:13px;padding:8px 13px}
+.ops-mobile-heading.is-active{display:flex}.ops-mobile-heading h1{font-size:19px;margin:0}.ops-back{font-size:32px;border:0;background:transparent;line-height:1;color:#444;cursor:pointer;min-width:40px;text-align:left}
+#opsWorkbench{display:none!important}#opsWorkbench.is-active{display:block!important}.ops-order-workspace{display:grid;grid-template-columns:minmax(0,1.04fr) minmax(330px,.96fr);align-items:start;gap:15px}
+.ops-order-workspace .panel{border-radius:15px!important;box-shadow:none!important}
+.ops-dispatch-stack{display:flex!important;flex-direction:column;gap:13px;min-width:0;position:sticky;top:15px;max-height:calc(100vh - 30px);overflow:auto}
+.ops-order-workspace .order-list{max-height:75vh;overflow:auto;display:grid;gap:10px;padding:0 2px}
+.ops-order-workspace .order-card{padding:13px!important;border-radius:13px}.ops-order-workspace .order-card.selected{padding:12px!important}
+.ops-order-workspace .profit-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ops-order-workspace #selectedOrderSummary{font-size:12px;line-height:1.6}
+.ops-list-toolbar{display:grid!important;gap:10px!important;align-items:stretch!important;margin:0 0 12px!important}
+.ops-list-search{width:100%!important;max-width:none!important;background:#fafafa!important;border:1px solid #e5e5e9!important;padding:13px 15px!important;font-size:14px;border-radius:12px!important}
+.ops-status-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#f0f0f2;border-radius:11px;padding:5px;gap:3px}
+.ops-status-tabs button{padding:11px 2px;font-size:13px;font-weight:700;background:transparent;border:0;border-radius:9px;white-space:nowrap;cursor:pointer;color:#63666e}
+.ops-status-tabs button.is-active{background:#fff;color:#282a31;box-shadow:0 1px 5px #00000018}
+.ops-order-workspace .panel-head{padding:13px 16px}.ops-order-workspace .panel-head>.filters{display:none!important}
+.ops-order-workspace .panel-title{font-size:16px!important}
+.ops-order-workspace .panel-sub{font-size:11px!important}
+.ops-page .panel{box-shadow:none!important}.ops-page .riders-list{max-height:none!important;display:block!important}
+.ops-page[data-ops-page="riders"] .rider-row{padding:17px 16px!important;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ops-page[data-ops-page="riders"] .rider-name{font-size:15px!important}
+.ops-page[data-ops-page="riders"] .rider-meta{font-size:12px!important;line-height:1.8;margin-top:8px}
+.ops-page[data-ops-page="riders"] .rider-state{font-size:12px;border-radius:999px;background:#e7f5ed;padding:5px 10px;white-space:nowrap}
+.ops-page[data-ops-page="riders"] .riders-list [hidden],.ops-order-workspace .order-list [hidden]{display:none!important}
+.ops-page[data-ops-page="analysis"] .intel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ops-page[data-ops-page="overview"] .ops-primary-kpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.ops-page[data-ops-page="overview"] .control-tower{margin-top:14px}
+@media(max-width:900px){.ops-order-workspace{grid-template-columns:minmax(0,1fr)}.ops-dispatch-stack{position:relative;top:0;max-height:none}.ops-order-workspace .order-list{max-height:none}.ops-page[data-ops-page="overview"] .ops-primary-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:700px){.app{padding:10px!important}.topbar .brand{font-size:18px!important}.topbar .status-live{display:none}.topbar .version{font-size:9px!important}.ops-nav{overflow-x:auto!important;flex-wrap:nowrap!important}.ops-nav button{white-space:nowrap}.ops-hero{min-height:225px;padding:52px 10px 95px;border-radius:22px 22px 0 0}.ops-hero h1{font-size:36px}.ops-home-content{padding:0 7px}.ops-home-card{padding:19px 12px}.ops-home-stat span{font-size:12px}.ops-home-links{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-status-tabs button{font-size:12px}.ops-page[data-ops-page="analysis"] .intel-grid{grid-template-columns:1fr}.ops-page[data-ops-page="riders"] .rider-row{padding:13px 9px!important}}
 </style>
 </head>
 
@@ -525,21 +514,22 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 
   <header class="topbar">
     <div class="brand-wrap">
-      <div class="brand">U<span class="bee">Bee</span> Operations Center</div>
-      <div class="version">V6.2.0 · NATIVE OPERATIONS CONSOLE</div>
+      <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
+      <div class="version">V6.3.2 · PURE DATA OPERATIONS</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
-      <button class="btn" id="fitMapBtn">定位全部</button>
+      <span id="lastUpdated" class="ops-updated-time">尚未更新</span>
       <button class="btn primary" id="refreshBtn">重新整理</button>
       <button class="btn dispatch-logout-btn" id="dispatchLogoutBtn" type="button">鎖定調度中心</button>
     </div>
   </header>
 
   <nav class="ops-nav" aria-label="營運後台導覽">
-    <button type="button" data-ops-view="dispatch" class="is-active">即時調度</button>
+    <button type="button" data-ops-view="home" class="is-active">首頁</button>
+    <button type="button" data-ops-view="dispatch">訂單調度</button>
     <button type="button" data-ops-view="overview">營運總覽</button>
-    <button type="button" data-ops-view="riders">小U運力</button>
+    <button type="button" data-ops-view="riders">小U管理</button>
     <button type="button" data-ops-view="incidents">異常案件</button>
     <button type="button" data-ops-view="analysis">城市供需與財務</button>
   </nav>
@@ -578,7 +568,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
         <div class="panel-head">
           <div>
             <div class="panel-title">任務調度與小U候選</div>
-            <div class="panel-sub">全區候選排序｜顯示距離但不以距離排除合法候選</div>
+            <div class="panel-sub">全區候選｜不需地圖，定位僅供參考</div>
           </div>
         </div>
         <div class="panel-body">
@@ -589,17 +579,8 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 
             <div id="v3RiskActionPanel" class="v3-risk-panel"></div>
 
-            <div class="radius-row">
+            <div class="dispatch-actions-row">
               <strong style="font-size:12px">全區任務池 · 無距離限制</strong>
-              <select id="radiusSelect" class="radius-select" hidden aria-hidden="true">
-                <option value="2">2 km</option>
-                <option value="3" selected>3 km</option>
-                <option value="5">5 km</option>
-                <option value="8">8 km</option>
-                <option value="12">12 km</option>
-                <option value="20">20 km</option>
-              </select>
-              <button class="btn small yellow" id="expandRadiusBtn" hidden disabled>已停用的擴圈操作</button>
               <button class="btn small" id="redispatchBtn" disabled>重新派單</button>
               <button class="btn small danger" id="unassignBtn" disabled>取消派單</button>
               <button class="btn small danger" id="emergencyRecoverBtn" disabled>啟動備援轉派</button>
@@ -610,7 +591,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
             </div>
 
             <div class="api-note">
-              V3 會綜合距離、定位新鮮度、任務階段、停留時間、區域供需與既有調度統計排序。取件前高風險任務可人工確認後啟動備援轉派；取件後啟用貨物安全鎖，禁止直接轉派。
+              優先顯示後端智慧候選；若無候選則顯示在線小U供人工參考，最終資格由後端確認。取件前高風險任務可人工確認後啟動備援轉派；取件後啟用貨物安全鎖，禁止直接轉派。
             </div>
           </div>
         </div>
@@ -622,31 +603,6 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
     </section>
 
     <section class="right-stack">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">即時營運地圖</div>
-            <div class="panel-sub">區域供需風險圈＋訂單／小U＋選定任務最近移動軌跡；點區域卡可聚焦該區營運</div>
-          </div>
-        </div>
-        <div class="map-wrap">
-          <div id="dispatchMap"></div>
-          <div class="map-toolbar">
-            <div class="legend">
-              <span class="legend-item"><i class="legend-dot" style="background:var(--green)"></i>上線小U <b id="legendFree">0</b></span>
-              <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>任務中 <b id="legendBusy">0</b></span>
-              <span class="legend-item"><i class="legend-dot" style="background:var(--orange)"></i>待派單 <b id="legendWaiting">0</b></span>
-              <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>配送中 <b id="legendActive">0</b></span>
-            </div>
-            <div class="map-status" id="mapStatus">地圖初始化中</div>
-          </div>
-        </div>
-        <div class="map-note">
-          <span id="mapInfo">目前顯示：台中地區</span>
-          <span id="lastUpdated">尚未更新</span>
-        </div>
-      </div>
-
       <div class="panel">
         <div class="panel-head">
           <div>
@@ -978,7 +934,6 @@ function logoutDispatch(){
    POST /api/dispatch/orders/:orderId/assign
    POST /api/dispatch/orders/:orderId/unassign
    POST /api/dispatch/orders/:orderId/redispatch
-   POST /api/dispatch/orders/:orderId/expand-radius
    POST /api/dispatch/orders/:orderId/recover
    ============================================================ */
 
@@ -995,21 +950,9 @@ const state = {
   incidentModalOrderId: '',
   incidentModalIncidentId: '',
   incidentModalAction: '',
-  radiusKm: 999,
   towerRiskFilter: 'all',
   stageFilter: '',
   zoneFilter: '',
-  map: null,
-  mapReady: false,
-  googleMapsApiKey: '',
-  googleMapsMapId: '',
-  googleMapsLoadPromise: null,
-  mapObjects: [],
-  infoWindow: null,
-  directionsService: null,
-  directionsRenderer: null,
-  routeRequestSeq: 0,
-  firstMapFitDone: false,
   dynamicPricingSettings: {
     global:{},
     weatherAdjustment:{}
@@ -1109,11 +1052,9 @@ function hasLatLng(lat,lng){
   return a !== null && b !== null && Math.abs(a) <= 90 && Math.abs(b) <= 180;
 }
 
-// 調度中心地圖只接受台灣營運範圍內的座標。
-// 目的不是限制 UBee 派單，而是防止 0,0、測試座標或異常舊座標
-// 被加入 fitBounds 後，把整張地圖縮到世界尺度。
-// 範圍包含台灣本島、澎湖、金門、馬祖等離島。
-function hasTaiwanMapLatLng(lat,lng){
+// 僅用於清單判斷最後定位資料是否是有效台灣座標。
+// 不影響後端派單資格、縣市隔離或距離判定。
+function hasValidTaiwanCoordinates(lat,lng){
   const a = num(lat), b = num(lng);
   return (
     a !== null &&
@@ -1158,50 +1099,6 @@ function riderStateLabel(rider){
     paused:'暫停接單',
     offline:'離線'
   }[riderStateKey(rider)] || '離線';
-}
-
-// 地圖顯示邏輯：
-// - 綠色 U：只顯示目前真正開啟騎士端、近期 heartbeat 仍有效的小U。
-// - 藍色 U：真正任務中永遠優先保留。
-// rider.online 維持原本即時在線新鮮度規則。
-function riderMapStateKey(rider){
-  const stateKey = String(rider?.mapState || '').toUpperCase();
-
-  if(
-    rider?.busy === true ||
-    stateKey === 'BUSY' ||
-    String(rider?.dispatchState || '').toUpperCase() === 'BUSY'
-  ){
-    return 'busy';
-  }
-
-  if(
-    rider?.online === true ||
-    rider?.mapOnline === true
-  ){
-    return 'online';
-  }
-
-  return riderStateKey(rider);
-}
-
-function riderMapStateLabel(rider){
-  const key = riderMapStateKey(rider);
-  if(key === 'busy') return '任務中';
-  if(key === 'online'){
-    return rider?.online === true
-      ? '上線可接單'
-      : '已上線・定位待更新';
-  }
-  return riderStateLabel(rider);
-}
-
-function riderMapStateColor(rider){
-  return riderMapStateKey(rider) === 'busy'
-    ? '#3478f6'
-    : riderMapStateKey(rider) === 'online'
-      ? '#20a464'
-      : riderStateColor(rider);
 }
 
 function trackingHealth(updatedAtMs){
@@ -1307,283 +1204,36 @@ function waitBadge(order){
    Dispatch Rider Visibility V1
    目的：
    1. 調度中心直接看出「為什麼有待派單但小U可能看不到」
-   2. 波次邏輯與 rider.html 對齊：0-30秒 3km、31-60秒 5km、60秒後全區
-   3. 若智慧調度已有 candidates，優先用後端候選；否則以即時在線＋GPS＋距離估算
+   2. 全區任務池：不根據距離圈阻擋候選；定位資料僅供顯示與診斷
+   3. 優先使用後端候選；候選缺失時以在線運力作為診斷參考
    4. 此區是營運診斷；服務區域、付款、略過名單等最終資格仍由後端 /api/rider/tasks 判定
    ============================================================ */
 
-function getRiderVisibilityOrderStartedAtMs(order){
-  const values=[
-    order?.redispatchStartedAtMs,
-    order?.dispatchStartedAtMs,
-    order?.redispatchStartedAt,
-    order?.dispatchStartedAt,
-    order?.createdAtMs,
-    order?.createdAt
-  ];
-
-  for(const value of values){
-    if(!value) continue;
-    if(typeof value==='number' && Number.isFinite(value)) return value;
-    if(typeof value==='string'){
-      const parsed=Date.parse(value);
-      if(Number.isFinite(parsed)) return parsed;
-    }
-    if(value && typeof value.toDate==='function'){
-      try{return value.toDate().getTime();}catch(_){}
-    }
-  }
-
-  return 0;
-}
-
-function getRiderVisibilityWave(order){
-  const startedAtMs=getRiderVisibilityOrderStartedAtMs(order);
-
-  if(!startedAtMs){
-    const fallback=Number(order?.dispatchRadiusKm);
-    if(Number.isFinite(fallback) && fallback>0 && fallback<999){
-      return {radiusKm:fallback,label:`${fallback} km`,stage:'manual'};
-    }
-    return {radiusKm:999,label:'全區',stage:'global'};
-  }
-
-  const elapsedSeconds=Math.max(
-    0,
-    Math.floor((Date.now()-startedAtMs)/1000)
-  );
-
-  if(elapsedSeconds<=30){
-    return {radiusKm:3,label:'3 km',stage:'3km'};
-  }
-
-  if(elapsedSeconds<=60){
-    return {radiusKm:5,label:'5 km',stage:'5km'};
-  }
-
-  return {radiusKm:999,label:'全區',stage:'global'};
-}
-
-function getRiderVisibilityCandidateRows(order,wave){
-  const riders=Array.isArray(state.data.riders)
-    ? state.data.riders
-    : [];
-
-  const insight=getOrderInsight(order?.id);
-  const backendCandidates=
-    insight && Array.isArray(insight.candidates)
-      ? insight.candidates
-      : [];
-
-  const byRiderId=new Map();
-
-  riders.forEach(rider=>{
-    [
-      rider?.riderId,
-      rider?.riderDocId,
-      rider?.id
-    ]
-      .map(value=>String(value||'').trim())
-      .filter(Boolean)
-      .forEach(key=>byRiderId.set(key,rider));
-  });
-
-  if(backendCandidates.length){
-    return backendCandidates.map(candidate=>{
-      const keyCandidates=[
-        candidate?.riderId,
-        candidate?.riderDocId,
-        candidate?.id
-      ]
-        .map(value=>String(value||'').trim())
-        .filter(Boolean);
-
-      let base={};
-      for(const key of keyCandidates){
-        if(byRiderId.has(key)){
-          base=byRiderId.get(key)||{};
-          break;
-        }
-      }
-
-      const merged={...base,...candidate};
-
-      let distanceKm=Number(merged.distanceKm);
-      if(
-        !Number.isFinite(distanceKm) &&
-        hasLatLng(order?.pickupLat,order?.pickupLng) &&
-        hasLatLng(merged?.currentLat,merged?.currentLng)
-      ){
-        distanceKm=haversineKm(
-          Number(order.pickupLat),
-          Number(order.pickupLng),
-          Number(merged.currentLat),
-          Number(merged.currentLng)
-        );
-      }
-
-      return {
-        ...merged,
-        distanceKm:Number.isFinite(distanceKm)?distanceKm:null,
-        fromBackendCandidate:true
-      };
-    });
-  }
-
-  if(!hasLatLng(order?.pickupLat,order?.pickupLng)){
-    return [];
-  }
-
-  return riders.map(rider=>{
-    let distanceKm=null;
-
-    if(hasLatLng(rider?.currentLat,rider?.currentLng)){
-      distanceKm=haversineKm(
-        Number(order.pickupLat),
-        Number(order.pickupLng),
-        Number(rider.currentLat),
-        Number(rider.currentLng)
-      );
-    }
-
-    return {
-      ...rider,
-      distanceKm,
-      fromBackendCandidate:false
-    };
-  });
-}
-
 function getRiderVisibilityDiagnostics(order){
   if(!order || statusKind(order)!=='waiting'){
-    return {
-      applicable:false,
-      state:'active',
-      label:'已離開待派階段',
-      wave:{radiusKm:0,label:'-'},
-      visibleCount:0,
-      onlineAvailableCount:0,
-      gpsAvailableCount:0,
-      backendCandidateCount:0,
-      skippedCount:0,
-      outsideRadiusCount:0,
-      minDistanceKm:null,
-      reason:'此訂單目前不是待派單。'
-    };
+    return {applicable:false,state:'active',label:'已離開待派階段',visibleCount:0};
   }
-
-  const wave=getRiderVisibilityWave(order);
-  const riders=Array.isArray(state.data.riders)
-    ? state.data.riders
-    : [];
-
-  const onlineAvailable=riders.filter(
-    rider=>rider?.online===true && rider?.busy!==true
-  );
-
-  const gpsAvailable=onlineAvailable.filter(
-    rider=>hasLatLng(rider?.currentLat,rider?.currentLng)
-  );
-
+  const riders=Array.isArray(state.data.riders)?state.data.riders:[];
+  const onlineAvailable=riders.filter(r=>r?.online===true&&r?.busy!==true);
+  const gpsAvailable=onlineAvailable.filter(r=>hasLatLng(r?.currentLat,r?.currentLng));
   const insight=getOrderInsight(order.id);
-  const backendCandidates=
-    insight && Array.isArray(insight.candidates)
-      ? insight.candidates
-      : [];
-
-  const rows=getRiderVisibilityCandidateRows(order,wave);
-
-  const candidateRows=backendCandidates.length
-    ? rows.filter(row=>row?.skippedThisOrder!==true)
-    : rows.filter(row=>row?.online===true && row?.busy!==true);
-
-  const skippedCount=backendCandidates.filter(
-    row=>row?.skippedThisOrder===true
-  ).length;
-
-  const eligibleOnlineRows=candidateRows.filter(
-    row=>row?.online===true && row?.busy!==true
-  );
-
-  const eligibleGpsRows=eligibleOnlineRows.filter(
-    row=>Number.isFinite(Number(row?.distanceKm))
-  );
-
-  const isGlobal=
-    !Number.isFinite(Number(wave.radiusKm)) ||
-    Number(wave.radiusKm)>=999;
-
-  const visibleRows=eligibleGpsRows.filter(row=>
-    isGlobal ||
-    Number(row.distanceKm)<=Number(wave.radiusKm)
-  );
-
-  const outsideRadiusRows=eligibleGpsRows.filter(row=>
-    !isGlobal &&
-    Number(row.distanceKm)>Number(wave.radiusKm)
-  );
-
-  const minDistanceKm=eligibleGpsRows.length
-    ? Math.min(
-        ...eligibleGpsRows.map(row=>Number(row.distanceKm))
-      )
-    : null;
-
-  let stateKey='blocked';
-  let label='目前無小U可見';
-  let reason='目前沒有符合本波次條件的小U。';
-
-  if(visibleRows.length>0){
-    stateKey='ready';
-    label=`預估 ${visibleRows.length} 位可進入本波次`;
-    reason=backendCandidates.length
-      ? '智慧候選、在線狀態與派單距離均符合目前波次。'
-      : '依在線狀態、GPS 與距離估算，可進入目前派單波次。';
-  }else if(onlineAvailable.length===0){
-    stateKey='offline';
-    label='目前沒有可接單小U在線';
-    reason='調度中心目前沒有偵測到在線且非任務中的小U。';
-  }else if(gpsAvailable.length===0){
-    stateKey='gps';
-    label='在線小U尚無可用定位';
-    reason='小U雖在線，但目前沒有可用 GPS，前 3 km／5 km 波次無法完成距離判斷。';
-  }else if(
-    backendCandidates.length &&
-    candidateRows.length===0
-  ){
-    stateKey='eligibility';
-    label='後端候選目前為 0';
-    reason='有在線運力，但智慧候選沒有可派人員；請檢查服務區域、略過名單、付款或其他後端資格。';
-  }else if(outsideRadiusRows.length>0){
-    stateKey='radius';
-    label=`${outsideRadiusRows.length} 位在本波次外`;
-    reason=`目前是 ${wave.label} 波次；最近候選約 ${Number(minDistanceKm).toFixed(2)} km，等待擴圈後可能進入。`;
-  }else if(backendCandidates.length && skippedCount>0){
-    stateKey='eligibility';
-    label='候選已被略過或資格受限';
-    reason=`智慧候選中有 ${skippedCount} 位被標記為本單略過；其餘候選目前未進入本波次。`;
-  }
-
+  const backendCandidates=Array.isArray(insight?.candidates)?insight.candidates:[];
+  const eligible=backendCandidates.length
+    ? backendCandidates.filter(c=>c.skippedThisOrder!==true&&c.online===true&&c.busy!==true)
+    : onlineAvailable;
+  const validDistance=eligible.map(r=>Number(r.distanceKm)).filter(x=>Number.isFinite(x)&&x>=0);
+  const minDistanceKm=validDistance.length?Math.min(...validDistance):null;
+  let stateKey='ready',label=`目前 ${eligible.length} 位在線候選`,reason='依目前資料顯示全區可接單人力；最終派單資格仍由後端確認。';
+  if(!onlineAvailable.length){stateKey='offline';label='目前沒有可接單小U在線';reason='調度中心尚未偵測到可接單的小U。';}
+  else if(backendCandidates.length && !eligible.length){stateKey='eligibility';label='後端候選目前為 0';reason='請檢查服務縣市、帳戶資格、略過名單及任務狀態。';}
+  else if(!gpsAvailable.length){stateKey='gps';label='目前定位資訊待更新';reason='定位缺失不會阻止前端顯示小U；派單資格由後端確認。';}
   return {
-    applicable:true,
-    state:stateKey,
-    label,
-    reason,
-    wave,
-    visibleCount:visibleRows.length,
+    applicable:true,state:stateKey,label,reason,
+    visibleCount:eligible.length,
     onlineAvailableCount:onlineAvailable.length,
     gpsAvailableCount:gpsAvailable.length,
-    backendCandidateCount:backendCandidates.filter(
-      row=>row?.skippedThisOrder!==true
-    ).length,
-    skippedCount,
-    outsideRadiusCount:outsideRadiusRows.length,
-    minDistanceKm:Number.isFinite(minDistanceKm)
-      ? minDistanceKm
-      : null,
-    source:backendCandidates.length
-      ? 'backend_candidates'
-      : 'local_estimate'
+    backendCandidateCount:backendCandidates.filter(c=>c.skippedThisOrder!==true).length,
+    minDistanceKm,source:backendCandidates.length?'backend_candidates':'local_estimate'
   };
 }
 
@@ -1610,14 +1260,14 @@ function riderVisibilityStrip(order,{compact=false}={}){
   const sourceLabel=
     d.source==='backend_candidates'
       ? '後端智慧候選'
-      : '運力／距離估算';
+      : '在線運力估算';
 
   if(compact){
     return `
       <div class="rider-visibility-strip ${esc(d.state)}">
         <div class="rider-visibility-head">
-          <strong>騎士可見性｜${esc(d.label)}</strong>
-          <span class="rider-visibility-label">${esc(d.wave.label)} 波次</span>
+          <strong>小U候選狀態｜${esc(d.label)}</strong>
+          <span class="rider-visibility-label">全區候選</span>
         </div>
         <div class="rider-visibility-reason">${esc(d.reason)}</div>
       </div>
@@ -1627,13 +1277,13 @@ function riderVisibilityStrip(order,{compact=false}={}){
   return `
     <div class="rider-visibility-strip ${esc(d.state)}">
       <div class="rider-visibility-head">
-        <strong>Rider Visibility｜${esc(d.label)}</strong>
-        <span class="rider-visibility-label">${esc(d.wave.label)} 波次 · ${esc(sourceLabel)}</span>
+        <strong>小U候選狀態｜${esc(d.label)}</strong>
+        <span class="rider-visibility-label">全區候選 · ${esc(sourceLabel)}</span>
       </div>
       <div class="rider-visibility-grid">
         <div class="rider-visibility-mini">
           <b>${esc(d.visibleCount)}</b>
-          <span>本波次可見</span>
+          <span>目前候選</span>
         </div>
         <div class="rider-visibility-mini">
           <b>${esc(d.onlineAvailableCount)}</b>
@@ -1736,483 +1386,12 @@ function suggestedIncidentTypeFromAlert(alert){
 }
 
 /* =========================
-   地圖：Google Maps 營運監控版
-   - 底圖與 UBee 客戶端一致，使用現有 /api/config 的 Google Maps 設定
-   - 綠色 U：保持上線的小U（即使暫時沒有新 heartbeat，也保留最後位置）
-   - 藍色 U：任務中小U
-   - 橘黃「取」：待派單
-   - 藍色「取」：配送中
-   - 黃色「送」：選中訂單送達點
-   - 黑色道路路線：優先使用 DirectionsService，失敗則以黑色直線備援
-   ========================= */
-async function ensureGoogleMapsLoaded(){
-  if(window.google && window.google.maps){
-    return true;
-  }
-
-  if(state.googleMapsLoadPromise){
-    return state.googleMapsLoadPromise;
-  }
-
-  state.googleMapsLoadPromise = (async()=>{
-    const cfgRes = await fetch('/api/config',{cache:'no-store'});
-    if(!cfgRes.ok){
-      throw new Error(`Google Maps 設定讀取失敗 (${cfgRes.status})`);
-    }
-
-    const cfg = await cfgRes.json();
-    state.googleMapsApiKey = String(cfg.googleMapsApiKey || '').trim();
-    state.googleMapsMapId = String(cfg.googleMapsMapId || '').trim();
-
-    if(!state.googleMapsApiKey){
-      throw new Error('Google Maps API Key 尚未設定');
-    }
-
-    await new Promise((resolve,reject)=>{
-      const callbackName = '__ubeeDispatchGoogleMapsReady';
-      window[callbackName] = ()=>{
-        try{ delete window[callbackName]; }catch{}
-        resolve();
-      };
-
-      const script = document.createElement('script');
-      script.dataset.ubeeDispatchGoogleMaps = 'true';
-      script.src =
-        'https://maps.googleapis.com/maps/api/js' +
-        `?key=${encodeURIComponent(state.googleMapsApiKey)}` +
-        '&v=weekly' +
-        '&loading=async' +
-        `&callback=${encodeURIComponent(callbackName)}` +
-        '&language=zh-TW' +
-        '&region=TW';
-      script.async = true;
-      script.onerror = ()=>{
-        try{ delete window[callbackName]; }catch{}
-        reject(new Error('Google Maps JavaScript API 載入失敗'));
-      };
-      document.head.appendChild(script);
-    });
-
-    return true;
-  })().catch(err=>{
-    state.googleMapsLoadPromise = null;
-    throw err;
-  });
-
-  return state.googleMapsLoadPromise;
-}
-
-async function initMap(){
-  if(state.mapReady && state.map) return true;
-
-  try{
-    await ensureGoogleMapsLoaded();
-  }catch(error){
-    console.error('UBee dispatch Google Maps load error:',error);
-    $('mapStatus').textContent = 'Google 地圖載入失敗';
-    $('mapInfo').textContent = error.message;
-    return false;
-  }
-
-  const options = {
-    center:{lat:24.1477,lng:120.6736},
-    zoom:11,
-    mapTypeId:'roadmap',
-    disableDefaultUI:false,
-    mapTypeControl:false,
-    streetViewControl:false,
-    fullscreenControl:true,
-    clickableIcons:false,
-    gestureHandling:'greedy',
-    backgroundColor:'#e8eaed'
-  };
-
-  if(state.googleMapsMapId){
-    options.mapId = state.googleMapsMapId;
-  }
-
-  state.map = new google.maps.Map($('dispatchMap'),options);
-  state.infoWindow = new google.maps.InfoWindow();
-  state.directionsService = new google.maps.DirectionsService();
-  state.directionsRenderer = new google.maps.DirectionsRenderer({
-    map:state.map,
-    suppressMarkers:true,
-    preserveViewport:true,
-    polylineOptions:{
-      strokeColor:'#171717',
-      strokeWeight:6,
-      strokeOpacity:.92
-    }
-  });
-
-  state.mapReady = true;
-  $('mapStatus').textContent = 'Google 營運監控地圖已啟動';
-  return true;
-}
-
-function clearMapObjects(){
-  for(const obj of state.mapObjects){
-    try{ obj.setMap(null); }catch{}
-  }
-  state.mapObjects = [];
-  if(state.directionsRenderer){
-    try{ state.directionsRenderer.setDirections({routes:[]}); }catch{}
-  }
-}
-
-function addMapObject(obj){
-  if(obj) state.mapObjects.push(obj);
-  return obj;
-}
-
-function markerSymbol(fillColor, scale=15){
-  return {
-    path:google.maps.SymbolPath.CIRCLE,
-    fillColor,
-    fillOpacity:1,
-    strokeColor:'#ffffff',
-    strokeOpacity:1,
-    strokeWeight:3,
-    scale
-  };
-}
-
-function createOpsMarker({position,label,fillColor,title,zIndex=1,onClick,infoHtml}){
-  const marker = new google.maps.Marker({
-    map:state.map,
-    position,
-    title:title || '',
-    zIndex,
-    icon:markerSymbol(fillColor,15),
-    label:{
-      text:String(label || ''),
-      color:'#111111',
-      fontWeight:'1000',
-      fontSize:'14px'
-    }
-  });
-
-  if(onClick || infoHtml){
-    marker.addListener('click',()=>{
-      if(typeof onClick === 'function') onClick();
-      if(infoHtml && state.infoWindow){
-        state.infoWindow.setContent(infoHtml);
-        state.infoWindow.open({map:state.map,anchor:marker});
-      }
-    });
-  }
-
-  return addMapObject(marker);
-}
-
-async function drawSelectedOrderRoute(order,pickup,dropoff){
-  const requestSeq = ++state.routeRequestSeq;
-
-  if(!state.directionsService || !state.directionsRenderer) return;
-
-  const geoStops=getDispatchDeliveryStops(order)
-    .filter(stop=>hasTaiwanMapLatLng(stop.dropoffLat,stop.dropoffLng));
-  const routePoints=geoStops.length
-    ? geoStops.map(stop=>({lat:Number(stop.dropoffLat),lng:Number(stop.dropoffLng)}))
-    : [dropoff];
-  const destination=routePoints[routePoints.length-1]||dropoff;
-  const waypoints=routePoints.slice(0,-1).map(location=>({location,stopover:true}));
-
-  try{
-    const result = await new Promise((resolve,reject)=>{
-      state.directionsService.route({
-        origin:pickup,
-        destination,
-        waypoints,
-        optimizeWaypoints:false,
-        travelMode:google.maps.TravelMode.DRIVING,
-        provideRouteAlternatives:false
-      },(response,status)=>{
-        if(status === 'OK' && response) resolve(response);
-        else reject(new Error(`Directions ${status}`));
-      });
-    });
-
-    if(requestSeq !== state.routeRequestSeq) return;
-    state.directionsRenderer.setDirections(result);
-  }catch(error){
-    if(requestSeq !== state.routeRequestSeq) return;
-    console.warn('UBee dispatch route fallback:',error);
-
-    const line = new google.maps.Polyline({
-      map:state.map,
-      path:[pickup,...routePoints],
-      strokeColor:'#171717',
-      strokeWeight:6,
-      strokeOpacity:.88,
-      geodesic:true,
-      zIndex:20
-    });
-    addMapObject(line);
-  }
-}
-
-async function renderMap(){
-  if(!(await initMap())) return;
-
-  clearMapObjects();
-
-  const bounds = new google.maps.LatLngBounds();
-  let hasBounds = false;
-
-  // V5 區域供需風險圈。
-  renderZoneOperationalOverlays(bounds);
-  let free = 0, busy = 0, paused = 0, offline = 0, waiting = 0, active = 0;
-
-  const renderedTaskRiderKeys = new Set();
-  const activeTaskOrders = (state.data.orders || []).filter(order=>statusKind(order)!=='waiting');
-
-  for(const rider of state.data.riders || []){
-    // 名單狀態仍使用 riderStateKey；地圖顯示改用 riderMapStateKey。
-    // 因此「5 分鐘內無 heartbeat」不會讓仍保持上線的小U從地圖消失。
-    const listState = riderStateKey(rider);
-    const visualState = riderMapStateKey(rider);
-
-    if(visualState === 'busy') busy++;
-    else if(visualState === 'online') free++;
-    else if(listState === 'paused') paused++;
-    else offline++;
-
-    // 任務中的小U：優先採用 orders 內該任務最後同步的位置。
-    // 即使一般 online/heartbeat 逾時，BUSY 仍保留在地圖。
-    const taskOrder = visualState === 'busy'
-      ? activeTaskOrders.find(order=>sameDispatchRider(rider,order)) || null
-      : null;
-
-    const orderLocationNewer =
-      taskOrder &&
-      hasLatLng(taskOrder.riderCurrentLat,taskOrder.riderCurrentLng) &&
-      Number(taskOrder.riderLocationUpdatedAtMs || 0) >= Number(rider.locationUpdatedAtMs || 0);
-
-    const displayLat = orderLocationNewer ? taskOrder.riderCurrentLat : rider.currentLat;
-    const displayLng = orderLocationNewer ? taskOrder.riderCurrentLng : rider.currentLng;
-    const displayLocationAtMs = orderLocationNewer
-      ? taskOrder.riderLocationUpdatedAtMs
-      : rider.locationUpdatedAtMs;
-
-    // 地圖同時顯示：
-    // 🟢 小U自己仍保持上線（mapOnline / declaredOnline）
-    // 🔵 真正任務中
-    // 暫停與真正離線者仍只保留在「全部小U」名單。
-    if(!['online','busy'].includes(visualState)) continue;
-    if(!hasTaiwanMapLatLng(displayLat,displayLng)) continue;
-
-    const position = {lat:Number(displayLat),lng:Number(displayLng)};
-    bounds.extend(position); hasBounds = true;
-
-    const tracking = visualState === 'busy'
-      ? trackingHealth(displayLocationAtMs)
-      : null;
-
-    const riderKey = String(rider.riderDocId || rider.riderId || rider.currentOrderId || '').trim().toLowerCase();
-    if(riderKey) renderedTaskRiderKeys.add(riderKey);
-    if(rider.currentOrderId) renderedTaskRiderKeys.add(String(rider.currentOrderId).trim().toLowerCase());
-
-    const mapStateLabel = riderMapStateLabel(rider);
-    const mapStateColor = riderMapStateColor(rider);
-    const locationFreshText =
-      visualState === 'online' && rider.online !== true
-        ? '<br><small style="color:#b77900;font-weight:800">目前顯示最後已知位置；即時派單仍需等待新定位／heartbeat</small>'
-        : '';
-
-    createOpsMarker({
-      position,
-      label:'U',
-      fillColor:mapStateColor,
-      title:`${rider.name || rider.riderId || '小U'} · ${mapStateLabel}`,
-      zIndex:visualState === 'busy' ? 310 : 300,
-      infoHtml:`
-        <div style="min-width:225px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
-          <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
-          <span style="font-weight:900;color:${mapStateColor}">${esc(mapStateLabel)}</span><br>
-          ${tracking ? `<span style="font-weight:900;color:${tracking.color}">● ${esc(tracking.label)}</span><br>` : ''}
-          <small>${esc(rider.district || rider.serviceArea || '未設定區域')}</small><br>
-          <small>最後定位：${esc(fmtAge(displayLocationAtMs))}</small>
-          ${locationFreshText}
-          ${taskOrder?.riderTrackingSource ? `<br><small>定位來源：${esc(taskOrder.riderTrackingSource)}</small>` : ''}
-          ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
-        </div>`
-    });
-  }
-
-  // 防漏保底：若 orders 已確認有進行中任務，但 riders 名單暫時缺少該小U，
-  // 仍使用訂單內最後已知 GPS 畫出藍色 U，不讓執行中小U從調度地圖消失。
-  for(const order of activeTaskOrders){
-    if(!hasTaiwanMapLatLng(order.riderCurrentLat,order.riderCurrentLng)) continue;
-
-    const keys = [order.riderDocId,order.riderId,order.id]
-      .map(v=>String(v||'').trim().toLowerCase())
-      .filter(Boolean);
-
-    if(keys.some(key=>renderedTaskRiderKeys.has(key))) continue;
-
-    const position={lat:Number(order.riderCurrentLat),lng:Number(order.riderCurrentLng)};
-    const tracking=trackingHealth(order.riderLocationUpdatedAtMs);
-    bounds.extend(position); hasBounds=true;
-
-    createOpsMarker({
-      position,
-      label:'U',
-      fillColor:'#3478f6',
-      title:`${order.riderName || order.riderId || '任務中小U'} · ${tracking.label}`,
-      zIndex:305,
-      infoHtml:`
-        <div style="min-width:225px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
-          <b>${esc(order.riderName || order.riderId || '任務中小U')}</b><br>
-          <span style="font-weight:900;color:#3478f6">任務中</span><br>
-          <span style="font-weight:900;color:${tracking.color}">● ${esc(tracking.label)}</span><br>
-          <small>最後定位：${esc(fmtAge(order.riderLocationUpdatedAtMs))}</small><br>
-          <small>目前訂單：${esc(order.id || '')}</small>
-          ${order.riderTrackingSource ? `<br><small>定位來源：${esc(order.riderTrackingSource)}</small>` : ''}
-        </div>`
-    });
-  }
-
-  for(const order of state.data.orders || []){
-    const kind = statusKind(order);
-    if(kind === 'waiting') waiting++; else active++;
-    if(!hasTaiwanMapLatLng(order.pickupLat,order.pickupLng)) continue;
-
-    const pickup = {lat:Number(order.pickupLat),lng:Number(order.pickupLng)};
-    bounds.extend(pickup); hasBounds = true;
-
-    const selected = String(order.id) === String(state.selectedOrderId);
-    createOpsMarker({
-      position:pickup,
-      label:'取',
-      fillColor:kind === 'waiting' ? '#f5b800' : '#3478f6',
-      title:String(order.id || ''),
-      zIndex:selected ? 520 : 220,
-      onClick:()=>selectOrder(order.id,{pan:false}),
-      infoHtml:`
-        <div style="min-width:220px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
-          <b>${esc(order.id)}</b><br>
-          <small>${esc(order.statusLabel || order.status || '')}</small><hr style="border:0;border-top:1px solid #eee">
-          <small><b>取件：</b>${esc(order.pickupAddress || '-')}</small><br>
-          <small><b>送達：</b>${esc(order.dropoffAddress || '-')}</small><br>
-          ${dispatchStopCount(order)>1?`<small><b>多點：</b>${esc(dispatchStopCount(order))} 點・${esc(dispatchMoney(order.multiStopFee||0))}</small><br>`:''}
-          <small>NT$ ${esc(order.total || 0)}</small>
-        </div>`
-    });
-
-    if(selected){
-      const selectedStops=getDispatchDeliveryStops(order);
-      let geoStops=selectedStops.filter(stop=>hasTaiwanMapLatLng(stop.dropoffLat,stop.dropoffLng));
-      if(!geoStops.length && hasTaiwanMapLatLng(order.dropoffLat,order.dropoffLng)){
-        geoStops=[{index:1,dropoffAddress:order.dropoffAddress||'',dropoffLat:Number(order.dropoffLat),dropoffLng:Number(order.dropoffLng)}];
-      }
-      geoStops.forEach((stop,index)=>{
-        const position={lat:Number(stop.dropoffLat),lng:Number(stop.dropoffLng)};
-        bounds.extend(position); hasBounds=true;
-        createOpsMarker({
-          position,
-          label:String(index+1),
-          fillColor:'#f5b800',
-          title:`送達點 ${index+1}：${order.id}`,
-          zIndex:500-index,
-          infoHtml:`<div style="min-width:180px"><b>送達點 ${index+1}</b><br><small>${esc(stop.dropoffAddress||'-')}</small></div>`
-        });
-      });
-      if(geoStops.length){
-        const finalStop=geoStops[geoStops.length-1];
-        drawSelectedOrderRoute(order,pickup,{lat:Number(finalStop.dropoffLat),lng:Number(finalStop.dropoffLng)});
-      }
-
-      if(kind === 'waiting'){
-        const circle = new google.maps.Circle({
-          map:state.map,
-          center:pickup,
-          radius:20000000,
-          strokeColor:'#f59e0b',
-          strokeOpacity:.26,
-          strokeWeight:1.5,
-          fillColor:'#f59e0b',
-          fillOpacity:.035,
-          zIndex:5
-        });
-        addMapObject(circle);
-      }
-    }
-  }
-
-  // V5 選定任務最近移動軌跡。
-  renderSelectedOrderTrail(bounds);
-
-  $('legendFree').textContent = free;
-  $('legendBusy').textContent = busy;
-  $('legendWaiting').textContent = waiting;
-  $('legendActive').textContent = active;
-
-  const mapInfo = $('mapInfo');
-  if(mapInfo){
-    mapInfo.textContent = `地圖顯示：上線小U ${free} 位｜任務中 ${busy} 位`;
-  }
-
-  if(!state.firstMapFitDone && hasBounds){
-    fitMapToData(bounds);
-    state.firstMapFitDone = true;
-  }
-}
-
-function fitMapToData(customBounds){
-  if(!state.mapReady || !state.map) return;
-
-  let bounds = customBounds;
-  if(!bounds){
-    bounds = new google.maps.LatLngBounds();
-    let hasAny = false;
-
-    for(const rider of state.data.riders || []){
-      const mapState = riderMapStateKey(rider);
-      if(
-        ['online','busy'].includes(mapState) &&
-        hasTaiwanMapLatLng(rider.currentLat,rider.currentLng)
-      ){
-        bounds.extend({lat:Number(rider.currentLat),lng:Number(rider.currentLng)});
-        hasAny = true;
-      }
-    }
-    for(const order of state.data.orders || []){
-      if(hasTaiwanMapLatLng(order.pickupLat,order.pickupLng)){
-        bounds.extend({lat:Number(order.pickupLat),lng:Number(order.pickupLng)});
-        hasAny = true;
-      }
-    }
-
-    if(!hasAny){
-      state.map.setCenter({lat:24.1477,lng:120.6736});
-      state.map.setZoom(11);
-      toast('目前沒有可定位的座標資料');
-      return;
-    }
-  }
-
-  if(bounds.isEmpty && bounds.isEmpty()){
-    state.map.setCenter({lat:24.1477,lng:120.6736});
-    state.map.setZoom(11);
-    return;
-  }
-
-  state.map.fitBounds(bounds,50);
-  google.maps.event.addListenerOnce(state.map,'idle',()=>{
-    if(state.map.getZoom() > 15) state.map.setZoom(15);
-  });
-}
-
-/* =========================
    Dashboard 資料
    ========================= */
 async function loadDashboard({silent=false}={}){
   if(!navigator.onLine){
     const statusEl = document.getElementById('systemStatusText');
-    const mapStatusEl = document.getElementById('mapStatus');
     if(statusEl) statusEl.textContent = '系統狀態：裝置網路中斷';
-    if(mapStatusEl) mapStatusEl.textContent = '連線受阻';
     return;
   }
   if(!dispatchAdminCredential) return;
@@ -2257,12 +1436,10 @@ async function loadDashboard({silent=false}={}){
     const generated = Number(data.generatedAtMs || Date.now());
     $('lastUpdated').textContent = '更新時間 ' + fmtTime(generated);
     $('systemStatusText').textContent = '系統狀態：正常';
-    $('mapStatus').textContent = '自動更新中';
 
   }catch(error){
     console.error('UBee dispatch dashboard error:',error);
     $('systemStatusText').textContent = '資料連線異常';
-    $('mapStatus').textContent = '資料讀取失敗';
     $('alertList').innerHTML = `
       <div class="alert-item"><strong>調度中心讀取失敗</strong><br>${esc(error.message)}</div>
     `;
@@ -2305,44 +1482,6 @@ function renderControlTower(){
   const meta=cityStatusMeta(ops.cityStatus); const cs=$('cityStatus'); if(cs){cs.textContent=meta.label;cs.style.color=meta.color;}
   const zb=$('selectedZoneBadge'); if(zb) zb.textContent=state.zoneFilter||'全台中';
 }
-
-function zonePointPool(district){
-  const points=[];
-  for(const o of state.data.orders||[]){
-    const od=String(o.pickupDistrict||'').trim();
-    if(od===district && hasTaiwanMapLatLng(o.pickupLat,o.pickupLng)) points.push({lat:Number(o.pickupLat),lng:Number(o.pickupLng)});
-  }
-  for(const r of state.data.riders||[]){
-    const rd=String(r.district||r.serviceArea||'').trim();
-    if(rd===district && hasTaiwanMapLatLng(r.currentLat,r.currentLng)) points.push({lat:Number(r.currentLat),lng:Number(r.currentLng)});
-  }
-  return points;
-}
-
-function renderZoneOperationalOverlays(bounds){
-  const zones=state.data.operationsV5?.zones||state.data.intelligence?.zones||[];
-  zones.forEach(z=>{
-    const district=String(z.district||'').trim(); if(!district) return;
-    const pts=zonePointPool(district); if(!pts.length) return;
-    const center={lat:pts.reduce((s,p)=>s+p.lat,0)/pts.length,lng:pts.reduce((s,p)=>s+p.lng,0)/pts.length};
-    const st=String(z.operationalState||z.risk||'BALANCED').toUpperCase();
-    const color=st==='CRITICAL'?'#e5484d':st==='HIGH'?'#f59e0b':st==='WATCH'?'#f5b800':st==='SURPLUS'?'#3478f6':'#20a464';
-    const circle=new google.maps.Circle({map:state.map,center,radius:Math.max(1300,Math.min(4200,1600+Number(z.waitingOrders||0)*180)),strokeColor:color,strokeOpacity:.65,strokeWeight:2,fillColor:color,fillOpacity:.10,zIndex:5});
-    addMapObject(circle); bounds.extend(center);
-    circle.addListener('click',()=>{state.zoneFilter=state.zoneFilter===district?'':district;renderAll();});
-  });
-}
-
-function renderSelectedOrderTrail(bounds){
-  const order=getSelectedOrder();
-  if(!order||!Array.isArray(order.riderLocationTrail)) return;
-  const path=order.riderLocationTrail.filter(p=>hasTaiwanMapLatLng(p.lat,p.lng)).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
-  if(path.length<2) return;
-  const line=new google.maps.Polyline({map:state.map,path,strokeColor:'#7c5cff',strokeOpacity:.82,strokeWeight:5,geodesic:true,zIndex:450});
-  addMapObject(line); path.forEach(p=>bounds.extend(p));
-}
-
-
 
 function getDispatchAdminKey(){
   return dispatchAdminCredential;
@@ -2664,18 +1803,17 @@ function renderAll(){
   renderRiders();
   renderAlerts();
   renderCandidates();
-  renderMap();
 }
 
 function renderSummary(){
   const s = state.data.summary || {};
-  const mapOnlineCount =
+  const onlineRiderCount =
     s.onlineRiders ??
     state.data.riders.filter(r=>r.online===true).length;
 
-  const mapOnlineWithLocation =
+  const onlineWithLocation =
     state.data.riders.filter(
-      r=>r.online===true && hasTaiwanMapLatLng(r.currentLat,r.currentLng)
+      r=>r.online===true && hasValidTaiwanCoordinates(r.currentLat,r.currentLng)
     ).length;
 
   const realtimeOnlineCount =
@@ -2686,7 +1824,7 @@ function renderSummary(){
 
   // 「上線小U」只顯示目前真的有開啟騎士端、
   // 且近期 heartbeat 仍有效的小U。
-  $('online').textContent = mapOnlineCount;
+  $('online').textContent = onlineRiderCount;
 
   // 可接單小U仍沿用真正即時在線／定位新鮮的安全判定。
   $('available').textContent = s.availableRiders ?? state.data.riders.filter(r=>r.online && !r.busy).length;
@@ -2708,7 +1846,7 @@ function renderSummary(){
   const pausedCount = s.pausedRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='paused').length;
   const offlineCount = s.offlineRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='offline').length;
   $('onlineSub').textContent =
-    `${mapOnlineWithLocation} 位有可顯示座標 · ${realtimeOnlineCount} 位即時連線 · 暫停 ${pausedCount}、離線 ${offlineCount}`;
+    `${onlineWithLocation} 位有可顯示座標 · ${realtimeOnlineCount} 位即時連線 · 暫停 ${pausedCount}、離線 ${offlineCount}`;
 
   const waits = state.data.orders.filter(o=>statusKind(o)==='waiting');
   if(waits.length){
@@ -2884,7 +2022,7 @@ function smartStackMeta(order){
     const km=Number(order?.stackTransferKm||0);
     const min=Number(order?.stackTransferMinutes||0);
     const liveEta=Math.max(0,Number(order?.stackQueuedEtaMinutes||order?.stackEstimatedWaitMinutes||0));
-    return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：下一筆任務 · Google Routes 銜接 ${esc(km.toFixed(1))} km / ${esc(Math.round(min))} 分鐘${liveEta>0?` · 預計 ${esc(Math.round(liveEta))} 分鐘抵達取件點`:''} · 前序 ${esc(order.stackPrimaryOrderId||'-')}</div>`;
+    return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：下一筆任務 · 後端道路銜接 ${esc(km.toFixed(1))} km / ${esc(Math.round(min))} 分鐘${liveEta>0?` · 預計 ${esc(Math.round(liveEta))} 分鐘抵達取件點`:''} · 前序 ${esc(order.stackPrimaryOrderId||'-')}</div>`;
   }
   if(role==='CURRENT' && order?.stackQueuedOrderId){
     return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：目前任務 · 下一筆 ${esc(order.stackQueuedOrderId)}</div>`;
@@ -3077,10 +2215,13 @@ function renderRiders(){
           </div>
           <div class="rider-meta">
             ${esc(r.healthReason||'')}<br>
-            ${esc(r.district || r.serviceArea || '未設定區域')}
-            · 最後活動 ${esc(fmtAge(r.lastActiveAtMs))}
-            · 最後定位 ${esc(fmtAge(r.locationUpdatedAtMs))}
-            · ${esc(locationText)}
+            小U類型：${esc(r.tierLabel||r.riderTierLabel||r.riderType||r.vehicleType||'未提供')}
+            · 接單狀態：${esc(riderStateLabel(r))}<br>
+            在線狀態：${esc(r.online===true?'在線':'離線')}
+            · 服務區：${esc(r.district||r.serviceArea||'未設定')}<br>
+            最後活動 ${esc(fmtAge(r.lastActiveAtMs))}
+            · 最後定位 ${esc(fmtAge(r.locationUpdatedAtMs))}<br>
+            ${esc(locationText)}${hasValidTaiwanCoordinates(r.currentLat,r.currentLng)?` · 經緯度 ${esc(Number(r.currentLng).toFixed(5))}, ${esc(Number(r.currentLat).toFixed(5))}`:''}
           </div>
         </div>
         <div class="rider-state ${riderStateClass(r)}">${esc(riderStateLabel(r))}</div>
@@ -3167,26 +2308,45 @@ function renderAlerts(){
 }
 
 /* =========================
-   候選小U推薦與距離排序
+   V6.3.2｜純資料候選小U
+   1. 後端智慧候選優先；禁止使用前端距離圈作接單資格限制。
+   2. 若後端沒有候選，僅列出目前在線且非忙碌的「人工參考名單」，
+      不宣稱符合派單資格。正式授權由後端 assign 交易再次判定。
+   3. 缺乏 GPS 不得使純資料名單整頁空白；距離僅作可選資訊。
    ========================= */
 function getCandidateRiders(order){
   if(!order) return [];
-  const insight = getOrderInsight(order.id);
-  if(insight && Array.isArray(insight.candidates) && insight.candidates.length){
-    return insight.candidates
-      .filter(c=>!c.skippedThisOrder)
-      
-      .map(c=>{
-        const base=(state.data.riders||[]).find(r=>String(r.riderId)===String(c.riderId)||String(r.riderDocId)===String(c.riderDocId))||{};
-        return {...base,...c,distanceKm:Number(c.distanceKm),dispatchScore:Number(c.score||0)};
-      })
-      .filter(r=>r.online === true && r.busy !== true);
+  const riders=Array.isArray(state.data.riders)?state.data.riders:[];
+  const insight=getOrderInsight(order.id);
+  const fromBackend=Array.isArray(insight?.candidates)?insight.candidates:[];
+  const keyOf=v=>String(v??'').trim();
+  const riderById=new Map();
+  for(const r of riders){
+    for(const rawId of [r.riderId,r.riderDocId,r.id]){
+      const id=keyOf(rawId);
+      if(id)riderById.set(id,r);
+    }
   }
-  if(!hasLatLng(order.pickupLat,order.pickupLng)) return [];
-  const pLat=Number(order.pickupLat),pLng=Number(order.pickupLng);
-  return (state.data.riders||[]).filter(r=>r.online===true && !r.busy).filter(r=>hasLatLng(r.currentLat,r.currentLng)).map(r=>({
-    ...r,distanceKm:haversineKm(pLat,pLng,Number(r.currentLat),Number(r.currentLng)),dispatchScore:0
-  })).sort((a,b)=>a.distanceKm-b.distanceKm);
+  function distanceFor(row){
+    const backendKm=row.distanceKm;
+    if(backendKm!==null&&backendKm!==undefined&&backendKm!==''&&Number.isFinite(Number(backendKm))&&Number(backendKm)>=0){
+      return Number(backendKm);
+    }
+    return hasLatLng(order.pickupLat,order.pickupLng)&&hasLatLng(row.currentLat,row.currentLng)
+      ? haversineKm(Number(order.pickupLat),Number(order.pickupLng),Number(row.currentLat),Number(row.currentLng))
+      : null;
+  }
+  if(fromBackend.length){
+    return fromBackend.filter(c=>c.skippedThisOrder!==true).map(c=>{
+      const base=[c.riderId,c.riderDocId,c.id].map(keyOf).map(id=>riderById.get(id)).find(Boolean)||{};
+      const merged={...base,...c};
+      const n=Number(c.dispatchScore??c.score);
+      return {...merged,distanceKm:distanceFor(merged),dispatchScore:Number.isFinite(n)?n:null,backendVerified:true};
+    }).filter(r=>r.online===true&&r.busy!==true);
+  }
+  return riders.filter(r=>r.online===true&&r.busy!==true)
+    .map(r=>({...r,distanceKm:distanceFor(r),dispatchScore:null,backendVerified:false}))
+    .sort((a,b)=>(a.distanceKm??Infinity)-(b.distanceKm??Infinity));
 }
 
 function renderCandidates(){
@@ -3203,10 +2363,8 @@ function renderCandidates(){
   const canRecover=isActive && order?.recoveryEligible===true && highRisk;
 
   $('redispatchBtn').disabled = !isWaiting;
-  $('expandRadiusBtn').disabled = true;
   $('unassignBtn').disabled = !canUnassign;
   $('emergencyRecoverBtn').disabled = !canRecover;
-  $('radiusSelect').value = '20';
 
   const riskPanel=$('v3RiskActionPanel');
   if(riskPanel){ riskPanel.classList.remove('show'); riskPanel.innerHTML=''; }
@@ -3351,7 +2509,7 @@ function renderCandidates(){
       <div class="v3-risk-title">V3 任務處置建議 · ${riskBadge(order.riskLevel,order.riskScore)}</div>
       <div class="v3-risk-text">小U：${esc(order.riderName||order.riderId||'-')} · 最後定位 ${esc(lastGps)}${order.pickupDistanceKm!=null?` · 距取件約 ${esc(order.pickupDistanceKm)} km`:''}${order.dropoffDistanceKm!=null?` · 距送達約 ${esc(order.dropoffDistanceKm)} km`:''}${liveMeta.eta!==null?` · Live ETA ${esc(liveMeta.eta)} 分`:''}${liveMeta.distance?` · ${esc(liveMeta.distance)}`:''}${liveMeta.delayLevel!=='NORMAL'?` · 延誤 +${esc(Math.round(liveMeta.delay))} 分`:''}</div>
       <div class="v3-risk-actions">
-        <button class="btn small" data-action="focus-last-location" data-id="${esc(order.id)}">查看最後位置</button>
+        <span class="badge">最後定位：${esc(lastGps)}</span>
         ${phone?`<button class="btn small" data-action="contact-rider" data-phone="${esc(phone)}">聯絡小U</button>`:''}
         ${canRecover?`<button class="btn small danger" data-action="emergency-recover" data-id="${esc(order.id)}">啟動備援轉派</button>`:''}
       </div>
@@ -3365,11 +2523,6 @@ function renderCandidates(){
     return;
   }
 
-  if(!hasLatLng(order.pickupLat,order.pickupLng)){
-    $('candidateList').innerHTML = '<div class="empty">訂單沒有 pickupLat / pickupLng，無法推薦附近小U</div>';
-    return;
-  }
-
   const candidates = getCandidateRiders(order);
 
   if(!candidates.length){
@@ -3379,8 +2532,8 @@ function renderCandidates(){
 
     $('candidateList').innerHTML = `
       <div class="empty">
-        ${state.radiusKm} km 內沒有符合條件的${isActive?'備援':'可接單'}小U<br>
-        ${isWaiting?'可使用「擴大派單半徑」':'可調整上方半徑查看更遠的備援候選'}
+        全區候選中目前沒有符合條件的${isActive?'備援':'可接單'}小U<br>
+        請檢查小U在線狀態、服務區域與正式接單資格
         ${visibility?.reason?`<br><span style="display:inline-block;margin-top:7px;color:var(--orange);font-weight:900">${esc(visibility.reason)}</span>`:''}
       </div>
     `;
@@ -3393,18 +2546,18 @@ function renderCandidates(){
         <div class="candidate-name">
           <span class="rank">${index+1}</span>
           ${esc(r.name || r.riderId || '小U')}
-          ${index===0?`<span class="badge green" style="margin-left:6px">${isActive?'最佳備援':'最佳候選'}</span>`:''}
+          ${r.backendVerified&&index===0?`<span class="badge green" style="margin-left:6px">後端優先候選</span>`:''}${!r.backendVerified?`<span class="badge warn" style="margin-left:6px">人工參考・非資格確認</span>`:''}
         </div>
         <div class="candidate-meta">
           ${esc(r.district || r.serviceArea || '未設定區域')}
-          · 定位更新 ${esc(fmtAge(r.locationUpdatedAtMs || (Date.now()-Number(r.locationAgeMs||0))))}
+          · 定位更新 ${esc(r.locationUpdatedAtMs?fmtAge(r.locationUpdatedAtMs):(Number.isFinite(Number(r.locationAgeMs))&&r.locationAgeMs!=null?fmtAge(Date.now()-Number(r.locationAgeMs)):'未提供'))}
           · 預估取件 ${esc(r.estimatedPickupMinutes || '-')} 分
           · ${esc(r.riderId || '')}
         </div>
       </div>
       <div>
-        <div class="candidate-score">${esc(r.dispatchScore ?? r.score ?? 0)}<small>Dispatch Score</small></div>
-        <div class="distance">${Number(r.distanceKm).toFixed(2)} km</div>
+        <div class="candidate-score">${Number.isFinite(r.dispatchScore)?esc(r.dispatchScore):'—'}<small>${r.backendVerified?'後端調度分數':'未提供評分'}</small></div>
+        <div class="distance">${Number.isFinite(r.distanceKm)?esc(r.distanceKm.toFixed(2))+' km':'距離未知'}</div>
         ${isWaiting?`<button class="btn small yellow" style="margin-top:6px" data-action="assign" data-rider-id="${esc(r.riderId)}">指定</button>`:'<span class="badge blue" style="margin-top:6px">備援候選</span>'}
       </div>
     </div>
@@ -3444,19 +2597,13 @@ async function loadDispatchTimeline(orderId){
   }
 }
 
-function selectOrder(orderId,{pan=true}={}){
-  state.selectedOrderId = String(orderId || '');
-  state.selectedCandidateRiderId = '';
+function selectOrder(orderId){
+  state.selectedOrderId=String(orderId||'');
+  state.selectedCandidateRiderId='';
   loadDispatchTimeline(state.selectedOrderId);
   renderOrders();
   renderCandidates();
-  renderMap();
-
-  const order = getSelectedOrder();
-  if(pan && order && state.mapReady && hasLatLng(order.pickupLat,order.pickupLng)){
-    state.map.setCenter({lat:Number(order.pickupLat),lng:Number(order.pickupLng)});
-    state.map.setZoom(13);
-  }
+  document.querySelector('.ops-dispatch-stack')?.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 /* =========================
@@ -3507,7 +2654,6 @@ async function redispatchOrder(orderId){
   if(!orderId) return;
   try{
     const result = await postJson(`/api/dispatch/orders/${encodeURIComponent(orderId)}/redispatch`,{
-      radiusKm:state.radiusKm,
       source:'dispatch_center'
     });
     toast(result.message || '已重新派單');
@@ -3608,8 +2754,7 @@ async function confirmUnassignOrder(){
       `/api/dispatch/orders/${encodeURIComponent(orderId)}/unassign`,
       {
         reason,
-        radiusKm:state.radiusKm,
-        source:'dispatch_center'
+          source:'dispatch_center'
       }
     );
 
@@ -3662,7 +2807,6 @@ async function emergencyRecoverOrder(orderId){
 
   try{
     const result=await postJson(`/api/dispatch/orders/${encodeURIComponent(orderId)}/recover`,{
-      radiusKm:state.radiusKm,
       reason,
       source:'dispatch_center_v3'
     });
@@ -3674,41 +2818,6 @@ async function emergencyRecoverOrder(orderId){
       toast(backendNotReadyMessage('V3 備援轉派'),6000);
     }else{
       toast('備援轉派失敗：'+error.message,6000);
-    }
-  }
-}
-
-async function expandRadius(orderId){
-  if(!orderId) return;
-
-  const steps = [999];
-  const currentIndex = 0;
-  const next = 999;
-
-  if(next === state.radiusKm && state.radiusKm >= 20){
-    toast('目前已是最大 20 km 派單半徑');
-    return;
-  }
-
-  const previous = state.radiusKm;
-  state.radiusKm = next;
-  $('radiusSelect').value = String(next);
-  renderCandidates();
-  renderMap();
-
-  try{
-    const result = await postJson(`/api/dispatch/orders/${encodeURIComponent(orderId)}/expand-radius`,{
-      radiusKm:next,
-      previousRadiusKm:previous,
-      source:'dispatch_center'
-    });
-    toast(result.message || `派單半徑已擴大至 ${next} km`);
-    await loadDashboard({silent:true});
-  }catch(error){
-    if(error.status===404 || error.status===405){
-      toast(`畫面已切換為 ${next} km；${backendNotReadyMessage('擴大派單半徑')}`,5200);
-    }else{
-      toast('擴大派單半徑失敗：'+error.message,5000);
     }
   }
 }
@@ -3773,15 +2882,7 @@ document.addEventListener('click',event=>{
       renderCandidates();
       return;
     }
-    const expand=(insight.recommendations||[]).find(x=>x.type==='EXPAND_RADIUS');
-    if(expand && Number(expand.targetRadiusKm)>state.radiusKm){
-      state.radiusKm=Number(expand.targetRadiusKm);
-      $('radiusSelect').value=String(state.radiusKm);
-      renderCandidates();renderMap();
-      toast(`已帶入建議半徑 ${state.radiusKm} km；請人工確認後再按「擴大派單半徑」`,5200);
-    }else{
-      toast('已選取此訂單，請人工檢視候選小U與系統判斷',4200);
-    }
+    toast('已選取此訂單，請人工檢視全區候選小U與系統判斷',4200);
     return;
   }
   if(action==='zone-review'){
@@ -3945,14 +3046,6 @@ document.addEventListener('click',event=>{
       selectOrder(id);
       emergencyRecoverOrder(id);
     }
-    if(action==='focus-last-location'){
-      selectOrder(id);
-      const order=getSelectedOrder();
-      if(order&&state.mapReady&&hasLatLng(order.riderCurrentLat,order.riderCurrentLng)){
-        state.map.setCenter({lat:Number(order.riderCurrentLat),lng:Number(order.riderCurrentLng)});
-        state.map.setZoom(16);
-      }else{ toast('目前沒有可用的小U最後定位'); }
-    }
     if(action==='contact-rider'){
       const phone=String(actionBtn.dataset.phone||'').trim();
       if(phone) window.location.href='tel:'+phone;
@@ -3987,7 +3080,6 @@ document.addEventListener('click',event=>{
 });
 
 $('refreshBtn').addEventListener('click',()=>loadDashboard());
-$('fitMapBtn').addEventListener('click',()=>fitMapToData());
 
 // 管理金鑰不再從 localStorage 復原，避免舊版憑證殘留。
 
@@ -4002,12 +3094,6 @@ $('saveWeatherPricingBtn')?.addEventListener(
   saveWeatherPricingSettings
 );
 
-$('radiusSelect').addEventListener('change',event=>{
-  state.radiusKm = Number(event.target.value || 3);
-  renderCandidates();
-  renderMap();
-});
-
 $('redispatchBtn').addEventListener('click',()=>{
   const order = getSelectedOrder();
   if(order) redispatchOrder(order.id);
@@ -4021,11 +3107,6 @@ $('unassignBtn').addEventListener('click',()=>{
 $('emergencyRecoverBtn').addEventListener('click',()=>{
   const order = getSelectedOrder();
   if(order) emergencyRecoverOrder(order.id);
-});
-
-$('expandRadiusBtn').addEventListener('click',()=>{
-  const order = getSelectedOrder();
-  if(order) expandRadius(order.id);
 });
 
 $('confirmAssignBtn').addEventListener('click',()=>{
@@ -4076,7 +3157,7 @@ document.addEventListener('click',event=>{
     const value=String(stageBtn.dataset.stageFilter||'');
     state.stageFilter=value==='clear'?'':value;
     document.querySelectorAll('[data-stage-filter]').forEach(btn=>btn.classList.toggle('active',value!=='clear'&&btn===stageBtn));
-    renderOrders(); renderMap();
+    renderOrders();
     return;
   }
   const zoneCard=event.target.closest('[data-zone-district]');
@@ -4087,14 +3168,10 @@ document.addEventListener('click',event=>{
   }
 });
 
-window.addEventListener('resize',()=>{
-  if(state.mapReady && state.map) setTimeout(()=>google.maps.event.trigger(state.map,'resize'),60);
-});
 
 /* =========================
    啟動
    ========================= */
-initMap();
 document.getElementById('dispatchAuthForm').addEventListener('submit',submitDispatchAuth);
 document.getElementById('dispatchLogoutBtn').addEventListener('click',logoutDispatch);
 document.getElementById('dispatchAuthKeyInput')?.focus();
@@ -4113,9 +3190,7 @@ setInterval(renderWeatherPricingStatus,30000);
 
   function setStatus(kind,message){
     const system = document.getElementById('systemStatusText');
-    const map = document.getElementById('mapStatus');
     if(system) system.textContent = message;
-    if(map) map.textContent = kind==='ok' ? '自動更新中' : '連線受阻';
     document.body.dataset.networkState = kind;
   }
 
@@ -4162,7 +3237,7 @@ setInterval(renderWeatherPricingStatus,30000);
     guarded.__ubeeNetworkGuard=true;
     window[name]=guarded;
   }
-  ['assignRider','redispatchOrder','expandRadius','emergencyRecoverOrder','createDispatchIncident','transitionDispatchIncident'].forEach(guardAction);
+  ['assignRider','redispatchOrder','emergencyRecoverOrder','createDispatchIncident','transitionDispatchIncident'].forEach(guardAction);
 
   window.addEventListener('offline',()=>{ setStatus('offline','系統狀態：裝置網路中斷'); banner('目前行動網路／網際網路受阻。調度中心已保留最後資料，請暫停人工指定與重新派單，恢復後會自動同步。'); });
   window.addEventListener('online',recover);
@@ -4173,48 +3248,143 @@ setInterval(renderWeatherPricingStatus,30000);
 
 
 
-<script id="ubee-ops-v620-console">
+<script id="ubee-v632-pure-data-console">
 (function(){
-  const app=document.querySelector('.app'), main=document.getElementById('opsWorkbench');
-  if(!app||!main)return;
-  const left=main.querySelector(':scope > .left-stack'),right=main.querySelector(':scope > .right-stack');
-  if(!left||!right)return;
-  const findPanel=id=>document.getElementById(id)?.closest('.panel');
-  const candidate=findPanel('candidateList'),timeline=findPanel('dispatchTimeline');
-  const riders=findPanel('riders'),incidents=findPanel('alertList');
-  const dispatchStack=document.createElement('section');dispatchStack.className='ops-dispatch-stack';
-  if(candidate)dispatchStack.appendChild(candidate);if(timeline)dispatchStack.appendChild(timeline);
-  main.appendChild(dispatchStack);main.classList.add('ops-grid','ops-view');
-  const pages={};
-  for(const key of ['overview','riders','incidents','analysis']){
-    const el=document.createElement('section');el.className='ops-page';el.dataset.opsPage=key;app.appendChild(el);pages[key]=el;
+'use strict';
+const app=document.querySelector('.app');
+const main=document.getElementById('opsWorkbench');
+const left=main?.querySelector(':scope > .left-stack');
+const right=main?.querySelector(':scope > .right-stack');
+if(!app||!main||!left||!right)return;
+const $=id=>document.getElementById(id);
+const findPanel=id=>$(id)?.closest('.panel');
+const orderPanel=findPanel('orders');
+const candidatePanel=findPanel('candidateList');
+const timelinePanel=findPanel('dispatchTimeline');
+const ridersPanel=findPanel('riders');
+const incidentPanel=findPanel('alertList');
+// Existing control elements and handlers are moved, not duplicated or re-bound.
+const orderWorkspace=document.createElement('div');orderWorkspace.className='ops-order-workspace';
+const dispatchStack=document.createElement('section');dispatchStack.className='ops-dispatch-stack';
+if(candidatePanel)dispatchStack.append(candidatePanel);
+if(timelinePanel)dispatchStack.append(timelinePanel);
+if(orderPanel)orderWorkspace.append(orderPanel);
+orderWorkspace.append(dispatchStack);
+main.replaceChildren(orderWorkspace);
+main.classList.add('ops-view');
+const pages={};
+for(const key of ['overview','riders','incidents','analysis']){
+  const page=document.createElement('section');page.className='ops-page';page.dataset.opsPage=key;
+  app.append(page);pages[key]=page;
+}
+if(ridersPanel)pages.riders.append(ridersPanel);
+if(incidentPanel)pages.incidents.append(incidentPanel);
+const primary=app.querySelector('.ops-primary-kpis');
+const secondary=app.querySelector('.ops-secondary-metrics');
+const tower=app.querySelector('.control-tower');
+const intelligence=app.querySelector('.intel-grid');
+if(primary)pages.overview.append(primary);
+if(secondary)pages.overview.append(secondary);
+if(tower)pages.overview.append(tower);
+if(intelligence)pages.analysis.append(intelligence);
+const home=document.createElement('section');home.className='ops-home';
+home.innerHTML=`<div class="ops-hero"><h1>首頁</h1><p>UBee 智慧調度中心</p></div>
+  <div class="ops-home-content">
+    <div class="ops-home-card"><h2>待處理事項</h2><div class="ops-home-stats">
+      <button type="button" class="ops-home-stat" data-go="dispatch" data-order-tab="waiting"><b data-count="waiting">–</b><span>待指派訂單</span></button>
+      <button type="button" class="ops-home-stat" data-go="dispatch" data-order-tab="pickup"><b data-count="pickup">–</b><span>小U待取</span></button>
+      <button type="button" class="ops-home-stat" data-go="dispatch" data-order-tab="delivery"><b data-count="delivery">–</b><span>配送中</span></button>
+    </div></div>
+    <div class="ops-home-card"><h2>功能入口</h2><div class="ops-home-links">
+      <button type="button" class="ops-home-link" data-go="dispatch"><i>▤</i>訂單管理</button>
+      <button type="button" class="ops-home-link" data-go="riders"><i>♟</i>小U管理</button>
+      <button type="button" class="ops-home-link" data-go="incidents"><i>!</i>異常案件</button>
+      <button type="button" class="ops-home-link" data-go="overview"><i>▦</i>營運總覽</button>
+      <button type="button" class="ops-home-link" data-go="analysis"><i>◴</i>城市與財務</button>
+    </div></div>
+  </div>`;
+app.insertBefore(home,main);
+const head=document.createElement('div');head.className='ops-mobile-heading';
+head.innerHTML='<button class="ops-back" type="button" aria-label="返回首頁">‹</button><h1 id="opsViewTitle">訂單管理</h1><span></span>';
+app.insertBefore(head,main);head.querySelector('.ops-back').addEventListener('click',()=>show('home'));
+const orderTools=document.createElement('div');orderTools.className='ops-list-toolbar';
+orderTools.innerHTML=`<input class="ops-list-search" id="opsOrderSearch" type="search" placeholder="搜尋訂單編號、商家、地址、小U姓名" aria-label="搜尋訂單">
+<div class="ops-status-tabs" role="group" aria-label="訂單狀態分類">
+<button type="button" data-order-tab="waiting">待指派</button><button type="button" data-order-tab="pickup">小U待取</button>
+<button type="button" data-order-tab="delivery">配送中</button><button type="button" data-order-tab="all">所有</button></div>`;
+if(orderPanel)orderPanel.prepend(orderTools);
+const riderTools=document.createElement('div');riderTools.className='ops-list-toolbar';
+riderTools.innerHTML='<input class="ops-list-search" id="opsRiderSearch" type="search" placeholder="搜尋小U姓名、電話或服務區" aria-label="搜尋小U">';
+if(ridersPanel)ridersPanel.prepend(riderTools);
+const views={home,dispatch:main,...pages};
+const names={home:'首頁',dispatch:'訂單管理',riders:'小U管理',incidents:'異常案件',overview:'營運總覽',analysis:'城市與財務'};
+let current='home';
+function show(key){
+  if(!views[key])key='home';current=key;
+  Object.entries(views).forEach(([k,el])=>el.classList.toggle('is-active',k===key));
+  document.querySelectorAll('[data-ops-view]').forEach(el=>{
+    const active=el.dataset.opsView===key;
+    el.classList.toggle('is-active',active);el.setAttribute('aria-current',active?'page':'false');
+  });
+  head.classList.toggle('is-active',key!=='home');$('opsViewTitle').textContent=names[key];
+  window.scrollTo(0,0);
+}
+function orderMatchesTab(o,tab){
+  const status=String(o?.status||'').toLowerCase();
+  if(tab==='all')return true;
+  if(tab==='waiting')return ['pending_dispatch','pending','waiting','searching','dispatching','redispatching'].includes(status);
+  if(tab==='pickup')return ['accepted','going_to_pickup','heading_to_pickup','arrived_pickup'].includes(status);
+  if(tab==='delivery')return ['picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff'].includes(status);
+  return false;
+}
+function syncHome(){
+  const orders=Array.isArray(window.__ubeeDispatchOrders)?window.__ubeeDispatchOrders:null;
+  const items=orders||((typeof state==='object'&&state?.data?.orders)||[]);
+  for(const type of ['waiting','pickup','delivery']){
+    const node=home.querySelector(`[data-count="${type}"]`);
+    if(node)node.textContent=String(items.filter(o=>orderMatchesTab(o,type)).length);
   }
-  if(riders)pages.riders.appendChild(riders);if(incidents)pages.incidents.appendChild(incidents);
-  const secondary=app.querySelector('.ops-secondary-metrics');
-  const tower=app.querySelector('.control-tower');
-  const health=app.querySelector('.health-grid')||document.getElementById('cityHealth')?.closest('section');
-  if(secondary)pages.overview.appendChild(secondary);
-  if(tower)pages.overview.appendChild(tower);
-  if(health && health!==tower && !tower?.contains(health))pages.overview.appendChild(health);
-  const intelligence=app.querySelector('.intel-grid');if(intelligence)pages.analysis.appendChild(intelligence);
-  // Any unclassified original sections remain visible on overview, never deleted.
-  const primary=app.querySelector('.ops-primary-kpis');
-  const title=document.createElement('div');title.className='ops-main-header';
-  title.innerHTML='<div><h1 id="opsViewTitle">即時調度</h1><p id="opsViewSub">訂單佇列、即時地圖、調度操作</p></div>';
-  app.insertBefore(title,primary||main);
-  const names={dispatch:['即時調度','訂單佇列、即時地圖、調度操作'],overview:['營運總覽','任務風險、營運指標與運力健康'],riders:['小U運力','小U狀態與接單能力'],incidents:['異常案件','異常告警、處理紀錄與結案'],analysis:['城市供需與財務','供需預測、動態定價與營運分析']};
-  const views={dispatch:main,...pages};
-  function show(key){
-    if(!views[key])key='dispatch';
-    Object.entries(views).forEach(([k,el])=>el.classList.toggle('is-active',k===key));
-    document.querySelectorAll('[data-ops-view]').forEach(el=>{const active=el.dataset.opsView===key;el.classList.toggle('is-active',active);el.setAttribute('aria-current',active?'page':'false');});
-    document.getElementById('opsViewTitle').textContent=names[key][0];document.getElementById('opsViewSub').textContent=names[key][1];
-    // Google Maps must be resized when switching back to the dispatch tab.
-    if(key==='dispatch' && window.google?.maps?.event){const map=window.dispatchMap||window.map; if(map)try{google.maps.event.trigger(map,'resize')}catch(e){}}
-    window.scrollTo({top:0,behavior:'instant'});
-  }
-  document.querySelectorAll('[data-ops-view]').forEach(el=>el.addEventListener('click',()=>show(el.dataset.opsView)));
-  show('dispatch');
+}
+function chooseTab(tab){
+  if(!['waiting','pickup','delivery','all'].includes(tab))tab='waiting';
+  // Search/tab UI filters the existing DOM rendered from the server dashboard.
+  document.querySelectorAll('[data-order-tab]').forEach(el=>{
+    const a=el.dataset.orderTab===tab;el.classList.toggle('is-active',a);
+    el.setAttribute('aria-pressed',a?'true':'false');
+  });
+  orderTools.dataset.tab=tab;
+  filterRows();
+}
+function filterRows(){
+  const oq=String($('opsOrderSearch')?.value||'').trim().toLowerCase();
+  const rq=String($('opsRiderSearch')?.value||'').trim().toLowerCase();
+  const tab=orderTools.dataset.tab||'waiting';
+  const all=(typeof state==='object'&&Array.isArray(state.data?.orders))?state.data.orders:[];
+  document.querySelectorAll('#orders .order-card').forEach(el=>{
+    const id=el.dataset.orderId;const record=all.find(o=>String(o.id)===String(id));
+    const text=el.textContent.toLowerCase();
+    const searchable=record?[record.customerName,record.customerPhone,record.riderName,record.pickupAddress,record.dropoffAddress,record.merchantName].filter(Boolean).join(' ').toLowerCase():'';
+    el.hidden=!(record&&orderMatchesTab(record,tab)&&(!oq||text.includes(oq)||searchable.includes(oq)));
+  });
+  document.querySelectorAll('#riders .rider-row').forEach(el=>{
+    el.hidden=Boolean(rq)&&!el.textContent.toLowerCase().includes(rq);
+  });
+}
+// Keep the original renderer's source data and sort; show all statuses, filter only visually.
+if(typeof state==='object'){state.filter='all';state.stageFilter='';state.towerRiskFilter='all';}
+const orderRoot=$('orders'),riderRoot=$('riders');
+const observer=new MutationObserver(()=>{filterRows();syncHome();});
+if(orderRoot)observer.observe(orderRoot,{childList:true});
+if(riderRoot)new MutationObserver(filterRows).observe(riderRoot,{childList:true});
+$('opsOrderSearch').addEventListener('input',filterRows);
+$('opsRiderSearch').addEventListener('input',filterRows);
+orderTools.querySelectorAll('[data-order-tab]').forEach(b=>b.addEventListener('click',()=>chooseTab(b.dataset.orderTab)));
+document.querySelectorAll('[data-ops-view]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.opsView)));
+home.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{
+  show(b.dataset.go);
+  if(b.dataset.go==='dispatch')chooseTab(b.dataset.orderTab||'waiting');
+}));
+chooseTab('waiting');syncHome();show('home');
 })();
 </script>
 </body>
