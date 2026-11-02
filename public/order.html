@@ -1,11 +1,11 @@
-<!-- UBee Customer TC V1.6 — Native Member Experience RC1.1｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
+<!-- UBee Customer TC V1.6 — Native Member Experience RC1.2｜Quote Stability Hotfix｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261102-customer-tc-v1-6-native-member-rc1-1
+  PWA: 20261102-customer-tc-v1-6-native-member-rc1-2
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -30,7 +30,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261102-customer-tc-v1-6-native-member-rc1-1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261102-customer-tc-v1-6-native-member-rc1-2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17924,6 +17924,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務、現金付款與服務規則</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間及最終顯示費用，同意以現金付款。按下建立任務後將開始媒合小U；我也同意 UBee 服務條款與隱私權政策。</small></span></label>
 
 <div class="flow-status" id="flowConfirmStatus"></div>
+<button class="flow-map-retry hidden" id="flowRetryQuote" type="button">重新估價</button>
 </div>
 <div class="ubee-native-checkout-actionbar"><div class="ubee-native-checkout-action-price"><span>預估費用</span><strong id="flowConfirmActionPrice">—</strong></div><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立現金任務</button></div>
 </section>
@@ -19451,12 +19452,66 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     ].join('');
   }
 
+  // RC1.2 Quote Stability：正式報價取自 /api/quote，不以可視路線的 Routes API 成敗為前置條件。
+  // 保留後端既有報價識別碼、送單前重新估價及費用變動二次確認，絕不在前端自行推算金額。
+  let confirmQuoteAttempt = 0;
   async function openConfirm(){
     if(!state.pickup||!state.dropoff){showPage('home');status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}
     if(!validateTask()){showPage('task');return}
     if(!validateOptions()){showPage('options');return}
-    syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowConfirmActionPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在計算道路時間與正式估價…');
-    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);const priceText=total>0?`NT$${Math.round(total)}`:'待估價';$('flowConfirmPrice').textContent=priceText;$('flowConfirmActionPrice').textContent=priceText;await window.UBeeUCoinV1?.refreshCheckout?.();const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'道路時間已計算，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
+    const attempt = ++confirmQuoteAttempt;
+    syncLegacy();wrapPayload();renderSummary();
+    $('flowAgree').checked=false;
+    $('flowSubmitOrder').disabled=true;
+    $('flowRetryQuote').classList.add('hidden');
+    status('flowConfirmStatus','');
+    $('flowConfirmPrice').textContent='—';
+    $('flowConfirmActionPrice').textContent='—';
+    $('flowRouteMeta').textContent='正在取得正式估價';
+    showPage('confirm');
+    setLoading(true,'正在取得 UBee 正式估價…');
+    try{
+      // /api/quote 已由後端自行計算道路距離、費用、動態費率及報價有效期。
+      // 路線預覽 /api/map-route 失敗，不應阻擋另一套正式計價 API。
+      const quote=typeof renderEstimate==='function' ? await renderEstimate() : null;
+      if(attempt!==confirmQuoteAttempt||state.page!=='confirm')return;
+      const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);
+      const hasQuote=!!quote&&!!lastQuoteData&&String(quote.quoteId||'').trim()!==''&&Number.isFinite(total)&&total>0;
+      if(!hasQuote){
+        $('flowRouteMeta').textContent='尚未取得正式估價';
+        status('flowConfirmStatus','正式估價暫時無法完成，請點選「重新估價」再試。',true);
+        $('flowRetryQuote').classList.remove('hidden');
+        return;
+      }
+      const priceText=`NT$${Math.round(total)}`;
+      $('flowConfirmPrice').textContent=priceText;
+      $('flowConfirmActionPrice').textContent=priceText;
+      $('flowSubmitOrder').disabled=false;
+      const distance=String(quote.distanceText||'').trim();
+      const duration=String(quote.durationText||'').trim();
+      $('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'已取得正式估價';
+
+      // 原有 U幣機制照舊。U幣刷新失敗不得誤報正式金額計算失敗；
+      // 送單時既有的 U幣／報價重新驗證不作任何放寬。
+      try{await window.UBeeUCoinV1?.refreshCheckout?.()}
+      catch(error){console.warn('確認頁 U幣資料刷新失敗（正式報價仍有效）：',error)}
+
+      // 地圖路線僅供座標／狀態補充，不參與本次金額的正確性判斷。
+      // 不等待 Google Routes API，以免無地圖的確認頁被其失敗或逾時阻擋。
+      Promise.resolve().then(()=>renderConfirmMap(null)).catch(error=>{
+        console.warn('確認頁路線補充暫時不可用；已保留後端正式估價：',error);
+      });
+    }catch(error){
+      console.error('確認頁估價流程失敗：',error);
+      if(attempt===confirmQuoteAttempt&&state.page==='confirm'){
+        $('flowSubmitOrder').disabled=true;
+        $('flowRouteMeta').textContent='尚未取得正式估價';
+        status('flowConfirmStatus','正式估價暫時無法完成，請點選「重新估價」再試。',true);
+        $('flowRetryQuote').classList.remove('hidden');
+      }
+    }finally{
+      if(attempt===confirmQuoteAttempt)setLoading(false);
+    }
   }
 
   // 本次登入只承接使用者剛剛明確點過的送單意圖；只存在記憶體，不跨重新載入。
@@ -20136,7 +20191,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
     $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
     $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn)setTiming(btn.dataset.timing)});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn)setSpeed(btn.dataset.speed)});$('flowOptionsNext').addEventListener('click',()=>{if(validateOptions())openConfirm()});
-    $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
+    $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowRetryQuote').addEventListener('click',()=>{if(!state.submitting)void openConfirm()});$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
     $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];status('flowSearchStatus','');$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;$('flowSearchResults').innerHTML='';setQuickAddressTab(state.quickAddressTab)});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);root.querySelectorAll('[data-address-tab]').forEach(btn=>btn.addEventListener('click',()=>setQuickAddressTab(btn.dataset.addressTab)));
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
     $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.addressTarget==='dropoff2'?(state.dropoff||state.pickup):state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
@@ -20474,7 +20529,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-6-native-member-rc1-1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-6-native-member-rc1-2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
