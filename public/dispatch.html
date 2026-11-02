@@ -1,10 +1,10 @@
-<!-- V6.3.2 RC: pure-data UI, with no Google Maps SDK or map rendering; production regression testing required -->
+<!-- V6.3.3 RC: Mobile-first pure-data Dispatch UI; preserve existing Render backend transaction contracts. -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <!-- 2026-09-29｜Drive Service V1：調度中心識別代駕任務並顯示車輛交接摘要。 -->
 <!-- 2026-09-23｜Dispatch Multi-stop & Finance Sync V1：完整顯示多點配送、+NT$50 多點費與代墊資訊；對齊最新版 index Dashboard contract。 -->
-<!-- 2026-09-18｜UBee Smart Stack V1.1：顯示 Google Routes 真實銜接與 QUEUED Live ETA。 -->
+<!-- 2026-09-18｜UBee Smart Stack V1.1：顯示後端已計算的路線銜接與 QUEUED Live ETA。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1：調度中心顯示 CURRENT／QUEUED、疊單群組與下一筆任務。 -->
 <!-- 2026-09-17｜Dispatch Profit Control V1：顯示客戶支付、小U收入、平台應得、實收／待收、定價版本與獲利警示。 -->
 <!-- 2026-09-07｜Dispatch Manual Unassign V1：新增「取消派單」；只解除目前小U，不取消客戶訂單；取件前可退回待派單並重新媒合，抵達取件後受貨物安全鎖保護。 -->
@@ -16,9 +16,9 @@
 <!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>UBee Dispatch V6.3.2｜App 化清單調度中心（無 Google 地圖）</title>
+<title>UBee Dispatch V6.3.3｜App 化純資料調度中心</title>
 
-<!-- V6.3.2：調度中心不載入 Google Maps Platform；訂單及小U狀態以 Render 調度 API 為準。 -->
+<!-- 調度中心前端只使用 UBee Render 調度 API；此頁不請求第三方地圖服務。 -->
 
 <style>
 :root{
@@ -441,58 +441,132 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 
 
 
-<style id="ubee-v632-pure-data">
-:root{--ubee-orange:#ee754b;--line:#e7e7eb;--ubee-bg:#f5f4f7}
-body{background:var(--ubee-bg)!important}
-.app{max-width:1170px!important;margin:0 auto!important;padding:14px 18px 48px!important}
-.topbar{position:relative!important;top:auto!important;box-shadow:none!important;border:0!important;border-radius:18px!important;background:#fff!important;padding:12px 16px!important}
-.topbar .brand{font-size:22px!important}.topbar .version{background:#1a1b20!important;font-size:10px!important}
-.topbar .actions{gap:8px!important;flex-wrap:wrap}.ops-updated-time{color:#8a8d94;font-size:11px;font-weight:700}
-.ops-nav{position:relative!important;left:auto!important;top:auto!important;bottom:auto!important;width:auto!important;height:auto!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:4px!important;margin:11px 0 16px!important;padding:7px!important;background:#fff!important;border-radius:14px!important;box-shadow:none!important}
-.ops-nav:before{display:none!important}.ops-nav button{background:transparent!important;color:#5d626a!important;padding:10px 13px!important;min-height:39px!important;border:0!important;border-radius:10px!important}
-.ops-nav button.is-active{background:var(--ubee-orange)!important;color:#fff!important}
-.ops-primary-kpis{display:none!important}.ops-view,.ops-page,.ops-home{display:none!important}
-.ops-view.is-active,.ops-page.is-active,.ops-home.is-active{display:block!important}
-.ops-home{max-width:890px;margin:0 auto}.ops-hero{background:var(--ubee-orange);color:#fff;min-height:245px;padding:63px 16px 110px;border-radius:26px 26px 0 0;text-align:center}
-.ops-hero h1{font-size:39px;font-weight:750;letter-spacing:.04em;margin:0}.ops-hero p{font-size:13px;opacity:.9;margin-top:10px}
-.ops-home-content{max-width:760px;margin:-65px auto 20px;position:relative;padding:0 12px}
-.ops-home-card{background:#fff;border-radius:18px;margin:0 0 16px;padding:23px;min-height:155px;border:1px solid #f1f1f2;box-shadow:0 5px 22px #2a2a4309}
-.ops-home-card h2{font-size:17px;font-weight:700;margin:0 0 20px}
-.ops-home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
-.ops-home-stat{border:0;background:transparent;border-right:1px solid #e5e5e9;text-align:center;cursor:pointer;padding:4px 5px 8px}.ops-home-stat:last-child{border-right:0}
-.ops-home-stat b{display:block;font-weight:700;font-size:32px;color:var(--ubee-orange)}.ops-home-stat span{display:block;color:#666a72;font-size:13px;margin-top:6px}
-.ops-home-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.ops-home-link{border:1px solid #ececf0;background:#fff;color:#333;border-radius:15px;min-height:105px;cursor:pointer;font-size:14px;font-weight:700}
-.ops-home-link i{font-style:normal;display:block;color:var(--ubee-orange);font-size:27px;font-weight:800;margin-bottom:8px}
-.ops-home-link:hover,.ops-home-link:focus-visible{border-color:var(--ubee-orange);background:#fff8f4;outline-color:var(--ubee-orange)}
-.ops-mobile-heading{display:none;align-items:center;justify-content:space-between;margin:4px 0 13px;background:#fff;min-height:59px;border-radius:13px;padding:8px 13px}
-.ops-mobile-heading.is-active{display:flex}.ops-mobile-heading h1{font-size:19px;margin:0}.ops-back{font-size:32px;border:0;background:transparent;line-height:1;color:#444;cursor:pointer;min-width:40px;text-align:left}
-#opsWorkbench{display:none!important}#opsWorkbench.is-active{display:block!important}.ops-order-workspace{display:grid;grid-template-columns:minmax(0,1.04fr) minmax(330px,.96fr);align-items:start;gap:15px}
-.ops-order-workspace .panel{border-radius:15px!important;box-shadow:none!important}
-.ops-dispatch-stack{display:flex!important;flex-direction:column;gap:13px;min-width:0;position:sticky;top:15px;max-height:calc(100vh - 30px);overflow:auto}
-.ops-order-workspace .order-list{max-height:75vh;overflow:auto;display:grid;gap:10px;padding:0 2px}
-.ops-order-workspace .order-card{padding:13px!important;border-radius:13px}.ops-order-workspace .order-card.selected{padding:12px!important}
-.ops-order-workspace .profit-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
-.ops-order-workspace #selectedOrderSummary{font-size:12px;line-height:1.6}
-.ops-list-toolbar{display:grid!important;gap:10px!important;align-items:stretch!important;margin:0 0 12px!important}
-.ops-list-search{width:100%!important;max-width:none!important;background:#fafafa!important;border:1px solid #e5e5e9!important;padding:13px 15px!important;font-size:14px;border-radius:12px!important}
-.ops-status-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#f0f0f2;border-radius:11px;padding:5px;gap:3px}
-.ops-status-tabs button{padding:11px 2px;font-size:13px;font-weight:700;background:transparent;border:0;border-radius:9px;white-space:nowrap;cursor:pointer;color:#63666e}
-.ops-status-tabs button.is-active{background:#fff;color:#282a31;box-shadow:0 1px 5px #00000018}
-.ops-order-workspace .panel-head{padding:13px 16px}.ops-order-workspace .panel-head>.filters{display:none!important}
-.ops-order-workspace .panel-title{font-size:16px!important}
-.ops-order-workspace .panel-sub{font-size:11px!important}
-.ops-page .panel{box-shadow:none!important}.ops-page .riders-list{max-height:none!important;display:block!important}
-.ops-page[data-ops-page="riders"] .rider-row{padding:17px 16px!important;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.ops-page[data-ops-page="riders"] .rider-name{font-size:15px!important}
-.ops-page[data-ops-page="riders"] .rider-meta{font-size:12px!important;line-height:1.8;margin-top:8px}
-.ops-page[data-ops-page="riders"] .rider-state{font-size:12px;border-radius:999px;background:#e7f5ed;padding:5px 10px;white-space:nowrap}
-.ops-page[data-ops-page="riders"] .riders-list [hidden],.ops-order-workspace .order-list [hidden]{display:none!important}
-.ops-page[data-ops-page="analysis"] .intel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.ops-page[data-ops-page="overview"] .ops-primary-kpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}
-.ops-page[data-ops-page="overview"] .control-tower{margin-top:14px}
-@media(max-width:900px){.ops-order-workspace{grid-template-columns:minmax(0,1fr)}.ops-dispatch-stack{position:relative;top:0;max-height:none}.ops-order-workspace .order-list{max-height:none}.ops-page[data-ops-page="overview"] .ops-primary-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-@media(max-width:700px){.app{padding:10px!important}.topbar .brand{font-size:18px!important}.topbar .status-live{display:none}.topbar .version{font-size:9px!important}.ops-nav{overflow-x:auto!important;flex-wrap:nowrap!important}.ops-nav button{white-space:nowrap}.ops-hero{min-height:225px;padding:52px 10px 95px;border-radius:22px 22px 0 0}.ops-hero h1{font-size:36px}.ops-home-content{padding:0 7px}.ops-home-card{padding:19px 12px}.ops-home-stat span{font-size:12px}.ops-home-links{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-status-tabs button{font-size:12px}.ops-page[data-ops-page="analysis"] .intel-grid{grid-template-columns:1fr}.ops-page[data-ops-page="riders"] .rider-row{padding:13px 9px!important}}
+<style id="ubee-v633-app-responsive">
+
+/* UBee Dispatch V6.3.3 — Mobile First App Console, replaces V6.3.2 layout rules */
+:root{--ubee-orange:#ed754d;--ubee-bg:#f4f4f6;--line:#e6e7eb;--ubee-paper:#fff}
+html{scroll-behavior:auto}body{background:var(--ubee-bg)}
+.app{max-width:1230px;margin:0 auto;padding:18px 22px 42px}
+.topbar{position:relative;top:auto;z-index:2;background:#fff;border:1px solid var(--line);border-radius:17px;box-shadow:none;padding:14px 17px;display:flex;gap:14px;align-items:center;justify-content:space-between}
+.brand-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:9px;min-width:0}
+.topbar .brand{font-weight:900;font-size:20px;letter-spacing:-.035em;white-space:nowrap}
+.topbar .version{font-size:10px;font-weight:800;background:#202126;color:#fff;padding:6px 10px;border-radius:9px;letter-spacing:0}
+.topbar .status-live{font-size:11px}.topbar .actions{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;flex-shrink:0}
+.topbar .btn{padding:9px 11px;font-size:12px;border-radius:10px;box-shadow:none}
+.ops-updated-time{color:#7b7f87;font-size:11px;font-weight:700;white-space:nowrap}
+.ops-nav{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:auto;height:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:none;margin:12px 0 18px;padding:5px;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:3px;z-index:2;overflow:visible}
+.ops-nav:before{display:none}.ops-nav button{border:0;background:transparent;color:#60636b;border-radius:9px;font-weight:800;font-size:13px;min-height:39px;padding:9px 13px;white-space:nowrap;cursor:pointer}
+.ops-nav button.is-active{background:var(--ubee-orange);color:white}
+.ops-primary-kpis{display:none}.ops-view,.ops-page,.ops-home{display:none}
+.ops-view.is-active,.ops-page.is-active,.ops-home.is-active{display:block}
+.ops-home{max-width:860px;margin:0 auto}
+.ops-hero{background:var(--ubee-orange);color:white;border-radius:21px 21px 0 0;min-height:195px;padding:46px 14px 86px;text-align:center}
+.ops-hero h1{margin:0;font-size:35px;font-weight:800;letter-spacing:.03em}.ops-hero p{font-size:13px;opacity:.95;margin:8px 0 0}
+.ops-home-content{max-width:770px;margin:-50px auto 0;position:relative;padding:0 14px 16px}
+.ops-home-card{background:white;border-radius:19px;padding:19px 20px;margin:0 0 14px;border:1px solid #ececf0;box-shadow:0 8px 25px rgba(22,22,35,.035)}
+.ops-home-card h2{font-size:17px;font-weight:900;margin:0 0 13px;line-height:1.35}
+.ops-home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.ops-home-stat{background:transparent;border:0;border-right:1px solid #e6e6ea;min-width:0;padding:4px 3px 7px;cursor:pointer;text-align:center;color:#555963}
+.ops-home-stat:last-child{border-right:0}.ops-home-stat b{display:block;color:var(--ubee-orange);font-size:29px;font-weight:900;line-height:1.2}
+.ops-home-stat span{display:block;font-size:12px;font-weight:700;margin-top:5px;white-space:nowrap}
+.ops-home-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ops-home-link{min-width:0;min-height:104px;background:#fff;border:1px solid #e8e8ec;border-radius:15px;color:#303138;font-size:14px;font-weight:800;cursor:pointer;padding:15px 8px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px}
+.ops-home-link i{font-size:25px;font-style:normal;line-height:1;color:var(--ubee-orange);font-weight:800}
+.ops-home-link:focus-visible,.ops-home-link:hover{border-color:var(--ubee-orange);background:#fff8f4;outline-color:var(--ubee-orange)}
+.ops-mobile-heading{display:none;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:8px 12px;margin:0 0 12px}
+.ops-mobile-heading.is-active{display:flex}.ops-mobile-heading h1{font-size:19px;font-weight:900;margin:0;flex:1;text-align:center}.ops-back{min-width:38px;min-height:38px;background:#f4f4f6;border:0;border-radius:9px;font-size:28px;line-height:1;cursor:pointer}
+#opsWorkbench{display:none}#opsWorkbench.is-active{display:block}
+.ops-order-workspace{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(350px,.95fr);align-items:start;gap:15px}
+.ops-order-workspace .panel,.ops-page .panel{border-radius:15px;box-shadow:none;min-width:0}
+.ops-order-workspace .order-list{max-height:70vh;overflow:auto;display:grid;gap:10px;padding:0 2px}
+.ops-order-workspace .order-card{padding:13px;border-radius:13px}.ops-order-workspace .order-card.selected{padding:12px}
+.ops-dispatch-stack{display:flex;flex-direction:column;gap:12px;min-width:0;position:sticky;top:12px;max-height:calc(100dvh - 24px);overflow:auto}
+.ops-order-workspace #selectedOrderSummary{line-height:1.65}
+.ops-list-toolbar{display:grid;gap:10px;align-items:stretch;margin:0 0 11px}
+.ops-list-search{width:100%;max-width:none;background:#fafafa;border:1px solid #e3e4e8;padding:13px 14px;font-size:15px;border-radius:11px;min-height:44px;outline-offset:2px}
+.ops-status-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#f0f0f3;padding:4px;border-radius:11px;gap:3px}
+.ops-status-tabs button{border:0;border-radius:8px;background:transparent;font-size:12px;font-weight:800;white-space:nowrap;padding:11px 3px;min-width:0;color:#686b72;cursor:pointer}
+.ops-status-tabs button.is-active{background:white;color:#26262d;box-shadow:0 1px 5px #00000012}
+.ops-order-workspace .panel-head{padding:13px}.ops-order-workspace .panel-head>.filters{display:none}
+.ops-order-workspace .panel-title{font-size:16px}.ops-order-workspace .panel-sub{font-size:11px}
+.ops-page .riders-list{max-height:none;display:block}
+.ops-page[data-ops-page="riders"] .rider-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px}
+.ops-page[data-ops-page="riders"] .rider-name{font-size:15px}.ops-page[data-ops-page="riders"] .rider-meta{font-size:12px;line-height:1.65;margin-top:6px}
+.ops-page[data-ops-page="riders"] .rider-state{font-size:11px;border-radius:999px;background:#eaf7ee;padding:5px 8px;white-space:nowrap}
+.ops-page[data-ops-page="analysis"] .intel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.ops-page[data-ops-page="overview"] .ops-primary-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.ops-page[data-ops-page="overview"] .control-tower{margin-top:13px}
+#riders [hidden],#orders [hidden]{display:none!important}
+.ops-sheet-backdrop,.ops-sheet-close{display:none}
+@media(max-width:950px){.ops-order-workspace{grid-template-columns:minmax(0,1fr)}.ops-dispatch-stack{position:static;max-height:none}.ops-order-workspace .order-list{max-height:none}.ops-page[data-ops-page="overview"] .ops-primary-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){
+  html,body{max-width:100%;overflow-x:hidden}
+  .app{max-width:100%;padding:0 12px calc(90px + env(safe-area-inset-bottom,0px));margin:0 auto}
+  .topbar{margin:0 -12px 12px;border-radius:0;border-left:0;border-right:0;border-top:0;box-shadow:none;padding:calc(11px + env(safe-area-inset-top,0px)) 13px 11px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+  .topbar .brand-wrap{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0}
+  .topbar .brand{font-size:19px;letter-spacing:-.04em;white-space:nowrap}
+  .topbar .version{display:none}.topbar .status-live{display:none}
+  .topbar .actions{gap:6px;justify-content:flex-end}
+  .ops-updated-time{display:none}
+  .topbar .btn{position:relative;font-size:0!important;width:40px;height:40px;min-height:40px;padding:0!important;border-radius:11px;display:grid;place-items:center}
+  .topbar #refreshBtn::after{content:'↻';font-size:25px;font-weight:700;line-height:1}
+  .topbar #dispatchLogoutBtn::after{content:'鎖';font-size:15px;font-weight:800;line-height:1}
+  .ops-nav{position:fixed;left:0;right:0;top:auto;bottom:0;width:100%;height:calc(65px + env(safe-area-inset-bottom,0px));margin:0;padding:5px 4px calc(5px + env(safe-area-inset-bottom,0px));z-index:1000;box-shadow:0 -6px 20px #10111411;border-radius:17px 17px 0 0;border:1px solid #e9e9ed;border-bottom:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;align-items:stretch;overflow:visible}
+  .ops-nav button{border:0!important;min-width:0;min-height:53px;padding:4px 0!important;background:transparent!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;white-space:nowrap;overflow:hidden;color:#747780!important;font-size:0!important;line-height:1}
+  .ops-nav button::before{content:'•';display:block;font-size:19px;line-height:22px;font-weight:700}
+  .ops-nav button::after{content:'功能';display:block;font-size:10px;line-height:13px;font-weight:800}
+  .ops-nav button:nth-child(1)::before{content:'⌂'}.ops-nav button:nth-child(1)::after{content:'首頁'}
+  .ops-nav button:nth-child(2)::before{content:'▤'}.ops-nav button:nth-child(2)::after{content:'訂單'}
+  .ops-nav button:nth-child(3)::before{content:'▦'}.ops-nav button:nth-child(3)::after{content:'總覽'}
+  .ops-nav button:nth-child(4)::before{content:'♙'}.ops-nav button:nth-child(4)::after{content:'小U'}
+  .ops-nav button:nth-child(5)::before{content:'!';font-weight:900}.ops-nav button:nth-child(5)::after{content:'異常'}
+  .ops-nav button:nth-child(6)::before{content:'▥'}.ops-nav button:nth-child(6)::after{content:'分析'}
+  .ops-nav button.is-active{background:#fff2eb!important;border-radius:12px;color:var(--ubee-orange)!important}
+  .ops-home{max-width:none;margin:0 -2px}
+  .ops-hero{min-height:152px;padding:24px 12px 65px;border-radius:19px 19px 0 0}
+  .ops-hero h1{font-size:29px;font-weight:800;line-height:1.35}
+  .ops-hero p{font-size:12px;margin-top:5px}
+  .ops-home-content{max-width:none;margin:-43px auto 0;padding:0 8px 16px}
+  .ops-home-card{margin:0 0 12px;padding:15px 13px;border-radius:16px;box-shadow:0 5px 16px #10111408}
+  .ops-home-card h2{font-size:16px;margin:0 0 12px}
+  .ops-home-stat{padding:3px 2px 5px}.ops-home-stat b{font-size:27px}
+  .ops-home-stat span{font-size:11px;margin-top:4px}
+  .ops-home-links{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .ops-home-link{min-height:82px;border-radius:13px;font-size:13px;gap:7px;padding:12px 6px}
+  .ops-home-link i{font-size:22px;margin:0}
+  .ops-mobile-heading{margin:0 0 10px;min-height:49px;padding:5px 9px}
+  .ops-mobile-heading h1{font-size:18px}
+  .ops-order-workspace{display:block}
+  .ops-order-workspace .order-list{max-height:none;overflow:visible;padding:0;gap:9px}
+  .ops-order-workspace .panel,.ops-page .panel{border-radius:13px}
+  .ops-order-workspace .panel-head{padding:12px;gap:7px;flex-wrap:wrap}
+  .ops-order-workspace .panel-title{font-size:15px}
+  .ops-order-workspace .panel-sub{font-size:11px;line-height:1.45}
+  .ops-list-toolbar{gap:8px;margin-bottom:10px}
+  .ops-list-search{font-size:14px;padding:10px 12px;min-height:43px}
+  .ops-status-tabs{padding:4px;gap:2px}
+  .ops-status-tabs button{font-size:11px;padding:11px 1px;min-height:42px}
+  .ops-order-workspace .order-card{padding:12px!important;border-radius:12px}.ops-order-workspace .order-card.selected{padding:11px!important}
+  .ops-order-workspace .profit-strip,.ops-order-workspace .order-finance-box{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ops-order-workspace .order-finance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ops-page[data-ops-page="riders"] .rider-row{padding:13px 10px}
+  .ops-page[data-ops-page="riders"] .rider-meta{font-size:11px;overflow-wrap:anywhere}
+  .ops-page[data-ops-page="overview"] .ops-primary-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ops-page[data-ops-page="analysis"] .intel-grid{grid-template-columns:1fr}
+  .control-tower{grid-template-columns:1fr}.health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .panel-head,.panel-body{min-width:0;overflow-wrap:anywhere}
+  .ops-dispatch-stack{display:none;position:fixed;z-index:1202;left:0;right:0;top:12dvh;bottom:0;background:#f4f4f6;border-radius:20px 20px 0 0;padding:56px 12px calc(24px + env(safe-area-inset-bottom,0px));max-height:none;overflow:auto;box-shadow:0 -15px 50px #0002;overscroll-behavior:contain}
+  .ops-dispatch-stack.is-open{display:flex}
+  .ops-sheet-backdrop.is-open{display:block;position:fixed;inset:0;z-index:1201;background:#0007;backdrop-filter:blur(2px)}
+  .ops-sheet-close{display:none}.ops-dispatch-stack.is-open .ops-sheet-close{display:flex;position:sticky;top:-56px;margin:-56px -12px 12px;padding:11px 16px;align-items:center;justify-content:space-between;gap:12px;background:#fff;border-bottom:1px solid #e8e8ed;border-radius:20px 20px 0 0;min-height:51px;font-size:15px;font-weight:900;z-index:1}
+  .ops-sheet-close button{border:0;border-radius:9px;min-height:34px;padding:7px 12px;background:#f0f0f3;color:#222;font-size:13px;font-weight:800}
+  body.ops-sheet-lock{overflow:hidden}
+  .dispatch-auth-panel{padding:22px 18px;border-radius:19px}
+  .dispatch-auth-panel h2{font-size:20px}
+}
+@media(max-width:360px){.app{padding-left:9px;padding-right:9px}.topbar{margin-left:-9px;margin-right:-9px}.topbar .brand{font-size:17px}.ops-home-stat span{font-size:10px}.ops-status-tabs button{font-size:10px}.ops-home-content{padding-left:5px;padding-right:5px}.ops-nav button::after{font-size:9px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
+
 </style>
 </head>
 
@@ -515,13 +589,13 @@ body{background:var(--ubee-bg)!important}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">V6.3.2 · PURE DATA OPERATIONS</div>
+      <div class="version">V6.3.3 · MOBILE FIRST DATA CONSOLE</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
       <span id="lastUpdated" class="ops-updated-time">尚未更新</span>
-      <button class="btn primary" id="refreshBtn">重新整理</button>
-      <button class="btn dispatch-logout-btn" id="dispatchLogoutBtn" type="button">鎖定調度中心</button>
+      <button class="btn primary" id="refreshBtn" aria-label="重新整理調度資料" title="重新整理">重新整理</button>
+      <button class="btn dispatch-logout-btn" id="dispatchLogoutBtn" type="button" aria-label="鎖定調度中心" title="鎖定調度中心">鎖定調度中心</button>
     </div>
   </header>
 
@@ -3248,7 +3322,7 @@ setInterval(renderWeatherPricingStatus,30000);
 
 
 
-<script id="ubee-v632-pure-data-console">
+<script id="ubee-v633-app-data-console">
 (function(){
 'use strict';
 const app=document.querySelector('.app');
@@ -3297,7 +3371,7 @@ home.innerHTML=`<div class="ops-hero"><h1>首頁</h1><p>UBee 智慧調度中心<
     </div></div>
     <div class="ops-home-card"><h2>功能入口</h2><div class="ops-home-links">
       <button type="button" class="ops-home-link" data-go="dispatch"><i>▤</i>訂單管理</button>
-      <button type="button" class="ops-home-link" data-go="riders"><i>♟</i>小U管理</button>
+      <button type="button" class="ops-home-link" data-go="riders"><i>♙</i>小U管理</button>
       <button type="button" class="ops-home-link" data-go="incidents"><i>!</i>異常案件</button>
       <button type="button" class="ops-home-link" data-go="overview"><i>▦</i>營運總覽</button>
       <button type="button" class="ops-home-link" data-go="analysis"><i>◴</i>城市與財務</button>
@@ -3316,11 +3390,23 @@ if(orderPanel)orderPanel.prepend(orderTools);
 const riderTools=document.createElement('div');riderTools.className='ops-list-toolbar';
 riderTools.innerHTML='<input class="ops-list-search" id="opsRiderSearch" type="search" placeholder="搜尋小U姓名、電話或服務區" aria-label="搜尋小U">';
 if(ridersPanel)ridersPanel.prepend(riderTools);
+// Mobile-only task detail sheet reuses the EXISTING candidate & event panels.
+const sheetBack=document.createElement('div');sheetBack.className='ops-sheet-backdrop';
+sheetBack.setAttribute('aria-hidden','true');document.body.appendChild(sheetBack);
+const sheetTop=document.createElement('div');sheetTop.className='ops-sheet-close';
+sheetTop.innerHTML='<span>訂單詳情與人工調度</span><button type="button" aria-label="關閉訂單詳情">關閉 ✕</button>';
+dispatchStack.prepend(sheetTop);
+function closeSheet(){dispatchStack.classList.remove('is-open');sheetBack.classList.remove('is-open');document.body.classList.remove('ops-sheet-lock');}
+function openSheet(){if(!window.matchMedia('(max-width:720px)').matches)return;dispatchStack.classList.add('is-open');sheetBack.classList.add('is-open');document.body.classList.add('ops-sheet-lock');}
+sheetBack.addEventListener('click',closeSheet);
+sheetTop.querySelector('button').addEventListener('click',closeSheet);
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closeSheet();});
+window.addEventListener('resize',()=>{if(!window.matchMedia('(max-width:720px)').matches)closeSheet();});
 const views={home,dispatch:main,...pages};
 const names={home:'首頁',dispatch:'訂單管理',riders:'小U管理',incidents:'異常案件',overview:'營運總覽',analysis:'城市與財務'};
 let current='home';
 function show(key){
-  if(!views[key])key='home';current=key;
+  if(!views[key])key='home';current=key;closeSheet();
   Object.entries(views).forEach(([k,el])=>el.classList.toggle('is-active',k===key));
   document.querySelectorAll('[data-ops-view]').forEach(el=>{
     const active=el.dataset.opsView===key;
@@ -3373,6 +3459,18 @@ function filterRows(){
 // Keep the original renderer's source data and sort; show all statuses, filter only visually.
 if(typeof state==='object'){state.filter='all';state.stageFilter='';state.towerRiskFilter='all';}
 const orderRoot=$('orders'),riderRoot=$('riders');
+// An order card already has its own existing selection handler; this listener only opens the visual sheet.
+if(orderRoot)orderRoot.addEventListener('click',event=>{
+  const card=event.target.closest('.order-card');
+  if(!card || !orderRoot.contains(card))return;
+  const action=event.target.closest('[data-action]')?.dataset.action;
+  if(action==='select' || action==='candidates' || action==='handle-risk'){openSheet();return;}
+  // Any non-control tap selects the order first, then opens its detail sheet.
+  if(!event.target.closest('button,a,input,select,textarea')){
+    selectOrder(card.dataset.orderId);
+    openSheet();
+  }
+});
 const observer=new MutationObserver(()=>{filterRows();syncHome();});
 if(orderRoot)observer.observe(orderRoot,{childList:true});
 if(riderRoot)new MutationObserver(filterRows).observe(riderRoot,{childList:true});
