@@ -1,11 +1,11 @@
-<!-- UBee Customer TC V1.6 — Native Member Experience RC1｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
+<!-- UBee Customer TC V1.6 — Native Member Experience RC1.1｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端正式版候選｜2026-10-16｜Native My V2
   Release: UBee Customer Native My V2 + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + My Service Smooth V1
-  PWA: 20261102-customer-tc-v1-6-native-member-rc1
+  PWA: 20261102-customer-tc-v1-6-native-member-rc1-1
   Member Security V1：免簡訊主動註冊、Session 密碼設定、LINE 安全復原；保留免註冊下單。
 
   本次整理：
@@ -30,7 +30,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261102-customer-tc-v1-6-native-member-rc1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261102-customer-tc-v1-6-native-member-rc1-1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18157,7 +18157,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="ubee-my-info-list"><button class="ubee-flat-row" id="ubeeRecoveryLineStart" type="button">綁定 LINE 安全復原 <span>›</span></button></div>
 <div class="ubee-flat-status" id="ubeeRecoveryLineStatus" aria-live="polite"></div>
 <button class="ubee-account-secondary-action" data-settings-action="logout" type="button">登出目前帳號</button>
-<button class="ubee-account-destructive-link" data-my-action="deleteAccount" type="button">申請刪除帳號</button>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyPrivacyPanel">
 <div class="ubee-my-panel-head"><strong>規範與隱私</strong><button data-my-close-account="" type="button">上一頁</button></div>
@@ -18168,11 +18167,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <button class="ubee-flat-row" data-flat-action="prohibited" type="button">禁止委託項目 <span>›</span></button>
 </div>
 <div class="ubee-flat-section" hidden id="ubeeMyDocumentContent" tabindex="-1"></div>
-</section>
-<section class="ubee-my-panel" hidden="" id="ubeeMyDeleteAccountPanel">
-<div class="ubee-my-panel-head"><strong>帳號刪除申請</strong><button data-my-close-security="" type="button">上一頁</button></div>
-<div class="ubee-my-feature-note">如不再使用 UBee，可在此提出帳號刪除申請。提交前會再次確認；訂單、付款、爭議或依法需保存的必要紀錄，仍依平台規範處理。</div>
-<button class="ubee-flat-danger" data-flat-action="confirm-delete" type="button">提出帳號刪除申請</button><div aria-live="polite" class="ubee-flat-status" id="ubeeDeleteAccountStatus"></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyFeedbackPanel">
 <div class="ubee-my-panel-head"><strong>意見回饋</strong><button data-my-close="" type="button">關閉</button></div>
@@ -20480,7 +20474,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-6-native-member-rc1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261102-customer-tc-v1-6-native-member-rc1-1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21851,22 +21845,7 @@ html,body{
   font-size:15px;
   font-weight:800;
 }
-#productionOrderFlow .ubee-account-destructive-link{
-  display:block;
-  min-height:44px;
-  margin:26px auto 6px;
-  padding:8px 14px;
-  border:0;
-  background:transparent;
-  color:#8a9097;
-  font:inherit;
-  font-size:14px;
-  font-weight:750;
-  text-decoration:underline;
-  text-underline-offset:3px;
-}
 #productionOrderFlow .ubee-account-secondary-action:active{background:#f5f6f7;}
-#productionOrderFlow .ubee-account-destructive-link:active{color:#c62828;}
 @media(max-width:380px){#productionOrderFlow .ubee-my-member-card{padding-left:14px;padding-right:14px}#productionOrderFlow .ubee-my-menu-copy small{font-size:13px}}
 </style>
 
@@ -21894,8 +21873,7 @@ html,body{
     changepassword:'ubeeMyPasswordPanel',
     preferences:'ubeeMyPreferencesPanel',
     security:'ubeeMySecurityPanel',
-    privacy:'ubeeMyPrivacyPanel',
-    deleteaccount:'ubeeMyDeleteAccountPanel'
+    privacy:'ubeeMyPrivacyPanel'
   });
   const preferences = Object.freeze({
     autoLocation:'ubee_setting_auto_location',
@@ -22605,14 +22583,6 @@ html,body{
       hapticPulse();
     }
 
-    const closeSecurityButton = event.target.closest('#productionOrderFlow [data-my-close-security]');
-    if(closeSecurityButton){
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      closeWithHistory() || openMySection('security',{fromHistory:true});
-      return;
-    }
-
     const closeAccountButton = event.target.closest('#productionOrderFlow [data-my-close-account]');
     if(closeAccountButton){
       event.preventDefault();
@@ -22640,18 +22610,6 @@ html,body{
 
       if(flatAction === 'phone-help'){
         openMySection('support');
-        return;
-      }
-
-      if(flatAction === 'confirm-delete'){
-        const status = document.getElementById('ubeeDeleteAccountStatus');
-        showUBeeCustomerNativeConfirm(
-          '提出刪除帳號申請？',
-          '客服完成身分確認前，帳號不會立即刪除。',
-          {confirmText:'提出申請',cancelText:'取消'}
-        ).then(ok=>{
-          if(ok){if(status)status.textContent='此處尚未送出正式刪除申請，請聯繫 UBee 官方客服完成申請與身分核對。';window.openUBeeOfficialAccount?.();}
-        });
         return;
       }
 
@@ -22849,7 +22807,7 @@ html,body{
             <p>平台得為確認申請人身分、避免他人冒用，要求提供合理驗證資料。若因法定保存、契約履行、爭議處理、防詐或第三人權益而不能立即刪除或停止利用，平台會說明原因及可處理範圍。</p>
 
             <h3>十四、權利行使方式</h3>
-            <p>使用者可透過「我的 → 會員帳號」、「編輯會員資料」、「刪除帳號」或「聯繫客服」提出申請。請提供會員手機號碼、必要身分確認及具體需求。平台會在法令要求或合理期間內回覆。</p>
+            <p>使用者可透過「我的 → 聯繫客服」提出資料查詢、更正、停止利用或刪除申請。請提供會員手機號碼、必要身分確認及具體需求。平台會在法令要求或合理期間內回覆。</p>
 
             <h3>十五、自由提供與不提供的影響</h3>
             <p>部分資料可自由選擇是否提供，但姓名、聯絡方式、取送地址、任務內容及必要付款資訊是提供跑腿服務所必需。拒絕或撤回提供必要資料時，平台可能無法完成使用身分建立、估價、派單、配送、退款、客服或安全驗證。</p>
@@ -24532,7 +24490,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
   const STATE_KEY='ubeeCustomerNavigationV3';
   const PRIMARY=new Set(['home','task','ucoin','notify','store','my']);
-  const MY_SECTIONS=new Set(['account','coupons','addresses','feedback','settings','favorites','serviceareas','becomerider','editprofile','changepassword','preferences','security','privacy','deleteaccount']);
+  const MY_SECTIONS=new Set(['account','coupons','addresses','feedback','settings','favorites','serviceareas','becomerider','editprofile','changepassword','preferences','security','privacy']);
   let applying=false;
 
   const normalizePrimary=value=>PRIMARY.has(String(value||'').toLowerCase())?String(value).toLowerCase():'home';
