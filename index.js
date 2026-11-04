@@ -1,5 +1,3 @@
-// UBee Customer RC2 — customer membership growth & new customer referrals retired (候選，尚未正式部署)
-// UBee Rider Review V4.0.2-HF1 supplement stability hotfix — shared backend
 // UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
 // ============================================================
 // UBee Backend｜會員安全增量 2026-10-17（以 2026-10-08 後端正式基準為底）
@@ -95,6 +93,16 @@ const UBEE_GROWTH_COLLECTIONS = Object.freeze({
   campaigns: 'growthCampaigns',
   anomalies: 'growthAnomalies',
 });
+
+const UBEE_CUSTOMER_TIER_RULES = Object.freeze([
+  Object.freeze({ key:'GENERAL', label:'一般', minOrders:0, minReferrals:0 }),
+  Object.freeze({ key:'GOLD', label:'黃金', minOrders:1, minReferrals:0 }),
+  Object.freeze({ key:'BRONZE', label:'銅牌', minOrders:1, minReferrals:30 }),
+  Object.freeze({ key:'SILVER', label:'銀牌', minOrders:50, minReferrals:30 }),
+  Object.freeze({ key:'WHITE_SILVER', label:'白銀', minOrders:150, minReferrals:30 }),
+  Object.freeze({ key:'GOLD_HIGH', label:'金牌', minOrders:300, minReferrals:30 }),
+  Object.freeze({ key:'PLATINUM', label:'白金', minOrders:600, minReferrals:30 }),
+]);
 
 const UBEE_RIDER_TIER_RULES = Object.freeze([
   Object.freeze({ key:'NEW', label:'新加入', minOrders:0, minQuality:0 }),
@@ -205,6 +213,18 @@ async function resolveGrowthReferralCode(code) {
   const data = doc.data() || {};
   if (data.active === false || !data.ownerId || !['customer','rider'].includes(String(data.ownerType))) return null;
   return { code:normalized, ...data };
+}
+
+function getCustomerGrowthTier(completedOrders, validReferrals) {
+  const orders = Math.max(0, Number(completedOrders || 0));
+  const referrals = Math.max(0, Number(validReferrals || 0));
+  let current = UBEE_CUSTOMER_TIER_RULES[0];
+  for (const rule of UBEE_CUSTOMER_TIER_RULES) {
+    if (orders >= rule.minOrders && referrals >= rule.minReferrals) current = rule;
+  }
+  const index = UBEE_CUSTOMER_TIER_RULES.findIndex(rule => rule.key === current.key);
+  const next = index >= 0 && index < UBEE_CUSTOMER_TIER_RULES.length - 1 ? UBEE_CUSTOMER_TIER_RULES[index + 1] : null;
+  return { ...current, next };
 }
 
 function getRiderGrowthQuality(rider = {}, riderOrders = []) {
@@ -366,6 +386,43 @@ function growthCurrentMonthCount(completedOrders = [], nowMs = Date.now()) {
   }, 0);
 }
 
+function buildCustomerGrowthTasks({ completedOrders = 0, monthCompleted = 0, validReferrals = 0 } = {}) {
+  const nextOrderMilestone = [10,25,50,75,100,150,300,600].find(value => completedOrders < value) || 600;
+  const nextReferralMilestone = [1,3,5,10,20,30].find(value => validReferrals < value) || 30;
+  return [
+    { key:'MONTH_3', title:'本月完成 3 筆任務', progress:Math.min(monthCompleted,3), target:3, completed:monthCompleted>=3, rewardText:'月度成長紀錄' },
+    { key:'MONTH_5', title:'本月完成 5 筆任務', progress:Math.min(monthCompleted,5), target:5, completed:monthCompleted>=5, rewardText:'活躍里程碑' },
+    { key:'ORDER_MILESTONE', title:`累積完成 ${nextOrderMilestone} 筆任務`, progress:Math.min(completedOrders,nextOrderMilestone), target:nextOrderMilestone, completed:completedOrders>=nextOrderMilestone, rewardText:'訂單里程碑' },
+    { key:'REFERRAL_MILESTONE', title:`累積 ${nextReferralMilestone} 位有效推薦`, progress:Math.min(validReferrals,nextReferralMilestone), target:nextReferralMilestone, completed:validReferrals>=nextReferralMilestone, rewardText:'推薦里程碑' },
+  ];
+}
+
+function buildCustomerGrowthAchievements(completedOrders = 0, validReferrals = 0) {
+  const definitions = [
+    ['FIRST_ORDER','初次相遇','完成第一筆 UBee 任務',completedOrders>=1],
+    ['TEN_ORDERS','熟客報到','累積完成 10 筆有效訂單',completedOrders>=10],
+    ['THIRTY_REFERRALS','銅牌推手','30 位有效推薦好友',validReferrals>=30],
+    ['FIFTY_ORDERS','五十次同行','累積完成 50 筆有效訂單',completedOrders>=50],
+    ['HUNDRED_ORDERS','百單會員','累積完成 100 筆有效訂單',completedOrders>=100],
+    ['THREE_HUNDRED','長期夥伴','累積完成 300 筆有效訂單',completedOrders>=300],
+    ['SIX_HUNDRED','白金里程碑','累積完成 600 筆有效訂單',completedOrders>=600],
+  ];
+  return definitions.map(([key,title,description,unlocked]) => ({ key,title,description,unlocked:Boolean(unlocked) }));
+}
+
+function getCustomerTierBenefits(tierKey = 'GENERAL') {
+  const benefits = {
+    GENERAL:['UBee 會員身份','使用邀請好友功能'],
+    GOLD:['黃金會員身份','會員成長紀錄','成長任務資格'],
+    BRONZE:['銅牌會員身份','成就徽章與會員活動資格','城市成長紀錄'],
+    SILVER:['銀牌會員身份','銀牌以上限定活動資格','新功能優先體驗資格'],
+    WHITE_SILVER:['白銀會員身份','進階會員活動資格','限定任務與活動資格'],
+    GOLD_HIGH:['金牌會員身份','高階會員活動資格','部分新服務預覽資格'],
+    PLATINUM:['白金會員身份','白金限定活動與權益資格','核心用戶測試與意見計畫資格'],
+  };
+  return benefits[String(tierKey || 'GENERAL')] || benefits.GENERAL;
+}
+
 function buildRiderGrowthTasks({ completedOrders = 0, monthCompleted = 0, quality = {}, nextTier = null } = {}) {
   const nextTarget = Number(nextTier?.minOrders || completedOrders || 1);
   const nextQuality = Number(nextTier?.minQuality || 0);
@@ -466,6 +523,12 @@ function buildRiderGrowthSummary({ rider = {}, riderOrders = [], completedOrders
 function buildGrowthTierHistoryReason(ownerType, growthSummary = {}) {
   const tierKey = String(growthSummary?.tier?.key || '');
   const completedOrders = Math.max(0, Number(growthSummary?.completedOrders || 0));
+  if (ownerType === 'customer') {
+    const validReferrals = Math.max(0, Number(growthSummary?.validReferrals || 0));
+    if (tierKey === 'GOLD') return '完成第一筆有效訂單';
+    if (tierKey === 'BRONZE') return `達成 ${validReferrals} 位有效推薦好友`;
+    return `累積完成 ${completedOrders} 筆有效訂單`;
+  }
   const minQuality = Math.max(0, Number(growthSummary?.tier?.minQuality || 0));
   return minQuality > 0
     ? `累積 ${completedOrders} 筆有效履約，品質 ${growthSummary?.quality?.sampleReady===true ? Math.max(0,Number(growthSummary?.quality?.score || 0))+' 分' : '已完成樣本'}`
@@ -480,7 +543,7 @@ async function syncGrowthTierHistory(ownerType, ownerId, growthSummary) {
     const old = profileDoc.exists ? (profileDoc.data() || {}) : {};
     const oldTier = String(old.currentTier || '');
     const newTier = String(growthSummary?.tier?.key || '');
-    const rules = UBEE_RIDER_TIER_RULES;
+    const rules = ownerType === 'rider' ? UBEE_RIDER_TIER_RULES : UBEE_CUSTOMER_TIER_RULES;
     const oldIndex = rules.findIndex(rule => rule.key === oldTier);
     const newIndex = rules.findIndex(rule => rule.key === newTier);
     const highestIndex = rules.findIndex(rule => rule.key === String(old.highestTier || ''));
@@ -602,27 +665,16 @@ async function resolveGrowthRiderOwnerIdFromOrder(order = {}) {
   return String(order.riderId || order.driverId || '').trim();
 }
 
-async function markRiderInvitedCustomerProgress(customerId, orderId) {
-  const safeId=String(customerId || '').trim();
-  if(!safeId) return {updated:false};
-  const doc=await db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`customer_${safeId}`).get();
-  if(!doc.exists || String(doc.data()?.referrerType || '')!=='rider') return {updated:false};
-  return markGrowthReferralProgress('customer', safeId, 'order_created', {
-    firstOrderCreatedId:String(orderId || ''),firstOrderCreatedAtMs:Date.now(),
-  });
-}
-
 async function processUBeeGrowthCompletedOrder(order = {}) {
   if (!isGrowthValidCompletedOrder(order)) return;
   const orderId = String(order.id || order.orderId || '').trim();
   if (!orderId) return;
   const customerId = String(order.userId || order.customerId || '').trim();
   if (customerId) {
-    // Customer Growth 已退場：U幣完單／首單獎勵獨立運作，不新增會員等級資料。
-    await processUCoinCompletedOrder(order).catch(err => console.warn('U coin completed-order reward:', err.message));
-    // 僅結算既有推薦登記（部署後不再接受 customer 推薦碼）；不新增客戶推薦。
-    await qualifyGrowthReferral('customer', customerId, { type:'legacy_referral_first_valid_order', orderId }).catch(err => console.warn('Legacy referral reconcile:', err.message));
-    await settleLegacyUCoinCustomerReferralReward(customerId, orderId).catch(err => console.warn('Legacy U coin referral settlement:', err.message));
+    const customerGrowthResult = await recordGrowthCompletedOrderForOwner('customer', customerId, orderId).catch(err => ({ recorded:false, error:err }));
+    await processUCoinCompletedOrder(order, customerGrowthResult).catch(err => console.warn('U coin completed-order reward:', err.message));
+    await qualifyGrowthReferral('customer', customerId, { type:'first_valid_order', orderId }).catch(err => console.warn('Growth customer referral reconcile:', err.message));
+    await processUCoinCustomerReferralReward(customerId, orderId).catch(err => console.warn('U coin referral reward:', err.message));
   }
   const riderOwnerId = await resolveGrowthRiderOwnerIdFromOrder(order).catch(()=>String(order.riderId || '').trim());
   if (riderOwnerId) {
@@ -649,6 +701,7 @@ const UBEE_UCOIN = Object.freeze({
   orderCompletedUnits:5,
   firstOrderBonusUnits:10,
   ratingUnits:5,
+  referralUnits:20,
   redemptionRateTwd:1,
   redemptionServicePercent:0.20,
   orderRedemptionCapTwd:20,
@@ -729,48 +782,20 @@ async function grantUCoin(customerId, units, type, eventKey, title, metadata = {
   return { granted, units:safeUnits, balanceUnits };
 }
 
-// 首單 U幣資格不依賴會員等級：唯讀歷史 Growth 完單數，寫入獨立 U幣資格事件。
-// 每筆訂單以固定事件鍵判定一次；重試時仍可重放首單資格而不會雙重入帳。
-async function recordUCoinCustomerCompletedOrder(customerId, orderId) {
-  const c=String(customerId||'').trim(),o=String(orderId||'').trim().toUpperCase();
-  if(!c||!o)return {recorded:false,firstOrder:false};
-  const eventKey=crypto.createHash('sha256').update(`${c}:${o}`).digest('hex');
-  const eventRef=db.collection('uCoinCustomerOrderEvents').doc(eventKey);
-  const counterRef=db.collection('uCoinCustomerOrderProgress').doc(c);
-  const legacyRef=db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('customer',c));
-  return db.runTransaction(async tx=>{
-    const [evt,counter,legacy]=await Promise.all([tx.get(eventRef),tx.get(counterRef),tx.get(legacyRef)]);
-    if(evt.exists)return {recorded:false,duplicate:true,firstOrder:evt.data()?.firstOrder===true};
-    const oldCount=Number(legacy.exists?legacy.data()?.completedOrders:0);
-    const newCount=Number(counter.exists?counter.data()?.completedOrders:0);
-    const completed=Math.max(0,Number.isFinite(oldCount)?Math.floor(oldCount):0,
-      Number.isFinite(newCount)?Math.floor(newCount):0);
-    const firstOrder=completed===0,nowMs=Date.now();
-    tx.set(eventRef,{customerId:c,orderId:o,firstOrder,createdAtMs:nowMs,
-      createdAt:admin.firestore.FieldValue.serverTimestamp()});
-    tx.set(counterRef,{customerId:c,completedOrders:completed+1,updatedAtMs:nowMs,
-      updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
-    return {recorded:true,firstOrder,completedOrders:completed+1};
-  });
-}
-
-async function processUCoinCompletedOrder(order = {}) {
-  const customerId=String(order.customerId||order.userId||'').trim();
-  const orderId=String(order.id||order.orderId||'').trim().toUpperCase();
-  if(!customerId||!orderId||!isGrowthValidCompletedOrder(order))return {rewarded:false};
-  let completed={granted:false},firstOrder={granted:false};
-  try{
-    completed=await grantUCoin(customerId,UBEE_UCOIN.orderCompletedUnits,
-      'order_completed',`order_completed:${orderId}`,'完成一趟跑腿',{orderId});
-    const eligibility=await recordUCoinCustomerCompletedOrder(customerId,orderId);
-    if(eligibility.firstOrder===true){
-      firstOrder=await grantUCoin(customerId,UBEE_UCOIN.firstOrderBonusUnits,
-        'first_order_bonus',`first_order:${customerId}`,'首次跑腿加贈',{orderId});
+async function processUCoinCompletedOrder(order = {}, growthResult = {}) {
+  const customerId = String(order.customerId || order.userId || '').trim();
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  if (!customerId || !orderId || !isGrowthValidCompletedOrder(order)) return { rewarded:false };
+  const completed = await grantUCoin(customerId, UBEE_UCOIN.orderCompletedUnits, 'order_completed', `order_completed:${orderId}`, '完成一趟跑腿', { orderId });
+  let firstOrder = { granted:false };
+  if (growthResult?.recorded) {
+    const { data:profile } = await loadGrowthProfile('customer', customerId).catch(() => ({ data:{} }));
+    if (Number(profile?.completedOrders || 0) === 1) {
+      firstOrder = await grantUCoin(customerId, UBEE_UCOIN.firstOrderBonusUnits, 'first_order_bonus', `first_order:${customerId}`, '首次跑腿加贈', { orderId });
     }
-    return {rewarded:completed.granted||firstOrder.granted,completed,firstOrder};
-  }finally{
-    await finalizeUCoinReservation(order).catch(e=>console.warn('U coin reservation finalize:',e?.message||e));
   }
+  await finalizeUCoinReservation(order).catch(error => console.warn('U coin reservation finalize:', error.message));
+  return { rewarded:completed.granted || firstOrder.granted, completed, firstOrder };
 }
 
 async function reconcileExpiredUCoin(customerId) {
@@ -816,7 +841,7 @@ async function reconcileExpiredUCoin(customerId) {
   return { expiredUnits };
 }
 
-async function settleLegacyUCoinCustomerReferralReward(inviteeId, orderId) {
+async function processUCoinCustomerReferralReward(inviteeId, orderId) {
   const safeInviteeId = String(inviteeId || '').trim();
   if (!safeInviteeId) return { rewarded:false };
   const referralDoc = await db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`customer_${safeInviteeId}`).get();
@@ -826,8 +851,8 @@ async function settleLegacyUCoinCustomerReferralReward(inviteeId, orderId) {
   if (String(referral.status || '') !== 'qualified' || String(referral.referrerType || '') !== 'customer' || !inviterId) return { rewarded:false };
   const key = `customer_referral:${safeInviteeId}`;
   const [inviter, invitee] = await Promise.all([
-    grantUCoin(inviterId, 20, 'referral', `${key}:inviter`, '推薦好友完成首趟', { orderId, inviteeId:safeInviteeId }),
-    grantUCoin(safeInviteeId, 20, 'referral', `${key}:invitee`, '好友推薦首趟獎勵', { orderId, inviterId }),
+    grantUCoin(inviterId, UBEE_UCOIN.referralUnits, 'referral', `${key}:inviter`, '推薦好友完成首趟', { orderId, inviteeId:safeInviteeId }),
+    grantUCoin(safeInviteeId, UBEE_UCOIN.referralUnits, 'referral', `${key}:invitee`, '好友推薦首趟獎勵', { orderId, inviterId }),
   ]);
   return { rewarded:inviter.granted || invitee.granted, inviter, invitee };
 }
@@ -985,6 +1010,21 @@ async function reconcileRiderLifetimeGrowthCounter(identity, ownerId, profile = 
   );
   const count = allCompleted.length;
   await db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('rider', ownerId)).set({
+    completedOrders:count, lifetimeCounterVersion:UBEE_GROWTH_COUNTER_VERSION,
+    lifetimeCounterReconciledAtMs:Date.now(), updatedAtMs:Date.now(),
+    updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge:true });
+  return count;
+}
+
+async function reconcileCustomerLifetimeGrowthCounter(customerId, profile = {}) {
+  if (Number(profile.lifetimeCounterVersion || 0) >= UBEE_GROWTH_COUNTER_VERSION) {
+    return Math.max(0, Number(profile.completedOrders || 0));
+  }
+  const pairs = [['userId', customerId], ['customerId', customerId]];
+  const allCompleted = await scanAllGrowthOrdersByQueryPairs(pairs, order => isGrowthValidCompletedOrder(order));
+  const count = allCompleted.length;
+  await db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('customer', customerId)).set({
     completedOrders:count, lifetimeCounterVersion:UBEE_GROWTH_COUNTER_VERSION,
     lifetimeCounterReconciledAtMs:Date.now(), updatedAtMs:Date.now(),
     updatedAt:admin.firestore.FieldValue.serverTimestamp(),
@@ -1781,50 +1821,6 @@ if (WEB_PUSH_PUBLIC_KEY && WEB_PUSH_PRIVATE_KEY) {
 
 const app = express();
 app.set('trust proxy', 1);
-
-// ============================================================
-// UBee Same-Index Domain Boundary RC2 | 2026-11-02
-// One Render / one Express app; separate request-local domain contexts.
-// IMPORTANT: existing customer/rider authorization and Core transaction
-// handlers remain authoritative. This does not isolate deployments or crashes.
-// ============================================================
-const UBEE_API_DOMAIN_RULES_RC2 = Object.freeze([
-  Object.freeze({ prefix: '/api/customer-auth', domain: 'CUSTOMER' }),
-  Object.freeze({ prefix: '/api/customer-identity', domain: 'CUSTOMER' }),
-  Object.freeze({ prefix: '/api/customer', domain: 'CUSTOMER' }),
-  Object.freeze({ prefix: '/api/rider-distance-to-pickup', domain: 'DRIVER' }),
-  Object.freeze({ prefix: '/api/rider', domain: 'DRIVER' }),
-  Object.freeze({ prefix: '/api/dispatch', domain: 'DISPATCH' }),
-  Object.freeze({ prefix: '/api/admin', domain: 'ADMIN' }),
-]);
-
-function ubeeMatchApiDomainRC2(pathname) {
-  const pathOnly = String(pathname || '').split('?')[0];
-  for (const rule of UBEE_API_DOMAIN_RULES_RC2) {
-    if (pathOnly === rule.prefix || pathOnly.startsWith(rule.prefix + '/')) {
-      return rule.domain;
-    }
-  }
-  return 'CORE'; // orders, quote, payment, notifications and other shared endpoints
-}
-
-// The context is immutable and unique to this request. Existing API paths,
-// handlers, auth middleware, body, cookies, and Firestore writes are unchanged.
-app.use((req, res, next) => {
-  const domain = ubeeMatchApiDomainRC2(req.path);
-  const context = Object.freeze({
-    domain,
-    boundaryVersion: 'same-index-domain-boundary-rc2',
-    isCustomer: domain === 'CUSTOMER',
-    isDriver: domain === 'DRIVER',
-    isCore: domain === 'CORE',
-  });
-  Object.defineProperty(req, 'ubeeApiDomain', {
-    configurable: false, enumerable: false, writable: false, value: context,
-  });
-  res.locals.ubeeApiDomain = domain;
-  return next();
-});
 
 // ===== CORS：允許 UBee 騎士前端正式站呼叫 Render 後端 =====
 app.use((req, res, next) => {
@@ -5794,7 +5790,7 @@ function sendCustomerAuthError(res, error) {
 // - 新客不經傳統註冊流程；第一次真正送出任務時才建立安全 Customer 身分。
 // - 只收下單必要的本人姓名、手機與條款同意，不要求密碼、Email 或預先設定常用行政區。
 // - 同一手機若已存在帳號，絕不覆寫、絕不重建；回傳既有身分登入／密碼設定流程。
-// - 建立 account / phone index / member counter / session 於同一 Firestore transaction，避免半套帳號。
+// - 建立 account / phone index / member counter / growth / session 於同一 Firestore transaction，避免半套帳號。
 // =====================================================
 async function createCustomerOnboarding(req, res, { withPassword = false } = {}) {
   res.setHeader('Cache-Control', 'no-store');
@@ -5850,12 +5846,13 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
     // 在通過手機格式、同意條款及既有帳號檢查後才執行 scrypt，避免無效註冊浪費 CPU。
     const passwordHash = withPassword ? await hashCustomerPassword(req.body?.password, phone) : null;
 
-    // 停止客戶推薦碼；保留小U邀請新客流程的跨系統相容性。
-    // 舊客戶推薦連結或失效推薦碼不應阻止新客首次下單。
-    const resolvedReferral = referralCode ? await resolveGrowthReferralCode(referralCode) : null;
-    const incomingReferral = resolvedReferral?.ownerType === 'rider' ? resolvedReferral : null;
+    const incomingReferral = referralCode ? await resolveGrowthReferralCode(referralCode) : null;
+    if (referralCode && !incomingReferral) {
+      throw customerAuthError('推薦碼不存在或已失效，請確認後再試。', 400, 'CUSTOMER_REFERRAL_CODE_INVALID');
+    }
 
     const customerId = `customer_${crypto.randomBytes(16).toString('hex')}`;
+    const growthReferralCode = buildGrowthReferralCode('customer', customerId);
     const sessionRawToken = customerAuthRandomToken(32);
     const sessionHash = customerAuthHash(sessionRawToken);
     const nowMs = Date.now();
@@ -5865,6 +5862,8 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
     const phoneIndexRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex).doc(phone);
     const counterRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.counters).doc('customerMembers');
     const sessionRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(sessionHash);
+    const growthCodeRef = db.collection(UBEE_GROWTH_COLLECTIONS.referralCodes).doc(growthReferralCode);
+    const growthProfileRef = db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('customer', customerId));
     const incomingReferralRef = incomingReferral
       ? db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`customer_${customerId}`)
       : null;
@@ -5915,6 +5914,7 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
         referralCode: incomingReferral ? incomingReferral.code : '',
         referredByType: incomingReferral ? String(incomingReferral.ownerType || '') : '',
         referredById: incomingReferral ? String(incomingReferral.ownerId || '') : '',
+        growthReferralCode,
         passwordHash,
         passwordVersion: 1,
         passwordConfigured: withPassword,
@@ -5953,6 +5953,31 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
         createdAtMs: nowMs,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      transaction.set(growthCodeRef, {
+        code: growthReferralCode,
+        ownerType: 'customer',
+        ownerId: customerId,
+        active: true,
+        city: serviceCity,
+        district: '',
+        version: UBEE_GROWTH_VERSION,
+        createdAtMs: nowMs,
+        updatedAtMs: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(growthProfileRef, {
+        ownerType: 'customer', ownerId: customerId, referralCode: growthReferralCode,
+        currentTier: 'GENERAL', highestTier: 'GENERAL', completedOrders: 0,
+        lifetimeCounterVersion: UBEE_GROWTH_COUNTER_VERSION,
+        validCustomerReferrals: 0, validRiderReferrals: 0, growthScore: 0,
+        city: serviceCity, district: '', rulesVersion: UBEE_GROWTH_RULES_VERSION,
+        createdAtMs: nowMs, updatedAtMs: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
 
       if (incomingReferralRef) {
         transaction.set(incomingReferralRef, {
@@ -6356,14 +6381,79 @@ app.get('/api/customer-identity/status', requireCustomerAuth, (req, res) => {
 });
 
 
-// Customer 會員等級／邀請制度已退場；保留受驗證的 410 契約供舊客戶端明確識別。
-// 舊紀錄仍由 Firestore 保存，供權益對帳；小U Growth API 及管理工具不變。
-for (const retiredCustomerGrowthPath of ['/api/customer/growth','/api/customer/growth/referrals']) {
-  app.get(retiredCustomerGrowthPath, requireCustomerAuth, (req, res) => {
-    res.setHeader('Cache-Control','no-store');
-    return res.status(410).json({success:false,code:'CUSTOMER_MEMBERSHIP_RETIRED',message:'會員等級與推薦制度已停止。'});
-  });
-}
+// =====================================================
+// UBee Growth Engine V1｜用戶端成長中心
+// =====================================================
+app.get('/api/customer/growth', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const account = req.customerAuth.account || {};
+    const snapshot = await db.collection('orders').where('userId', '==', customerId).limit(500).get();
+    const recentCompletedOrders = snapshot.docs.filter(doc => isGrowthValidCompletedOrder(doc.data() || {}));
+    const completedOrderData = recentCompletedOrders.map(doc => ({ id:doc.id, ...(doc.data() || {}) }));
+    const monthCompleted = growthCurrentMonthCount(completedOrderData);
+
+    const referralCode = await ensureGrowthReferralCode('customer', customerId, {
+      city:account.serviceCity || '', district:account.serviceDistrict || '',
+    });
+    const { data:profile } = await loadGrowthProfile('customer', customerId);
+    const completedCount = await reconcileCustomerLifetimeGrowthCounter(customerId, profile);
+    if (completedCount >= 1) {
+      await qualifyGrowthReferral('customer', customerId, { type:'first_valid_order', orderId:recentCompletedOrders[0]?.id || '' });
+    }
+    const validReferrals = Math.max(0, Number(profile.validCustomerReferrals || 0));
+    const tier = getCustomerGrowthTier(completedCount, validReferrals);
+    const next = tier.next;
+    const tasks = buildCustomerGrowthTasks({ completedOrders:completedCount, monthCompleted, validReferrals });
+    const achievements = buildCustomerGrowthAchievements(completedCount, validReferrals);
+    const benefits = getCustomerTierBenefits(tier.key);
+    const growth = {
+      version:UBEE_GROWTH_VERSION,
+      rulesVersion:UBEE_GROWTH_RULES_VERSION,
+      completedOrders:completedCount,
+      monthCompleted,
+      validReferrals,
+      tasks,
+      achievements,
+      benefits,
+      unlockedAchievementCount:achievements.filter(item=>item.unlocked).length,
+      referralCode,
+      shareUrl:`${String(process.env.UBEE_CUSTOMER_PUBLIC_BASE_URL || 'https://ubee-line-bot-2-zezw.onrender.com').replace(/\/$/,'')}/order.html?ref=${encodeURIComponent(referralCode)}&source=invite`,
+      tier:{ key:tier.key, label:tier.label, minOrders:tier.minOrders, minReferrals:tier.minReferrals },
+      nextTier:next ? {
+        key:next.key, label:next.label, minOrders:next.minOrders, minReferrals:next.minReferrals,
+        remainingOrders:Math.max(0,next.minOrders-completedCount),
+        remainingReferrals:Math.max(0,next.minReferrals-validReferrals),
+      } : null,
+      contribution:{ score:Math.max(0,Number(profile.growthScore || validReferrals*10)) },
+      city:String(account.serviceCity || ''), district:String(account.serviceDistrict || ''),
+    };
+    await syncGrowthTierHistory('customer', customerId, growth);
+
+    const historySnap = await db.collection(UBEE_GROWTH_COLLECTIONS.tierHistory).where('ownerId','==',customerId).limit(30).get();
+    const history = historySnap.docs.map(doc => ({ id:doc.id, ...(doc.data() || {}) })).sort((a,b)=>Number(b.createdAtMs||0)-Number(a.createdAtMs||0)).slice(0,20);
+    return res.json({ success:true, growth, history });
+  } catch (error) {
+    console.error('❌ Customer Growth Engine 讀取失敗：', error);
+    return res.status(500).json({ success:false, message:'成長資料讀取失敗，請稍後再試。' });
+  }
+});
+
+app.get('/api/customer/growth/referrals', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const snap = await db.collection(UBEE_GROWTH_COLLECTIONS.referrals).where('referrerId','==',customerId).limit(100).get();
+    const referrals = snap.docs.map(doc => {
+      const r = doc.data() || {};
+      return { id:doc.id, refereeType:r.refereeType || '', status:r.status || 'registered', progressStage:r.status || 'registered', city:r.city || '', district:r.district || '', createdAtMs:Number(r.createdAtMs || 0), qualifiedAtMs:Number(r.qualifiedAtMs || 0), firstOrderCreatedAtMs:Number(r.firstOrderCreatedAtMs || 0) };
+    }).sort((a,b)=>b.createdAtMs-a.createdAtMs);
+    return res.json({ success:true, referrals });
+  } catch (error) {
+    return res.status(500).json({ success:false, message:'推薦紀錄讀取失敗。' });
+  }
+});
 
 // UBee Growth Engine V1.3｜小U邀請進度（不回傳被邀請者姓名／電話）
 app.get('/api/rider/growth/referrals', riderAuthMiddleware, async (req, res) => {
@@ -6451,6 +6541,7 @@ function uCoinRulesPayload() {
       { key:'order', title:'完成一趟跑腿', amountText:'0.5 U幣' },
       { key:'first_order', title:'完成首次跑腿', amountText:'加贈 1 U幣' },
       { key:'rating', title:'完成訂單評價', amountText:'0.5 U幣' },
+      { key:'referral', title:'推薦朋友完成首趟', amountText:'雙方各 2 U幣' },
     ],
     checkinSchedule:[1,1,1,1,2,2,2],
   };
@@ -21695,24 +21786,6 @@ app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res
       });
     }
 
-    if (String(req.body?.declarationVersion || '') === 'rider-application-declarations-v1' &&
-        req.body?.photoAuthenticityDeclared !== true) {
-      return res.status(400).json({success:false,code:'PHOTO_AUTHENTICITY_DECLARATION_REQUIRED',message:'請確認本人照片真實性聲明。'});
-    }
-    // V4.0.1: a photo explicitly requested by Rider Review must be re-submitted
-    // through application-supplement for review, not directly committed to ridersV2.
-    const pendingApplicationDoc = await db.collection(RIDER_V2_COLLECTIONS.applications).doc(phone).get();
-    const pendingPhotoReview = pendingApplicationDoc.exists ? (pendingApplicationDoc.data() || {}) : {};
-    if (pendingApplicationDoc.exists && (
-        String(pendingPhotoReview.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement' ||
-        (pendingPhotoReview.credentialMaintenanceActive === true &&
-         pendingPhotoReview.credentialMaintenanceProfilePhotoRequested === true)
-    )) {
-      return res.status(409).json({
-        success:false, code:'PROFILE_PHOTO_REVIEW_PENDING',
-        message:'管理員已要求大頭照補件，請使用申請進度中的補件流程上傳，審核通過後再更新正式大頭照。',
-      });
-    }
     const validated = await validateRiderProfilePhoto(req.body?.profilePhoto, phone);
     if (!validated.ok) return res.status(400).json({ success:false, message:validated.message });
     const nowMs=Date.now();
@@ -21720,9 +21793,6 @@ app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res
       ...validated.profilePhoto,
       source:'existing_rider_supplement',
       authSource:tokenPhone?'firebase_bearer':'compat_phone_session',
-      photoAuthenticityDeclared:req.body?.photoAuthenticityDeclared===true ? true : null,
-      photoAuthenticityDeclaredAtMs:req.body?.photoAuthenticityDeclared===true ? nowMs : null,
-      photoAuthenticityDeclarationVersion:String(req.body?.declarationVersion||'legacy-missing'),
       updatedAtMs:nowMs
     };
     const riderRef=db.collection(RIDER_V2_COLLECTIONS.riders).doc(phone);
@@ -22401,11 +22471,6 @@ app.post('/api/rider/register', async (req, res) => {
       emergencyContactPhone,
       documents,
       profilePhoto,
-      photoAuthenticityDeclared,
-      warningAccountStatus,
-      warningAccountReconfirmed,
-      warningAccountConfirmationVersion,
-      declarationVersion,
 
       driverLicenseConfirmed,
       vehicleLicenseConfirmed,
@@ -22730,31 +22795,12 @@ app.post('/api/rider/register', async (req, res) => {
       return res.status(400).json({ success:false, code:'RIDER_PROFILE_PHOTO_REQUIRED', message:profilePhotoValidation.message });
     }
 
-    // V5.23.5.4 RC2: 新版申請必填；舊版 Web Clip 快取採補件標記，不預設「否」。
-    const declarationV1 = String(declarationVersion || '') === 'rider-application-declarations-v1';
-    const warningAccountValue = String(warningAccountStatus || '').trim().toUpperCase();
-    if (declarationV1 && photoAuthenticityDeclared !== true) {
-      return res.status(400).json({ success:false, code:'PHOTO_DECLARATION_REQUIRED', message:'請確認大頭照真實性聲明。' });
-    }
-    if (declarationV1 && !['YES','NO'].includes(warningAccountValue)) {
-      return res.status(400).json({ success:false, code:'WARNING_ACCOUNT_DECLARATION_REQUIRED', message:'請選擇是否有銀行或郵局警示帳戶。' });
-    }
-    const confirmationV1 = String(warningAccountConfirmationVersion || '') === 'warning-account-confirm-v1';
-    if(confirmationV1 && warningAccountReconfirmed !== true){
-      return res.status(400).json({success:false,code:'WARNING_ACCOUNT_RECONFIRM_REQUIRED',message:'請再次確認警示帳戶申報狀態。'});
-    }
-    const warningAccountReconfirmedValid = confirmationV1 && warningAccountReconfirmed === true;
-    const declarationComplete = declarationV1 && photoAuthenticityDeclared === true && ['YES','NO'].includes(warningAccountValue);
-    const declarationManualReview = !declarationComplete || !warningAccountReconfirmedValid || warningAccountValue === 'YES';
-
     const riderId = cleanPhone;
-    const resolvedGrowthReferral = referralCode
+    const incomingGrowthReferral = referralCode
       ? await resolveGrowthReferralCode(referralCode)
       : null;
-    // 客戶端會員推薦已退場，不再由客戶推薦碼建立新的騎士推薦關係。
-    // 小U推薦碼保留；舊客戶推薦碼不阻止合法騎士申請。
-    const incomingGrowthReferral = resolvedGrowthReferral?.ownerType === 'rider' ? resolvedGrowthReferral : null;
-    if (referralCode && !resolvedGrowthReferral) {
+
+    if (referralCode && !incomingGrowthReferral) {
       return res.status(400).json({ success:false, message:'推薦碼不存在或已失效，請重新確認。' });
     }
 
@@ -22822,23 +22868,6 @@ app.post('/api/rider/register', async (req, res) => {
       profilePhotoUploadedAtMs: Number(profilePhotoValidation.profilePhoto?.uploadedAtMs || nowMs),
       applicationStage: 'SUBMITTED',
       applicationFlowVersion: 'native-onboarding-v1-9-step',
-      photoAuthenticity: {
-        declaredGenuine: declarationComplete ? true : null,
-        declarationVersion: declarationV1 ? 'rider-application-declarations-v1' : 'legacy-missing',
-        reviewStatus: 'pending',
-        declaredAtMs: declarationComplete ? nowMs : null,
-      },
-      financialRiskDeclaration: {
-        warningAccountStatus: declarationComplete ? warningAccountValue : 'UNKNOWN',
-        verificationStatus: 'self_declared_not_verified',
-        declarationVersion: declarationV1 ? 'rider-application-declarations-v1' : 'legacy-missing',
-        reviewStatus: declarationManualReview ? 'manual_review_required' : 'pending',
-        declaredAtMs: declarationComplete ? nowMs : null,
-        reconfirmed: warningAccountReconfirmedValid,
-        confirmationVersion: confirmationV1 ? 'warning-account-confirm-v1' : 'legacy-no-reconfirmation',
-        reconfirmedAtMs: warningAccountReconfirmedValid ? nowMs : null,
-      },
-      applicationDeclarationReviewRequired: declarationManualReview,
 
       documents: documentValidation.documents,
       requiredDocumentKeys,
@@ -23125,20 +23154,9 @@ function getRiderApplicationDocumentReviewItems(application = {}) {
       document.reviewStatus || document.status || ''
     );
 
-    // RC4-HF1: 舊資料「沒有逐項狀態」時才沿用整體核准；
-    // 管理員已明確寫入 pending / needs_supplement 時不可被舊旗標覆蓋。
-    const hasExplicitReviewStatus =
-      // 舊版可能預設存 pending，只有管理員有逐項審核紀錄才視為明確待審。
-      ((Number(document.reviewedAtMs || 0) > 0 || Boolean(document.reviewedBy)) &&
-        (typeof document.reviewStatus === 'string' && document.reviewStatus.trim() !== '' ||
-         typeof document.status === 'string' && document.status.trim() !== '')) ||
-      String(document.reviewStatus || document.status || '').trim().toLowerCase() ===
-        RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT ||
-      String(document.reviewStatus || document.status || '').trim().toLowerCase() ===
-        RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+    // 舊資料曾只保存整體 approved；升級後仍視為逐項通過。
     if (
       overallApproved &&
-      !hasExplicitReviewStatus &&
       reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.PENDING
     ) {
       reviewStatus = RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
@@ -23369,10 +23387,7 @@ function getRiderApplicationLifecyclePresentation(application = {}, officialRide
   const active = lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
   const training = lifecycle === RIDER_V4_LIFECYCLE.TRAINING || status === 'training';
   const rejected = lifecycle === RIDER_V4_LIFECYCLE.REJECTED || status === 'rejected';
-  const photoNeedsSupplement = application.profilePhotoRequired === true &&
-    String(application.profilePhoto?.reviewStatus || '').trim().toLowerCase() === 'needs_supplement';
   const needsSupplement =
-    photoNeedsSupplement ||
     status === 'needs_supplement' ||
     String(application.reviewStatus || '').trim().toLowerCase() === 'needs_supplement' ||
     documentSummary.hasSupplementRequest;
@@ -23732,8 +23747,6 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
     rejectionReason: cleanText(application.rejectionReason || '', 1000),
     credentialMaintenanceActive:
       application.credentialMaintenanceActive === true,
-    credentialMaintenanceProfilePhotoRequested:
-      application.credentialMaintenanceProfilePhotoRequested === true,
     credentialMaintenancePreviousLifecycleStatus: cleanText(
       application.credentialMaintenancePreviousLifecycleStatus || '',
       40
@@ -24319,6 +24332,10 @@ app.post(
         100
       );
       const reason = cleanText(req.body?.reason || '', 1000);
+      const confirmationName = cleanText(
+        req.body?.confirmationName || '',
+        100
+      );
       const applicationDoc = await getRiderApplicationDocumentById(
         req.params.riderId
       );
@@ -24333,61 +24350,6 @@ app.post(
       const application = applicationDoc.data() || {};
       const status = String(application.status || 'pending').toLowerCase();
       const nowMs = Date.now();
-
-      // Review V4: explicit profile-photo review, independent of document review.
-      if (action === 'mark_profile_photo') {
-        if (['training','approved','active','rejected'].includes(status)) {
-          return res.status(409).json({success:false,message:'此申請狀態不可修改大頭照審核。'});
-        }
-        if (!String(application.profilePhoto?.storagePath || '').trim()) {
-          return res.status(409).json({success:false,message:'尚未上傳大頭照，無法審核。'});
-        }
-        const photoStatus = String(req.body?.documentStatus || '').trim().toLowerCase();
-        if (!['pending','approved','needs_supplement'].includes(photoStatus)) {
-          return res.status(400).json({success:false,message:'大頭照審核狀態不正確。'});
-        }
-        // V4.0.1: requests for photo supplements must use the unified request_supplement
-        // workflow so official riders receive the same qualification lock and audit events.
-        if (photoStatus === 'needs_supplement') {
-          return res.status(409).json({
-            success:false,
-            message:'大頭照補件請使用「批次要求補件」，確保正式小U資格與通知同步。',
-          });
-        }
-        await applicationDoc.ref.update({
-          'profilePhoto.reviewStatus':photoStatus,
-          'profilePhoto.reviewReason':photoStatus === 'needs_supplement' ? reason : '',
-          'profilePhoto.reviewedBy':operator,
-          'profilePhoto.reviewedAtMs':nowMs,
-          reviewedAtMs:nowMs,
-          updatedAtMs:nowMs,
-          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-        });
-        let freshDoc = await applicationDoc.ref.get();
-        const freshPhotoApplication = freshDoc.data() || {};
-        if (photoStatus === 'approved' &&
-            String(freshPhotoApplication.status || '').toLowerCase() === 'needs_supplement') {
-          const remaining = summarizeRiderApplicationDocuments(freshPhotoApplication);
-          if (!remaining.hasSupplementRequest) {
-            await applicationDoc.ref.set({
-              status:'under_review', reviewStatus:'under_review',
-              documentReviewStatus:remaining.allApproved ? 'approved' : 'pending',
-              supplementReason:'',
-              updatedAt:admin.firestore.FieldValue.serverTimestamp(), updatedAtMs:Date.now(),
-            }, {merge:true});
-            freshDoc = await applicationDoc.ref.get();
-          }
-        }
-        await writeRiderApplicationReviewEvent({
-          application:freshDoc.data() || {}, type:'mark_profile_photo', operator,
-          reason:photoStatus === 'needs_supplement' ? reason : `大頭照審核：${photoStatus}`,
-          metadata:{photoStatus},
-        });
-        if (photoStatus === 'needs_supplement') {
-          await notifyRiderApplicationReviewUpdate(freshDoc.data() || {}, 'needs_supplement', `小U大頭照：${reason}`, {documentKeys:['profilePhoto']});
-        }
-        return res.json({success:true,message:'大頭照審核狀態已更新。',application:await serializeRiderApplicationForAdmin(freshDoc)});
-      }
 
       if (action === 'mark_document') {
         if (['training', 'approved', 'active'].includes(status)) {
@@ -24443,27 +24405,20 @@ app.post(
         let freshDoc = await applicationDoc.ref.get();
         let freshApplication = freshDoc.data() || {};
         const summary = summarizeRiderApplicationDocuments(freshApplication);
-        const photoStillNeedsSupplement =
-          freshApplication.profilePhotoRequired === true &&
-          String(freshApplication.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement';
-        const outstandingSupplement = summary.hasSupplementRequest || photoStillNeedsSupplement;
-        const officialMaintenance = freshApplication.credentialMaintenanceActive === true;
         const overallUpdate = {
           documentReviewStatus: summary.allApproved
             ? 'approved'
             : summary.hasSupplementRequest
               ? 'needs_supplement'
               : 'pending',
-          status: outstandingSupplement
+          status: summary.hasSupplementRequest
             ? 'needs_supplement'
             : 'under_review',
-          reviewStatus: outstandingSupplement
+          reviewStatus: summary.hasSupplementRequest
             ? 'needs_supplement'
             : 'under_review',
-          lifecycleStatus: officialMaintenance
-            ? RIDER_V4_LIFECYCLE.RESTRICTED
-            : RIDER_V4_LIFECYCLE.UNDER_REVIEW,
-          approved: officialMaintenance,
+          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: false,
           canAcceptOrders: false,
           reviewStartedAt:
             application.reviewStartedAtMs
@@ -24477,7 +24432,7 @@ app.post(
           updatedAtMs: Date.now(),
         };
 
-        if (outstandingSupplement) {
+        if (summary.hasSupplementRequest) {
           const reasons = summary.documents
             .filter(
               item =>
@@ -24485,9 +24440,6 @@ app.post(
                 RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
             )
             .map(item => `${item.label}：${item.reviewReason || '請重新上傳'}`);
-          if (photoStillNeedsSupplement) {
-            reasons.push(`小U大頭照：${cleanText(freshApplication.profilePhoto?.reviewReason || '請重新上傳',500)}`);
-          }
           overallUpdate.supplementReason = reasons.join('\n');
           overallUpdate.supplementRequestedAt =
             admin.firestore.FieldValue.serverTimestamp();
@@ -24567,9 +24519,131 @@ app.post(
         });
       }
 
-      // Review V4: block bulk document approval; each required document must be reviewed separately.
-      if (action === 'approve_group' || action === 'approve_all') {
-        return res.status(409).json({success:false,message:'V4 已停用整組／一鍵通過，請逐份審核必要文件與大頭照。'});
+      if (action === 'approve_group') {
+        if (['training', 'approved', 'active'].includes(status)) {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已通過審核，不能再修改驗證狀態。',
+          });
+        }
+        if (status === 'rejected') {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已拒絕，請先重新開啟申請。',
+          });
+        }
+
+        const groupKey = String(req.body?.groupKey || '').trim();
+        const group = RIDER_VERIFICATION_GROUPS[groupKey];
+        if (!group) {
+          return res.status(400).json({
+            success: false,
+            message: '驗證區塊不正確。',
+          });
+        }
+
+        const requiredKeys = getRequiredRiderDocumentKeys(
+          application.vehicle,
+          application.requiredDocumentKeys
+        );
+        const groupDocumentKeys = group.documentKeys.filter(key =>
+          requiredKeys.includes(key)
+        );
+
+        if (!groupDocumentKeys.length) {
+          return res.status(409).json({
+            success: false,
+            message: `${group.label}不適用於此配送工具。`,
+          });
+        }
+
+        const missing = groupDocumentKeys.filter(key =>
+          !String(application.documents?.[key]?.storagePath || '').trim()
+        );
+
+        if (missing.length) {
+          return res.status(409).json({
+            success: false,
+            message:
+              `${group.label}仍缺少：` +
+              missing.map(key => RIDER_DOCUMENT_LABELS[key]).join('、'),
+          });
+        }
+
+        const update = {
+          status: 'under_review',
+          reviewStatus: 'under_review',
+          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: false,
+          canAcceptOrders: false,
+          reviewStartedAt:
+            application.reviewStartedAtMs
+              ? application.reviewStartedAt || null
+              : admin.firestore.FieldValue.serverTimestamp(),
+          reviewStartedAtMs: Number(application.reviewStartedAtMs || nowMs),
+          reviewStartedBy: application.reviewStartedBy || operator,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+        };
+
+        for (const documentKey of groupDocumentKeys) {
+          update[`documents.${documentKey}.reviewStatus`] =
+            RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+          update[`documents.${documentKey}.reviewReason`] = '';
+          update[`documents.${documentKey}.reviewedBy`] = operator;
+          update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
+        }
+
+        await applicationDoc.ref.set(update, { merge: true });
+        let freshDoc = await applicationDoc.ref.get();
+        let freshApplication = freshDoc.data() || {};
+        const freshSummary =
+          summarizeRiderApplicationDocuments(freshApplication);
+
+        await applicationDoc.ref.set(
+          {
+            documentReviewStatus: freshSummary.allApproved
+              ? 'approved'
+              : freshSummary.hasSupplementRequest
+                ? 'needs_supplement'
+                : 'pending',
+            supplementReason: freshSummary.documents
+              .filter(
+                item =>
+                  item.reviewStatus ===
+                  RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
+              )
+              .map(item => `${item.label}：${item.reviewReason}`)
+              .join('\n'),
+          },
+          { merge: true }
+        );
+
+        freshDoc = await applicationDoc.ref.get();
+        freshApplication = freshDoc.data() || {};
+        await writeRiderApplicationReviewEvent({
+          application: freshApplication,
+          type: 'approve_group',
+          operator,
+          reason: `${group.label}已整組確認通過。`,
+          metadata: {
+            groupKey,
+            documentKeys: groupDocumentKeys,
+          },
+        });
+
+        if (!application.reviewStartedAtMs) {
+          await notifyRiderApplicationReviewUpdate(
+            freshApplication,
+            'under_review'
+          );
+        }
+
+        return res.json({
+          success: true,
+          message: `${group.label}已全部標記為通過。`,
+          application: await serializeRiderApplicationForAdmin(freshDoc),
+        });
       }
 
       if (action === 'request_supplement') {
@@ -24650,47 +24724,25 @@ app.post(
 
         const reasonLines = [];
         const normalizedRequestedKeys = [];
-        const requestedAllowedKeys = new Set(getRequiredRiderDocumentKeys(
-          application.vehicle, application.requiredDocumentKeys
-        ));
 
         for (const [rawKey, rawReason] of Object.entries(requestedDocuments)) {
           const documentKey = normalizeRiderDocumentKey(rawKey);
           const documentReason = cleanText(rawReason || reason, 500);
-          // V4.0.1: old or already-active riders can be asked for a missing headshot.
-          // The new requirement is opt-in per request, never a bulk retroactive migration.
-          const isProfilePhoto = documentKey === RIDER_PROFILE_PHOTO_KEY;
-          if (!isProfilePhoto && (!documentKey || !requestedAllowedKeys.has(documentKey))) {
-            return res.status(400).json({
-              success:false, message:'補件項目不適用於這位小U的配送工具。',
-            });
-          }
+          if (!documentKey || !RIDER_REQUIRED_DOCUMENTS[documentKey]) continue;
           if (!documentReason) {
             return res.status(400).json({
               success: false,
-              message: `${isProfilePhoto ? '小U大頭照' : RIDER_DOCUMENT_LABELS[documentKey]}缺少補件原因。`,
+              message: `${RIDER_DOCUMENT_LABELS[documentKey]}缺少補件原因。`,
             });
           }
-          if (isProfilePhoto) {
-            update.profilePhotoRequired = true;
-            update['profilePhoto.reviewStatus'] = 'needs_supplement';
-            update['profilePhoto.reviewReason'] = documentReason;
-            update['profilePhoto.reviewedBy'] = operator;
-            update['profilePhoto.reviewedAtMs'] = nowMs;
-            if (maintenanceActive) {
-              update.credentialMaintenanceProfilePhotoRequested = true;
-              update.credentialMaintenanceProfilePhotoRequestedAtMs = nowMs;
-            }
-          } else {
-            update[`documents.${documentKey}.reviewStatus`] =
-              RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT;
-            update[`documents.${documentKey}.reviewReason`] = documentReason;
-            update[`documents.${documentKey}.reviewedBy`] = operator;
-            update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
-          }
+          update[`documents.${documentKey}.reviewStatus`] =
+            RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT;
+          update[`documents.${documentKey}.reviewReason`] = documentReason;
+          update[`documents.${documentKey}.reviewedBy`] = operator;
+          update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
           normalizedRequestedKeys.push(documentKey);
           reasonLines.push(
-            `${isProfilePhoto ? '小U大頭照' : RIDER_DOCUMENT_LABELS[documentKey]}：${documentReason}`
+            `${RIDER_DOCUMENT_LABELS[documentKey]}：${documentReason}`
           );
         }
 
@@ -24701,27 +24753,8 @@ app.post(
           });
         }
 
-        // Photo-only supplement must not downgrade an existing document approval.
-        const documentKeysRequested = normalizedRequestedKeys.filter(key => key !== RIDER_PROFILE_PHOTO_KEY);
-        if (!documentKeysRequested.length) {
-          update.documentReviewStatus = String(application.documentReviewStatus || 'pending').trim().toLowerCase();
-        } else if (String(application.documentReviewStatus || '').toLowerCase() === 'approved') {
-          const originalDocumentSummary = summarizeRiderApplicationDocuments(application);
-          for (const item of originalDocumentSummary.documents) {
-            if (documentKeysRequested.includes(item.documentKey)) continue;
-            if (item.reviewStatus !== RIDER_DOCUMENT_REVIEW_STATUS.APPROVED || !item.storagePath) continue;
-            const storedStatus = String(application.documents?.[item.documentKey]?.reviewStatus || '').toLowerCase();
-            if (storedStatus !== RIDER_DOCUMENT_REVIEW_STATUS.APPROVED) {
-              update[`documents.${item.documentKey}.reviewStatus`] = RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
-              update[`documents.${item.documentKey}.reviewReason`] = '';
-            }
-          }
-        }
         update.supplementReason = reasonLines.join('\n');
-        // RC4-HF1: 資格停權寫入不可分段成功。將申請／正式騎士／Presence
-        // 放入同一 Firestore Write Batch；任一步失敗就不寫入任何一步。
-        const supplementBatch = db.batch();
-        supplementBatch.update(applicationDoc.ref, update, { lastUpdateTime: applicationDoc.updateTime });
+        await applicationDoc.ref.update(update);
 
         if (officialRiderDoc) {
           const riderUpdate = {
@@ -24743,22 +24776,7 @@ app.post(
             riderUpdate.lifecycleStatus = RIDER_V4_LIFECYCLE.RESTRICTED;
           }
 
-          supplementBatch.set(officialRiderDoc.ref, riderUpdate, { merge: true });
-          supplementBatch.set(
-            db.collection(RIDER_V2_COLLECTIONS.presence).doc(officialRiderDoc.id),
-            {
-              online: false,
-              acceptingOrders: false,
-              dispatchPresenceState: 'PAUSED',
-              credentialReviewRequired: true,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              updatedAtMs: nowMs,
-            },
-            { merge: true }
-          );
-        }
-        await supplementBatch.commit();
-        if (officialRiderDoc) {
+          await officialRiderDoc.ref.set(riderUpdate, { merge: true });
           try {
             const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
             riders[officialRiderDoc.id] = {
@@ -24766,6 +24784,28 @@ app.post(
               ...(refreshedOfficialRiderDoc.data() || {}),
             };
           } catch (_) {}
+
+          try {
+            await db
+              .collection(RIDER_V2_COLLECTIONS.presence)
+              .doc(officialRiderDoc.id)
+              .set(
+                {
+                  online: false,
+                  acceptingOrders: false,
+                  dispatchPresenceState: 'PAUSED',
+                  credentialReviewRequired: true,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAtMs: nowMs,
+                },
+                { merge: true }
+              );
+          } catch (presenceError) {
+            console.warn(
+              '⚠️ 證件補件期間暫停小U presence 失敗：',
+              presenceError?.message || presenceError
+            );
+          }
         }
 
         const freshDoc = await applicationDoc.ref.get();
@@ -24800,7 +24840,24 @@ app.post(
         });
       }
 
-      if (action === 'approve') {
+      if (action === 'approve_all') {
+        if (application.credentialMaintenanceActive === true) {
+          return res.status(409).json({
+            success: false,
+            message: '此為正式小U證件複審，請使用「確認補件並恢復資格」，不要重新建立入職資料。',
+          });
+        }
+
+        if (
+          !confirmationName ||
+          confirmationName !== String(application.name || '').trim()
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: '請正確輸入申請者姓名，才能確認所有驗證並通過。',
+          });
+        }
+
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
             success: false,
@@ -24818,8 +24875,164 @@ app.post(
           return res.status(409).json({ success:false, message:'缺少小U大頭照，不能正式通過。' });
         }
 
-        if (application.profilePhotoRequired === true && String(application.profilePhoto?.reviewStatus || '').toLowerCase() !== 'approved') {
-          return res.status(409).json({success:false,message:'小U大頭照尚未個別審核通過，禁止正式核准。'});
+        const storedDocuments =
+          application.documents && typeof application.documents === 'object'
+            ? application.documents
+            : {};
+
+        const requiredDocumentKeys = getRequiredRiderDocumentKeys(
+          application.vehicle,
+          application.requiredDocumentKeys
+        );
+
+        const missingDocuments = requiredDocumentKeys
+          .filter(documentKey => {
+            const document = storedDocuments[documentKey];
+            return (
+              !document ||
+              typeof document !== 'object' ||
+              !String(document.storagePath || '').trim()
+            );
+          })
+          .map(documentKey => RIDER_DOCUMENT_LABELS[documentKey]);
+
+        if (missingDocuments.length) {
+          return res.status(409).json({
+            success: false,
+            message: `以下證件尚未上傳完整，不能確認通過：${missingDocuments.join('、')}`,
+          });
+        }
+
+        const documentApprovalUpdate = {
+          documentReviewStatus: 'approved',
+          status: 'pending',
+          reviewStatus: 'pending',
+          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: false,
+          canAcceptOrders: false,
+          supplementReason: '',
+          reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+          reviewedAtMs: nowMs,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+        };
+
+        for (const documentKey of requiredDocumentKeys) {
+          documentApprovalUpdate[`documents.${documentKey}.reviewStatus`] =
+            RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+          documentApprovalUpdate[`documents.${documentKey}.reviewReason`] = '';
+          documentApprovalUpdate[`documents.${documentKey}.reviewedBy`] =
+            operator;
+          documentApprovalUpdate[`documents.${documentKey}.reviewedAtMs`] =
+            nowMs;
+        }
+
+        await applicationDoc.ref.set(documentApprovalUpdate, { merge: true });
+
+        const approvedApplicationDoc = await applicationDoc.ref.get();
+        const approvedApplication = approvedApplicationDoc.data() || {};
+        const summary =
+          summarizeRiderApplicationDocuments(approvedApplication);
+
+        if (
+          summary.totalCount !== requiredDocumentKeys.length ||
+          !summary.allApproved
+        ) {
+          return res.status(409).json({
+            success: false,
+            message: '必要驗證狀態更新不完整，系統已停止正式通過流程，請重新整理後再試。',
+          });
+        }
+
+        const riskChecks = buildRiderApplicationRiskChecks(
+          approvedApplication,
+          summary
+        );
+        if (riskChecks.criticalCount > 0) {
+          return res.status(409).json({
+            success: false,
+            message:
+              '仍有高風險項目未處理：' +
+              riskChecks.items
+                .filter(item => item.level === 'critical')
+                .map(item => item.label)
+                .join('、'),
+          });
+        }
+
+        const approvedRider =
+          buildApprovedRiderV2(approvedApplication, operator);
+
+        await saveRiderV2(approvedRider, { mirrorLegacy: true });
+
+        await applicationDoc.ref.set(
+          {
+            status: 'training',
+            reviewStatus: 'approved',
+            lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
+            canAcceptOrders: false,
+            onboardingRequired: true,
+            approved: true,
+            documentReviewStatus: 'approved',
+            officialRiderCollection: RIDER_V2_COLLECTIONS.riders,
+            officialRiderId: approvedRider.riderId,
+            approvedAt: approvedRider.approvedAt,
+            approvedBy: operator,
+            quickApproved: true,
+            quickApprovedAt: admin.firestore.FieldValue.serverTimestamp(),
+            quickApprovedAtMs: nowMs,
+            quickApprovedBy: operator,
+            reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewedAtMs: nowMs,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          },
+          { merge: true }
+        );
+
+        const freshDoc = await applicationDoc.ref.get();
+        const freshApplication = freshDoc.data() || {};
+
+        await writeRiderApplicationReviewEvent({
+          application: freshApplication,
+          type: 'approve_all',
+          operator,
+          reason:
+            reason ||
+            '管理人員已確認所有必要驗證並完成最終通過。',
+          metadata: {
+            approvedDocumentKeys: requiredDocumentKeys,
+          },
+        });
+
+        await notifyRiderApplicationReviewUpdate(
+          freshApplication,
+          'approved'
+        );
+
+        return res.json({
+          success: true,
+          message: '所有必要驗證與小U申請已通過，已進入數位入職階段。',
+          application: await serializeRiderApplicationForAdmin(freshDoc),
+        });
+      }
+
+      if (action === 'approve') {
+        if (['training', 'approved', 'active'].includes(status)) {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已經通過審核，不需要重複操作。',
+          });
+        }
+        if (status === 'rejected') {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已拒絕，請先重新開啟後再審核。',
+          });
+        }
+
+        if (application.profilePhotoRequired === true && !String(application.profilePhoto?.storagePath || '').trim()) {
+          return res.status(409).json({ success:false, message:'缺少小U大頭照，不能正式通過。' });
         }
 
         const summary = summarizeRiderApplicationDocuments(application);
@@ -24914,20 +25127,6 @@ app.post(
             restoredLifecycle === RIDER_V4_LIFECYCLE.ACTIVE &&
             canRestoreActive;
 
-          const photoRequestedDuringMaintenance =
-            application.credentialMaintenanceProfilePhotoRequested === true;
-          const maintenancePhoto = application.profilePhoto || {};
-          if (photoRequestedDuringMaintenance &&
-              (!String(maintenancePhoto.storagePath || '').trim() ||
-               String(maintenancePhoto.reviewStatus || '').toLowerCase() !== 'approved' ||
-               Number(maintenancePhoto.resubmittedAtMs || 0) <
-                 Number(application.credentialMaintenanceProfilePhotoRequestedAtMs || 0))) {
-            return res.status(409).json({
-              success:false,
-              message:'本次要求補交的大頭照尚未完成重新上傳及獨立審核，不能恢復資格。',
-            });
-          }
-
           const officialUpdate = {
             status: restoredStatus,
             lifecycleStatus: restoredLifecycle,
@@ -24963,62 +25162,7 @@ app.post(
             updatedAtMs: nowMs,
           };
 
-          if (photoRequestedDuringMaintenance) {
-            officialUpdate.profilePhoto = {
-              ...maintenancePhoto,
-              source:'credential_maintenance_approved',
-              updatedAtMs:nowMs,
-            };
-            officialUpdate.profilePhotoUpdatedAtMs = nowMs;
-          }
-          // RC4-HF1: 恢復資格也必須與 application/Presence 同步完成，
-          // 不可先讓 rider ACTIVE 後在 application 留下需補件狀態。
-          const resumeBatch = db.batch();
-          resumeBatch.set(officialRiderDoc.ref, officialUpdate, { merge: true });
-          resumeBatch.update(applicationDoc.ref, {
-            status: restoredStatus,
-            reviewStatus: 'approved',
-            lifecycleStatus: restoredLifecycle,
-            canAcceptOrders: restoredCanAcceptOrders,
-            approved: true,
-            documentReviewStatus: 'approved',
-            supplementReason: '',
-            credentialMaintenanceActive: false,
-            credentialMaintenanceProfilePhotoRequested: false,
-            credentialMaintenanceProfilePhotoRequestedAtMs: 0,
-            credentialMaintenanceCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
-            credentialMaintenanceCompletedAtMs: nowMs,
-            credentialMaintenanceCompletedBy: operator,
-            reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-            reviewedAtMs: nowMs,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAtMs: nowMs,
-          }, { lastUpdateTime: applicationDoc.updateTime });
-          resumeBatch.set(
-            db.collection(RIDER_V2_COLLECTIONS.presence).doc(officialRiderDoc.id),
-            {
-              online: false,
-              acceptingOrders: false,
-              dispatchPresenceState: 'PAUSED',
-              credentialReviewRequired: false,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              updatedAtMs: nowMs,
-            },
-            { merge: true }
-          );
-          await resumeBatch.commit();
-          if (photoRequestedDuringMaintenance && RIDER_V2_MIRROR_TO_LEGACY_RIDERS) {
-            try {
-              await db.collection('riders').doc(officialRiderDoc.id).set({
-                profilePhoto:officialUpdate.profilePhoto,
-                profilePhotoUpdatedAtMs:nowMs,
-                updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-                updatedAtMs:nowMs,
-              }, {merge:true});
-            } catch (mirrorError) {
-              console.warn('⚠️ 證件複審大頭照舊資料鏡像失敗：', mirrorError?.message || mirrorError);
-            }
-          }
+          await officialRiderDoc.ref.set(officialUpdate, { merge: true });
           try {
             const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
             riders[officialRiderDoc.id] = {
@@ -25026,6 +25170,50 @@ app.post(
               ...(refreshedOfficialRiderDoc.data() || {}),
             };
           } catch (_) {}
+
+          await applicationDoc.ref.set(
+            {
+              status: restoredStatus,
+              reviewStatus: 'approved',
+              lifecycleStatus: restoredLifecycle,
+              canAcceptOrders: restoredCanAcceptOrders,
+              approved: true,
+              documentReviewStatus: 'approved',
+              supplementReason: '',
+              credentialMaintenanceActive: false,
+              credentialMaintenanceCompletedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+              credentialMaintenanceCompletedAtMs: nowMs,
+              credentialMaintenanceCompletedBy: operator,
+              reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+              reviewedAtMs: nowMs,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: nowMs,
+            },
+            { merge: true }
+          );
+
+          try {
+            await db
+              .collection(RIDER_V2_COLLECTIONS.presence)
+              .doc(officialRiderDoc.id)
+              .set(
+                {
+                  online: false,
+                  acceptingOrders: false,
+                  dispatchPresenceState: 'PAUSED',
+                  credentialReviewRequired: false,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAtMs: nowMs,
+                },
+                { merge: true }
+              );
+          } catch (presenceError) {
+            console.warn(
+              '⚠️ 證件複審完成後更新小U presence 失敗：',
+              presenceError?.message || presenceError
+            );
+          }
 
           const freshDoc = await applicationDoc.ref.get();
           const freshApplication = freshDoc.data() || {};
@@ -25204,14 +25392,6 @@ app.post(
         message: '不支援的審核動作。',
       });
     } catch (error) {
-      const concurrencyCode = String(error?.code ?? '').toUpperCase();
-      if (['9', '10', 'ABORTED', 'FAILED_PRECONDITION'].includes(concurrencyCode)) {
-        return res.status(409).json({
-          success: false,
-          code: 'REVIEW_CONCURRENT_UPDATE',
-          message: '申請資料已被其他操作更新。這次審核未提交，請重新載入後再確認。',
-        });
-      }
       console.error('❌ 小U申請審核動作失敗：', error);
       return res.status(500).json({
         success: false,
@@ -25232,9 +25412,6 @@ app.post('/api/rider/application-supplement', async (req, res) => {
     const compulsoryInsuranceExpiryDate = String(
       req.body?.compulsoryInsuranceExpiryDate || ''
     ).trim();
-    const requestedProfilePhoto = req.body?.profilePhoto && typeof req.body.profilePhoto === 'object'
-      ? req.body.profilePhoto
-      : null;
 
     if (!/^09\d{8}$/.test(phone)) {
       return res.status(400).json({
@@ -25269,49 +25446,23 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       )
       .map(item => item.documentKey);
 
-    const photoNeedsSupplement = application.profilePhotoRequired === true &&
-      String(application.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement';
-    if (!allowedKeys.length && !photoNeedsSupplement) {
+    if (!allowedKeys.length) {
       return res.status(409).json({
         success: false,
-        message: '目前沒有需要補交的證件或大頭照。',
-      });
-    }
-    // 大頭照審核是 V4 獨立項目，禁止任意替換尚未被要求補件的照片。
-    if (requestedProfilePhoto && !photoNeedsSupplement) {
-      return res.status(409).json({
-        success:false, code:'PROFILE_PHOTO_SUPPLEMENT_NOT_REQUESTED',
-        message:'目前沒有要求重新拍攝大頭照，請重新整理申請進度。'
-      });
-    }
-    if (requestedProfilePhoto && req.body?.photoAuthenticityDeclared !== true) {
-      return res.status(400).json({
-        success:false, code:'PHOTO_AUTHENTICITY_DECLARATION_REQUIRED',
-        message:'補拍大頭照時必須確認照片為本人真實照片，且未使用 AI 生成或變造。'
-      });
-    }
-    if (!requestedProfilePhoto && !Object.keys(documents).length) {
-      return res.status(400).json({
-        success:false, message:'請先選擇需要補交的資料。'
+        message: '目前沒有需要補交的證件。',
       });
     }
 
-    // Only-photo supplement must bypass the old document validator, which rejects empty documents.
-    const validation = Object.keys(documents).length
-      ? await validateRiderApplicationDocumentSubset(documents,phone,allowedKeys)
-      : {ok:true,documents:{}};
+    const validation = await validateRiderApplicationDocumentSubset(
+      documents,
+      phone,
+      allowedKeys
+    );
     if (!validation.ok) {
       return res.status(400).json({
         success: false,
         message: validation.message,
       });
-    }
-    // 經過原有 storagePath／bucket／metadata／檔案存在性驗證，不直接信任前端的照片路徑。
-    const profilePhotoResult = requestedProfilePhoto
-      ? await validateRiderProfilePhoto(requestedProfilePhoto, phone)
-      : null;
-    if (profilePhotoResult && !profilePhotoResult.ok) {
-      return res.status(400).json({success:false, code:'PROFILE_PHOTO_SUPPLEMENT_INVALID', message:profilePhotoResult.message});
     }
 
     const includesInsurance = Object.prototype.hasOwnProperty.call(
@@ -25369,80 +25520,36 @@ app.post('/api/rider/application-supplement', async (req, res) => {
         supplementVersion: Number(previous.supplementVersion || 0) + 1,
       };
     }
-    if (profilePhotoResult?.ok) {
-      const oldPhoto = application.profilePhoto || {};
-      update.profilePhoto = {
-        ...profilePhotoResult.profilePhoto,
-        reviewStatus:'pending',
-        reviewReason:'',
-        reviewedBy:'',
-        reviewedAtMs:0,
-        previousStoragePath:String(oldPhoto.storagePath || '').trim(),
-        previousReviewReason:cleanText(oldPhoto.reviewReason || '', 500),
-        supplementVersion:Number(oldPhoto.supplementVersion || 0) + 1,
-        resubmittedAtMs:nowMs,
-        source:'application_profile_photo_supplement',
-      };
-      update.profilePhotoUploadedAtMs=nowMs;
-      update.photoAuthenticity={
-        declaredGenuine:true,
-        declarationVersion:'rider-application-declarations-v1',
-        reviewStatus:'pending',
-        declaredAtMs:nowMs,
-        declarationSource:'profile_photo_supplement',
-      };
-    }
 
-    // 照片補件只在管理端明確標記為 needs_supplement 時才可寫入。
-    // 使用交易防止審核人員在拍照期間已核准／變更狀態後舊請求覆蓋新照片。
-    if (profilePhotoResult?.ok) {
-      let photoConflict=false;
-      await db.runTransaction(async tx=>{
-        const latest=await tx.get(applicationDoc.ref);
-        const current=latest.exists ? (latest.data() || {}) : {};
-        if (!latest.exists || String(current.profilePhoto?.reviewStatus || '').toLowerCase()!=='needs_supplement' ||
-            ['approved','training','active','rejected'].includes(String(current.status || '').toLowerCase())) {
-          photoConflict=true;
-          return;
-        }
-        tx.update(applicationDoc.ref,update);
-      });
-      if (photoConflict) return res.status(409).json({success:false,code:'PHOTO_SUPPLEMENT_REVIEW_CHANGED',message:'大頭照審核狀態已變更，請重新整理申請進度。'});
-    } else {
-      await applicationDoc.ref.update(update);
-    }
+    await applicationDoc.ref.update(update);
     let freshDoc = await applicationDoc.ref.get();
     let freshApplication = freshDoc.data() || {};
     const freshSummary = summarizeRiderApplicationDocuments(freshApplication);
-    const photoStillNeedsSupplement =
-      freshApplication.profilePhotoRequired === true &&
-      String(freshApplication.profilePhoto?.reviewStatus || '').toLowerCase() === 'needs_supplement';
-    const anySupplementOutstanding = freshSummary.hasSupplementRequest || photoStillNeedsSupplement;
 
     await applicationDoc.ref.set(
       {
-        status: anySupplementOutstanding
+        status: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
           : 'under_review',
-        reviewStatus: anySupplementOutstanding
+        reviewStatus: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
           : 'under_review',
         documentReviewStatus: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
-          : freshSummary.allApproved ? 'approved' : 'pending',
+          : 'pending',
         lifecycleStatus: maintenanceActive
           ? RIDER_V4_LIFECYCLE.RESTRICTED
           : RIDER_V4_LIFECYCLE.UNDER_REVIEW,
         approved: maintenanceActive,
         canAcceptOrders: false,
-        supplementReason: [
-          ...freshSummary.documents
-            .filter(item => item.reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT)
-            .map(item => `${item.label}：${item.reviewReason}`),
-          ...(photoStillNeedsSupplement
-            ? [`小U大頭照：${cleanText(freshApplication.profilePhoto?.reviewReason || '',500)}`]
-            : []),
-        ].join('\n'),
+        supplementReason: freshSummary.documents
+          .filter(
+            item =>
+              item.reviewStatus ===
+              RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
+          )
+          .map(item => `${item.label}：${item.reviewReason}`)
+          .join('\n'),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAtMs: Date.now(),
       },
@@ -25493,7 +25600,7 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       type: 'supplement_submitted',
       operator: 'applicant',
       metadata: {
-        documentKeys: [...Object.keys(validation.documents), ...(profilePhotoResult?.ok ? ['profilePhoto'] : [])],
+        documentKeys: Object.keys(validation.documents),
         compulsoryInsuranceExpiryDate: includesInsurance
           ? compulsoryInsuranceExpiryDate
           : '',
@@ -25505,7 +25612,7 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       'supplement_submitted',
       '',
       {
-        documentKeys: [...Object.keys(validation.documents), ...(profilePhotoResult?.ok ? ['profilePhoto'] : [])],
+        documentKeys: Object.keys(validation.documents),
         compulsoryInsuranceExpiryDate: includesInsurance
           ? compulsoryInsuranceExpiryDate
           : '',
@@ -25521,8 +25628,8 @@ app.post('/api/rider/application-supplement', async (req, res) => {
             `📎 小U補件已送出\n\n` +
             `姓名：${freshApplication.name || '-'}\n` +
             `申請編號：${freshApplication.riderId || phone}\n` +
-            `補件項目：${[...Object.keys(validation.documents), ...(profilePhotoResult?.ok ? ['profilePhoto'] : [])]
-              .map(key => RIDER_DOCUMENT_LABELS[key] || RIDER_UPLOAD_LABELS[key] || key)
+            `補件項目：${Object.keys(validation.documents)
+              .map(key => RIDER_DOCUMENT_LABELS[key])
               .join('、')}\n` +
             (includesInsurance
               ? `新強制險到期日：${compulsoryInsuranceExpiryDate}\n`
@@ -25627,14 +25734,6 @@ app.get('/api/rider/application-status', async (req, res) => {
           ''
         ).trim(),
         credentialMaintenanceActive: maintenanceActive,
-        profilePhotoReview: application.profilePhotoRequired === true ? {
-          required: true,
-          reviewStatus: String(application.profilePhoto?.reviewStatus || 'pending').trim().toLowerCase(),
-          reviewReason: cleanText(application.profilePhoto?.reviewReason || '', 500),
-          originalName: cleanText(application.profilePhoto?.originalName || '', 180),
-          uploadedAtMs: Number(application.profilePhoto?.uploadedAtMs || 0),
-          resubmittedAtMs: Number(application.profilePhoto?.resubmittedAtMs || 0),
-        } : null,
         documents: serializeRiderApplicationDocumentsForClient(application),
         documentSummary: {
           totalCount: presentation.documentSummary.totalCount,
@@ -25739,14 +25838,6 @@ app.get('/api/rider/application-status', async (req, res) => {
         ).trim(),
         credentialMaintenanceActive:
           application.credentialMaintenanceActive === true,
-        profilePhotoReview: application.profilePhotoRequired === true ? {
-          required: true,
-          reviewStatus: String(application.profilePhoto?.reviewStatus || 'pending').trim().toLowerCase(),
-          reviewReason: cleanText(application.profilePhoto?.reviewReason || '', 500),
-          originalName: cleanText(application.profilePhoto?.originalName || '', 180),
-          uploadedAtMs: Number(application.profilePhoto?.uploadedAtMs || 0),
-          resubmittedAtMs: Number(application.profilePhoto?.resubmittedAtMs || 0),
-        } : null,
         documents: serializeRiderApplicationDocumentsForClient(application),
         documentSummary: {
           totalCount: presentation.documentSummary.totalCount,
@@ -26521,7 +26612,7 @@ app.get('/api/admin/growth/dashboard', requireRiderV4AdminKey, async (req, res) 
         registeredReferrals:referrals.length,
       },
       cities:Array.from(cityMap.values()).sort((a,b)=>(b.customers+b.riders)-(a.customers+a.riders)),
-      tierRules:{ customer:[], rider:UBEE_RIDER_TIER_RULES },
+      tierRules:{ customer:UBEE_CUSTOMER_TIER_RULES, rider:UBEE_RIDER_TIER_RULES },
     });
   } catch (error) {
     console.error('❌ Growth Dashboard API 失敗：', error);
@@ -35682,7 +35773,103 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-// Clean RC3: removed legacy nearby places endpoint; customer ordering and pricing retained.
+app.get('/api/nearby-places', async (req, res) => {
+  try {
+    const lat = req.query.lat;
+    const lng = req.query.lng;
+    const keyword = req.query.keyword || '餐廳';
+    const radius = Math.min(Number(req.query.radius || 2000), 3000);
+
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少定位資料'
+      });
+    }
+
+    function fetchJsonWithTimeout(url, ms = 7000) {
+      return Promise.race([
+        fetch(url).then(r => r.json()),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Google Places request timeout')), ms);
+        })
+      ]);
+    }
+
+    const url =
+      'https://maps.googleapis.com/maps/api/place/nearbysearch/json?' +
+      new URLSearchParams({
+        location: `${lat},${lng}`,
+        radius: String(radius),
+        keyword: String(keyword),
+        language: 'zh-TW',
+        key: GOOGLE_MAPS_SERVER_API_KEY
+      }).toString();
+
+    const data = await fetchJsonWithTimeout(url, 7000);
+
+    if (data.status && data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('Google Nearby Search error:', data.status, data.error_message || '');
+
+      return res.status(502).json({
+        success: false,
+        error: data.error_message || `Google Places error: ${data.status}`
+      });
+    }
+
+    const basePlaces = (data.results || []).slice(0, 6).map(place => ({
+      name: place.name || '',
+      address: place.vicinity || '',
+      placeId: place.place_id || '',
+      lat: place.geometry?.location?.lat || '',
+      lng: place.geometry?.location?.lng || '',
+      rating: place.rating || '',
+      userRatingsTotal: place.user_ratings_total || '',
+      phone: ''
+    }));
+
+    const places = await Promise.all(basePlaces.map(async place => {
+      if (!place.placeId) return place;
+
+      try {
+        const detailUrl =
+          'https://maps.googleapis.com/maps/api/place/details/json?' +
+          new URLSearchParams({
+            place_id: place.placeId,
+            fields: 'formatted_phone_number,international_phone_number',
+            language: 'zh-TW',
+            key: GOOGLE_MAPS_SERVER_API_KEY
+          }).toString();
+
+        const detailData = await fetchJsonWithTimeout(detailUrl, 2500);
+
+        return {
+          ...place,
+          phone:
+            detailData.result?.formatted_phone_number ||
+            detailData.result?.international_phone_number ||
+            ''
+        };
+      } catch (e) {
+        console.warn('place detail phone timeout or error:', e.message);
+        return place;
+      }
+    }));
+
+    return res.json({
+      success: true,
+      places
+    });
+
+  } catch (err) {
+    console.error('nearby places error:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message || '附近地點搜尋失敗'
+    });
+  }
+});
 
 // ==============================
 // UBee 客戶端地圖真實路線 API
@@ -36571,7 +36758,125 @@ app.post('/estimate', async (req, res) => {
 }
 });
 
-// Clean RC3: removed legacy places search/detail endpoints; customer ordering and pricing retained.
+// ===== Google Places 附近店家搜尋 API =====
+app.post('/api/places/search', async (req, res) => {
+  try {
+
+    const {
+      lat,
+      lng,
+      keyword
+    } = req.body;
+
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少定位資訊'
+      });
+    }
+
+    const radius = Math.min(Math.max(Number(req.body.radius || 3000), 3000), 3000);
+
+    const url =
+      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword || '飲料店')}&location=${lat},${lng}&radius=${radius}&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      return res.status(400).json({
+        success: false,
+        error: data.error_message || data.status || 'Google Places 搜尋失敗'
+      });
+    }
+
+    if (!data.results || !data.results.length) {
+      return res.json({
+        success: true,
+        places: [],
+        googleStatus: data.status
+      });
+    }
+
+    const places = data.results.slice(0, 20).map(place => ({
+      placeId: place.place_id,
+      name: place.name,
+      address: place.vicinity || '',
+      rating: place.rating || null
+    }));
+
+    return res.json({
+      success: true,
+      places
+    });
+
+  } catch (err) {
+    console.error('places search error:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+// ===== Google Places 店家詳細資料 API =====
+app.post('/api/places/detail', async (req, res) => {
+  try {
+    const { placeId } = req.body;
+
+    if (!placeId) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少 placeId'
+      });
+    }
+
+    const fields = [
+      'place_id',
+      'name',
+      'formatted_address',
+      'formatted_phone_number',
+      'geometry'
+    ].join(',');
+
+    const url =
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields)}&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK' || !data.result) {
+      return res.status(400).json({
+        success: false,
+        error: data.error_message || data.status || '查無店家詳細資料'
+      });
+    }
+
+    const place = data.result;
+
+    return res.json({
+      success: true,
+      place: {
+        placeId: place.place_id,
+        name: place.name || '',
+        address: place.formatted_address || '',
+        phone: place.formatted_phone_number || '',
+        lat: place.geometry?.location?.lat || null,
+        lng: place.geometry?.location?.lng || null
+      }
+    });
+
+  } catch (err) {
+    console.error('places detail error:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'places detail error'
+    });
+  }
+});
+
+
 
 // ============================================================
 // UBee 客人端 V4 地址中心 API
@@ -39691,7 +39996,261 @@ function applyVerifiedStoreDiscoveryToOrder(orderData, storeDiscovery) {
   orderData.isPartnerStore = storeDiscovery?.isPartnerStore === true;
 }
 
-// Clean RC3: removed customer store discovery endpoints (search/detail); customer ordering and pricing retained.
+app.get(
+  '/api/customer/stores',
+  requireCustomerAuth,
+  storeSearchRateLimit,
+  async (req, res) => {
+    try {
+      const category = normalizeStoreCategory(req.query.category);
+      const query = cleanText(req.query.query || '', 100);
+      const area = cleanText(req.query.area || '', 80);
+      const lat = getNullableCoordinate(req.query.lat);
+      const lng = getNullableCoordinate(req.query.lng);
+      const hasLocation = isValidStoreCoordinate(lat, lng);
+      const radius = Math.max(
+        500,
+        Math.min(
+          UBEE_STORE_SEARCH_MAX_RADIUS_METERS,
+          Math.round(Number(req.query.radius || UBEE_STORE_SEARCH_DEFAULT_RADIUS_METERS))
+        )
+      );
+      const limit = Math.max(
+        1,
+        Math.min(
+          UBEE_STORE_SEARCH_MAX_RESULTS,
+          Math.round(Number(req.query.limit || UBEE_STORE_SEARCH_MAX_RESULTS))
+        )
+      );
+
+      if (!hasLocation && !area) {
+        return res.status(400).json({
+          success: false,
+          code: 'STORE_LOCATION_REQUIRED',
+          message: '請允許定位，或手動輸入要搜尋的地區。',
+        });
+      }
+
+      const baseQuery = query || UBEE_STORE_CATEGORY_QUERY[category];
+      const textQuery = [baseQuery, area].filter(Boolean).join(' ');
+      const body = {
+        textQuery,
+        languageCode: 'zh-TW',
+        regionCode: 'TW',
+        pageSize: limit,
+        includePureServiceAreaBusinesses: false,
+      };
+
+      if (hasLocation) {
+        body.locationBias = {
+          circle: {
+            center: {
+              latitude: Number(lat),
+              longitude: Number(lng),
+            },
+            radius,
+          },
+        };
+        body.rankPreference = 'DISTANCE';
+      }
+
+      const inflightKey = [
+        'search', category, query, area,
+        hasLocation ? Number(lat).toFixed(5) : '',
+        hasLocation ? Number(lng).toFixed(5) : '',
+        radius, limit,
+      ].join('|');
+
+      const result = await runStoreInflight(inflightKey, () =>
+        callGooglePlacesApi(
+          'https://places.googleapis.com/v1/places:searchText',
+          {
+            method: 'POST',
+            body,
+            // 列表不要求 currentOpeningHours，避免每次搜尋進入 Enterprise SKU。
+            fieldMask: [
+              'places.id',
+              'places.displayName',
+              'places.formattedAddress',
+              'places.shortFormattedAddress',
+              'places.location',
+              'places.businessStatus',
+              'places.primaryType',
+              'places.primaryTypeDisplayName',
+              'places.googleMapsUri',
+              'places.attributions',
+            ].join(','),
+          }
+        )
+      );
+
+      const rawPlaces = Array.isArray(result?.places) ? result.places : [];
+      const overrides = await loadStoreDirectoryOverrides(
+        rawPlaces.map(place => place?.id),
+        { strict: true }
+      );
+
+      const stores = rawPlaces
+        .map(place => applyStoreDirectoryOverride(
+          normalizeGoogleStorePlace(place, {
+            category,
+            originLat: hasLocation ? lat : null,
+            originLng: hasLocation ? lng : null,
+          }),
+          overrides.get(cleanText(place?.id || '', 200))
+        ))
+        .filter(store =>
+          store.placeId &&
+          store.name &&
+          !store.hidden &&
+          (
+            !hasLocation ||
+            (
+              Number.isFinite(Number(store.distanceMeters)) &&
+              Number(store.distanceMeters) <= radius
+            )
+          )
+        )
+        .sort((a, b) => {
+          const aDistance = Number.isFinite(Number(a.distanceMeters))
+            ? Number(a.distanceMeters)
+            : Number.MAX_SAFE_INTEGER;
+          const bDistance = Number.isFinite(Number(b.distanceMeters))
+            ? Number(b.distanceMeters)
+            : Number.MAX_SAFE_INTEGER;
+          return aDistance - bDistance;
+        });
+
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+      return res.json({
+        success: true,
+        category,
+        categoryLabel: UBEE_STORE_CATEGORY_LABEL[category],
+        query,
+        area,
+        radiusMeters: hasLocation ? radius : null,
+        location: hasLocation ? { lat: Number(lat), lng: Number(lng) } : null,
+        stores,
+        count: stores.length,
+        source: 'google_places',
+        sourceLabel: 'Google Maps 公開店家資訊',
+        disclosure: '一般搜尋結果不代表店家與 UBee 存在合作關係。',
+      });
+    } catch (error) {
+      console.error('❌ UBee 店家探索搜尋失敗：', error);
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        code: error.code || 'STORE_SEARCH_FAILED',
+        message: error.message || '附近店家暫時無法搜尋，請稍後再試。',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/customer/stores/:placeId',
+  requireCustomerAuth,
+  storeDetailRateLimit,
+  async (req, res) => {
+    try {
+      const placeId = cleanText(req.params.placeId || '', 200);
+      if (!placeId || !/^[A-Za-z0-9_-]+$/.test(placeId)) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_STORE_PLACE_ID',
+          message: '店家識別資料不正確。',
+        });
+      }
+
+      const url =
+        `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}` +
+        '?languageCode=zh-TW&regionCode=TW';
+      const place = await runStoreInflight(`detail|${placeId}`, () =>
+        callGooglePlacesApi(url, {
+          // 詳細頁才取得電話與營業時間；移除 editorialSummary 與 websiteUri。
+          fieldMask: [
+            'id',
+            'displayName',
+            'formattedAddress',
+            'shortFormattedAddress',
+            'location',
+            'businessStatus',
+            'primaryType',
+            'primaryTypeDisplayName',
+            'currentOpeningHours',
+            'regularOpeningHours',
+            'nationalPhoneNumber',
+            'internationalPhoneNumber',
+            'googleMapsUri',
+            'attributions',
+          ].join(','),
+        })
+      );
+
+      const overrideMap = await loadStoreDirectoryOverrides(
+        [placeId],
+        { strict: true }
+      );
+      const override = overrideMap.get(placeId) || null;
+      const baseStore = normalizeGoogleStorePlace(place, {
+        category: normalizeStoreCategory(req.query.category),
+        originLat: getNullableCoordinate(req.query.lat),
+        originLng: getNullableCoordinate(req.query.lng),
+      });
+      const store = applyStoreDirectoryOverride(baseStore, override);
+
+      if (store.hidden === true) {
+        return res.status(404).json({
+          success: false,
+          code: 'STORE_HIDDEN',
+          message: '此店家目前不提供顯示或代買服務。',
+        });
+      }
+
+      const weekdayDescriptions = Array.isArray(place?.regularOpeningHours?.weekdayDescriptions)
+        ? place.regularOpeningHours.weekdayDescriptions
+            .map(value => cleanText(value, 160))
+            .filter(Boolean)
+        : [];
+
+      const detail = {
+        ...store,
+        phone: cleanText(
+          place?.nationalPhoneNumber || place?.internationalPhoneNumber || '',
+          40
+        ),
+        description:
+          store.description ||
+          '此頁提供公開店家資訊，客人可直接委託小U前往代買。商品、價格與庫存以店家現場為準。',
+        weekdayDescriptions,
+        photoUrl: store.photoUrl || '',
+        purchaseNotes: [
+          '商品名稱、價格與庫存以店家現場為準。',
+          '若遇缺貨、規格不同或價格差異，小U會依訂單聯絡方式與你確認。',
+          '商品費用與 UBee 跑腿服務費分開計算。',
+          store.isPartnerStore
+            ? '此店家已由 UBee 後端標示為合作店家。'
+            : '此公開資訊不代表店家與 UBee 存在合作關係。',
+        ],
+      };
+
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+      return res.json({
+        success: true,
+        store: detail,
+        source: 'google_places',
+        sourceLabel: 'Google Maps 公開店家資訊',
+      });
+    } catch (error) {
+      console.error('❌ UBee 店家詳細資訊讀取失敗：', error);
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        code: error.code || 'STORE_DETAIL_FAILED',
+        message: error.message || '店家資訊暫時無法讀取，請稍後再試。',
+      });
+    }
+  }
+);
 
 app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req, res) => {
     try {
@@ -40562,8 +41121,10 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     notifySelfOrderGuardCustomerOrder(order, req.customerAuth.account || {})
       .catch(error => console.warn('⚠️ Self-Order 自動通知失敗：', error?.message || error));
 
-    await markRiderInvitedCustomerProgress(req.customerAuth.customerId, String(order.id || id || ''))
-      .catch(err => console.warn('Rider customer invitation progress:', err.message));
+    await markGrowthReferralProgress('customer', req.customerAuth.customerId, 'order_created', {
+      firstOrderCreatedId:String(order.id || id || ''),
+      firstOrderCreatedAtMs:Date.now(),
+    }).catch(err => console.warn('Growth customer referral progress:', err.message));
 
     logDispatchEvent({
       type:'ORDER_CREATED',
