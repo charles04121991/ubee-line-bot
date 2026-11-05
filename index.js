@@ -1,4 +1,3 @@
-// UBee Finance V4.5.0｜Production Safety Hotfix｜Candidate / NOT DEPLOYED
 // UBee Customer RC2 — customer membership growth & new customer referrals retired (候選，尚未正式部署)
 // UBee Rider Review V4.0.2-HF1 supplement stability hotfix — shared backend
 // UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
@@ -15142,182 +15141,6 @@ const riderIncome =
 });
 
 // ============================================================
-// UBee Finance V4.5.0｜PRODUCTION SAFETY HOTFIX
-// Device enrollment is a ONE-TIME operational step. An existing verified device
-// then uses an HttpOnly SameSite=Strict session cookie with CSRF protection.
-// No credentials -> fail CLOSED, never silently open finance administration.
-// Env (Render): UBEE_FINANCE_SESSION_SECRET, UBEE_FINANCE_ENROLLMENT_CODE
-// Both must be 32+ random characters. Use HTTPS and keep both out of source.
-// Rotate enrollment code AND reset financeAdminBootstrap/initial in Firestore
-// only through a separately audited maintenance operation to change the device.
-// ============================================================
-const FINANCE_SESSION_SECRET = String(process.env.UBEE_FINANCE_SESSION_SECRET || '');
-const FINANCE_ENROLLMENT_CODE = String(process.env.UBEE_FINANCE_ENROLLMENT_CODE || '');
-const FINANCE_SESSION_COOKIE = 'ubee_finance_device';
-const FINANCE_SESSION_LIFETIME_MS = 180 * 86400000;
-const financeEnrollmentAttempts = new Map();
-function financeConfigured() {
-  return FINANCE_SESSION_SECRET.length >= 32 && FINANCE_ENROLLMENT_CODE.length >= 32 &&
-    FINANCE_SESSION_SECRET !== FINANCE_ENROLLMENT_CODE;
-}
-function financeHash(value) { return crypto.createHash('sha256').update(String(value)).digest('hex'); }
-function financeCompareHex(a, b) {
-  if (!/^[a-f0-9]{64}$/.test(String(a)) || !/^[a-f0-9]{64}$/.test(String(b))) return false;
-  return crypto.timingSafeEqual(Buffer.from(a,'hex'), Buffer.from(b,'hex'));
-}
-function financeSignedPayload(deviceId, expiresAtMs) {
-  return crypto.createHmac('sha256', FINANCE_SESSION_SECRET)
-    .update(`${deviceId}.${expiresAtMs}`).digest('hex');
-}
-function financeGetCookie(req) {
-  const raw = String(req.headers.cookie || '');
-  const row = raw.split(';').map(v => v.trim()).find(v => v.startsWith(`${FINANCE_SESSION_COOKIE}=`));
-  return row ? decodeURIComponent(row.slice(FINANCE_SESSION_COOKIE.length+1)) : '';
-}
-function financeSetCookie(res, deviceId, expiresAtMs) {
-  const encoded = `${deviceId}.${expiresAtMs}.${financeSignedPayload(deviceId,expiresAtMs)}`;
-  const prod = process.env.NODE_ENV === 'production';
-  const attributes = [`${FINANCE_SESSION_COOKIE}=${encodeURIComponent(encoded)}`,
-    'HttpOnly', 'SameSite=Strict', 'Path=/api/admin', `Max-Age=${Math.floor(FINANCE_SESSION_LIFETIME_MS/1000)}`];
-  if (prod) attributes.push('Secure');
-  res.setHeader('Set-Cookie',attributes.join('; '));
-}
-function financeRequestActor(req) {
-  return `finance_device:${String(req.financeAdmin?.deviceId || '').slice(0,12)}`;
-}
-function financeCsrf(deviceId) {
-  return crypto.createHmac('sha256', FINANCE_SESSION_SECRET)
-    .update(`csrf:${deviceId}`).digest('hex');
-}
-async function financeDeviceAuth(req, res, next) {
-  res.setHeader('Cache-Control','no-store');
-  if (!financeConfigured()) return res.status(503).json({success:false,code:'FINANCE_SECURITY_NOT_CONFIGURED',message:'財務安全設定未完成，已拒絕存取。'});
-  const values = financeGetCookie(req).split('.');
-  if (values.length !== 3) return res.status(401).json({success:false,code:'FINANCE_DEVICE_AUTH_REQUIRED',message:'請先在此裝置完成一次性財務授權。'});
-  const [deviceId,expiresRaw,signature] = values;
-  const expiresAtMs = Number(expiresRaw);
-  if (!/^[a-f0-9]{48}$/.test(deviceId) || !Number.isSafeInteger(expiresAtMs) || expiresAtMs <= Date.now() ||
-      !financeCompareHex(signature, financeSignedPayload(deviceId,expiresAtMs))) {
-    return res.status(401).json({success:false,code:'FINANCE_DEVICE_SESSION_EXPIRED',message:'財務裝置授權已過期。'});
-  }
-  try {
-    const deviceDoc = await db.collection('financeAdminDevices').doc(financeHash(deviceId)).get();
-    const device = deviceDoc.data() || {};
-    if (!deviceDoc.exists || device.active !== true || Number(device.expiresAtMs || 0) < Date.now()) {
-      return res.status(403).json({success:false,code:'FINANCE_DEVICE_REVOKED',message:'此裝置的財務權限已停用。'});
-    }
-    req.financeAdmin = Object.freeze({ deviceId });
-    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
-      const fetchSite=String(req.headers['sec-fetch-site'] || '').toLowerCase();
-      if(fetchSite==='cross-site')return res.status(403).json({success:false,code:'FINANCE_CROSS_SITE_DENIED',message:'拒絕跨站財務操作。'});
-      const origin = String(req.headers.origin || '');
-      if (origin) {
-        let originHost = '';
-        try { originHost = new URL(origin).host; } catch (_) {}
-        if (originHost !== String(req.headers.host || '')) {
-          return res.status(403).json({success:false,code:'FINANCE_ORIGIN_DENIED',message:'財務操作來源驗證失敗。'});
-        }
-      }
-      if (!financeCompareHex(String(req.get('x-ubee-finance-csrf') || ''), financeCsrf(deviceId))) {
-        return res.status(403).json({success:false,code:'FINANCE_CSRF_DENIED',message:'財務操作安全驗證失敗，請重新整理後再試。'});
-      }
-    }
-    return next();
-  } catch (err) {
-    console.error('finance device authentication failed:',err);
-    return res.status(503).json({success:false,code:'FINANCE_AUTH_UNAVAILABLE',message:'無法安全確認財務裝置，操作已停止。'});
-  }
-}
-app.get('/api/admin/finance-auth/status', async (req,res) => {
-  res.setHeader('Cache-Control','no-store');
-  if (!financeConfigured()) return res.status(503).json({success:false,code:'FINANCE_SECURITY_NOT_CONFIGURED',message:'後端尚未設定財務安全環境變數。'});
-  try {
-    const doc=await db.collection('financeAdminBootstrap').doc('initial').get();
-    return res.json({success:true, enrollmentAvailable:!doc.exists});
-  } catch (_) {return res.status(503).json({success:false,message:'無法讀取財務裝置啟用狀態。'});}
-});
-app.post('/api/admin/finance-auth/enroll', async (req,res) => {
-  res.setHeader('Cache-Control','no-store');
-  if (!financeConfigured()) return res.status(503).json({success:false,message:'財務安全環境變數尚未設定，拒絕裝置啟用。'});
-  const address=String(req.ip||'unknown');
-  const now=Date.now();
-  const attempt=financeEnrollmentAttempts.get(address)||{count:0,since:now};
-  if(now-attempt.since>3600000){attempt.count=0;attempt.since=now;}
-  attempt.count++;financeEnrollmentAttempts.set(address,attempt);
-  if(attempt.count>5)return res.status(429).json({success:false,message:'嘗試次數過多，請稍後由管理員處理。'});
-  const submitted=String(req.body?.enrollmentCode||'');
-  if(!financeCompareHex(financeHash(submitted),financeHash(FINANCE_ENROLLMENT_CODE))) {
-    return res.status(403).json({success:false,message:'首次裝置授權資料不正確。'});
-  }
-  const deviceId=crypto.randomBytes(24).toString('hex');
-  const expiresAtMs=now+FINANCE_SESSION_LIFETIME_MS;
-  try {
-    await db.runTransaction(async tx=>{
-      const bootstrap=db.collection('financeAdminBootstrap').doc('initial');
-      const exists=await tx.get(bootstrap);
-      if(exists.exists){const err=new Error('FINANCE_ALREADY_ENROLLED');err.statusCode=409;throw err;}
-      tx.create(bootstrap,{deviceHash:financeHash(deviceId),createdAt:admin.firestore.FieldValue.serverTimestamp(),enrolledAtMs:now});
-      tx.create(db.collection('financeAdminDevices').doc(financeHash(deviceId)),{
-        active:true,createdAt:admin.firestore.FieldValue.serverTimestamp(),enrolledAtMs:now,expiresAtMs,
-        label:'primary_finance_device',version:'v4.5.0'
-      });
-    });
-    financeSetCookie(res,deviceId,expiresAtMs);
-    return res.json({success:true,message:'此裝置已完成首次授權。',csrfToken:financeCsrf(deviceId),expiresAtMs});
-  } catch(err){
-    return res.status(Number(err.statusCode||503)).json({success:false,message:err.message==='FINANCE_ALREADY_ENROLLED'?'已有正式財務管理裝置，此啟用碼不能再次使用。':'無法安全啟用此裝置，未建立授權。'});
-  }
-});
-app.get('/api/admin/finance-auth/session',financeDeviceAuth,async (req,res)=>{
-  const deviceId=req.financeAdmin.deviceId;
-  const expiresAtMs=Date.now()+FINANCE_SESSION_LIFETIME_MS;
-  try {
-    await db.collection('financeAdminDevices').doc(financeHash(deviceId)).update({expiresAtMs});
-    financeSetCookie(res,deviceId,expiresAtMs);
-    return res.json({success:true,authenticated:true,csrfToken:financeCsrf(deviceId),expiresAtMs});
-  } catch(_){return res.status(503).json({success:false,message:'財務安全授權續期失敗。'});}
-});
-const FINANCE_RESTRICTED_PATHS = [
-  '/api/admin/finance-overview','/api/admin/cash-remittances','/api/admin/pending-settlements',
-  '/api/admin/settle-order','/api/admin/settle-orders','/api/admin/rider-finance-dispatch',
-  '/api/admin/finance-ledger','/api/admin/finance-orders','/api/admin/merchant-receivables'
-];
-app.use((req,res,next)=>{
-  const path=String(req.path||'');
-  if (!FINANCE_RESTRICTED_PATHS.some(prefix=>path===prefix||path.startsWith(`${prefix}/`)))return next();
-  return financeDeviceAuth(req,res,next);
-});
-
-// Full pagination (not the silent first-500/first-1000 truncation previously used).
-// Hard-stop instead of reporting incomplete balances as complete if collection grows.
-async function financeReadQueryCompletely(query, name = 'orders') {
-  const all=[];
-  let last=null;
-  for (let page=0;page<100;page++) {
-    let q=query.orderBy(admin.firestore.FieldPath.documentId()).limit(350);
-    if(last)q=q.startAfter(last);
-    const snap=await q.get();
-    all.push(...snap.docs);
-    if(snap.size<350)return {docs:all,forEach:fn=>all.forEach(fn),size:all.length};
-    last=snap.docs[snap.docs.length-1];
-  }
-  const error=new Error(`FINANCE_SCAN_LIMIT:${name}`);
-  error.statusCode=503;
-  throw error;
-}
-function financeAuditSet(tx,{orderId,type,operator,reason,before=null,after=null,metadata={}}) {
-  tx.set(db.collection('finance_audit_logs').doc(),{
-    orderId:String(orderId||'').toUpperCase(),type,operator,reason:String(reason||'').slice(0,500),
-    before,after,metadata,createdAt:admin.firestore.FieldValue.serverTimestamp(),createdAtMs:Date.now()
-  });
-}
-function financeRequireMatchingCash(order) {
-  const amounts=getFinanceCashAmounts(order);
-  if (amounts.moneyConflict) return {amounts,reason:'cash_amount_conflict'};
-  if (amounts.customerTotal<=0) return {amounts,reason:'customer_amount_missing'};
-  return {amounts,reason:''};
-}
-// ============================================================
 // UBee 財務結算中心 V2：共用工具
 // - 現金：小U -> UBee（回繳）
 // - 街口：UBee -> 小U（騎士收入 + 騎士代墊）
@@ -15410,11 +15233,17 @@ function buildFinanceRiderOrderQueryPairs(identity = {}) {
 
 async function getFinancePendingCashForRider(identity = {}) {
   const queryPairs = buildFinanceRiderOrderQueryPairs(identity);
-  if (!queryPairs.length) { const error=new Error('FINANCE_RIDER_IDENTITY_MISSING'); error.statusCode=409; throw error; }
   const byId = new Map();
 
   for (const [field, value] of queryPairs) {
-    const snap = await financeReadQueryCompletely(db.collection('orders').where(field,'==',value),`rider-${field}`);
+    const snap = await db
+      .collection('orders')
+      .where(field, '==', value)
+      .limit(500)
+      .get()
+      .catch(() => null);
+
+    if (!snap) continue;
     snap.docs.forEach(doc => {
       byId.set(doc.id, { id: doc.id, ...(doc.data() || {}) });
     });
@@ -15430,9 +15259,6 @@ async function getFinancePendingCashForRider(identity = {}) {
     if (isCashRemittanceSettled(order)) continue;
 
     const cashAmounts = getFinanceCashAmounts(order);
-    if (cashAmounts.moneyConflict) {
-      const err=new Error('FINANCE_CASH_CONFLICT');err.statusCode=409;throw err;
-    }
     const due = Math.max(0, Math.round(Number(cashAmounts.cashDueToPlatform || 0)));
     if (due <= 0) continue;
 
@@ -15486,7 +15312,7 @@ function isFinancePaidJkoOrder(order = {}) {
   const paymentStatus = getOrderPaymentStatus(order);
 
   return (
-    ['completed','done'].includes(String(order.status || '').trim().toLowerCase()) &&
+    String(order.status || '').trim().toLowerCase() === 'completed' &&
     (
       paymentMethod === 'jko' ||
       paymentMethod === 'jkopay' ||
@@ -15525,7 +15351,7 @@ function isFinancePaidMerchantOrder(order = {}) {
     paymentMethod === 'merchant';
 
   return (
-    ['completed','done'].includes(status) &&
+    status === 'completed' &&
     isMerchantOrder &&
     isMerchantPayment &&
     deliveryType !== 'merchant' &&
@@ -15562,30 +15388,69 @@ function getFinancePlatformPaymentMeta(order = {}) {
 }
 
 function getFinanceJkoAmounts(order = {}) {
-  const riderIncome=firstFinanceMoney(order,[
-    'riderIncome','riderFee','driverFee','riderEarning','riderPayout','riderShare','fee'
-  ],0);
-  const advancePayment=getOrderAdvancePaymentAmount(order);
-  return {riderIncome,advancePayment,payoutTotal:Math.max(0,Math.round(riderIncome+advancePayment))};
+  const riderIncome =
+    getOrderMoneyValue(order, [
+      'riderFee',
+      'driverFee',
+      'riderIncome',
+      'riderEarning',
+      'riderPayout',
+      'riderShare',
+      'fee',
+    ]) || 0;
+
+  const advancePayment =
+    getOrderAdvancePaymentAmount(order);
+
+  return {
+    riderIncome: Math.max(0, Math.round(riderIncome)),
+    advancePayment: Math.max(0, Math.round(advancePayment)),
+    payoutTotal: Math.max(
+      0,
+      Math.round(riderIncome + advancePayment)
+    ),
+  };
 }
 
 function getFinanceCashAmounts(order = {}) {
-  const customerTotal=getFinanceFinalCustomerTotal(order);
-  const riderIncome=firstFinanceMoney(order,[
-    'riderIncome','riderFee','driverFee','riderEarning','riderPayout','riderShare','fee'
-  ],0);
-  const advancePayment=getOrderAdvancePaymentAmount(order);
-  const calculatedDue=Math.max(0,Math.round(customerTotal-riderIncome-advancePayment));
-  const explicitlyRecordedDue=getOrderMoneyValue(order,[
-    'cashDueToPlatform','platformReceivable','riderDueToPlatform'
-  ]);
-  // Historical explicit amounts are kept unchanged. A mismatch is NEVER auto-collected:
-  // Finance must resolve it using the audited adjustment flow.
-  const cashDueToPlatform=explicitlyRecordedDue===null?calculatedDue:explicitlyRecordedDue;
+  const customerTotal =
+    getOrderCustomerPayableTotal(order);
+
+  const riderIncome =
+    getOrderMoneyValue(order, [
+      'riderFee',
+      'driverFee',
+      'riderIncome',
+      'riderEarning',
+      'riderPayout',
+      'riderShare',
+      'fee',
+      'price',
+    ]) || 0;
+
+  const advancePayment =
+    getOrderAdvancePaymentAmount(order);
+
+  const fallbackPlatformDue = Math.max(
+    0,
+    Math.round(
+      customerTotal -
+      advancePayment -
+      riderIncome
+    )
+  );
+
+  const cashDueToPlatform =
+    getOrderCashDueToPlatformAmount(
+      order,
+      fallbackPlatformDue
+    );
+
   return {
-    customerTotal,riderIncome,advancePayment,cashDueToPlatform,calculatedDue,
-    explicitlyRecordedDue,
-    moneyConflict:explicitlyRecordedDue!==null&&Math.abs(explicitlyRecordedDue-calculatedDue)>1
+    customerTotal: Math.max(0, Math.round(customerTotal)),
+    riderIncome: Math.max(0, Math.round(riderIncome)),
+    advancePayment: Math.max(0, Math.round(advancePayment)),
+    cashDueToPlatform: Math.max(0, Math.round(cashDueToPlatform)),
   };
 }
 
@@ -15594,7 +15459,10 @@ function getFinanceCashAmounts(order = {}) {
 // ============================================================
 app.get('/api/admin/finance-overview', async (req, res) => {
   try {
-    const snap = await financeReadQueryCompletely(db.collection('orders'),'overview');
+    const snap = await db
+      .collection('orders')
+      .limit(1000)
+      .get();
 
     const nowMs = Date.now();
     const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -15907,7 +15775,11 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
   try {
     // 不要求 settlementStatus 欄位一定已存在，
     // 讓舊的已完成街口訂單也能由後端統一判斷是否待撥。
-    const snap = await financeReadQueryCompletely(db.collection('orders'),'payouts');
+    const snap = await db
+      .collection('orders')
+      .where('status', '==', 'completed')
+      .limit(500)
+      .get();
 
     const orders = [];
     const riderMap = new Map();
@@ -16058,49 +15930,160 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
   }
 });
 
-async function settleFinanceJkoOrders({orderIds=[],settledBy='finance_center'}={}) {
-  const ids=[...new Set((Array.isArray(orderIds)?orderIds:[]).map(x=>String(x||'').trim().toUpperCase()).filter(Boolean))];
-  if(!ids.length){const e=new Error('SETTLEMENT_ORDER_IDS_REQUIRED');e.statusCode=400;throw e;}
-  if(ids.length>200){const e=new Error('SETTLEMENT_TOO_MANY_ORDERS');e.statusCode=400;throw e;}
-  return db.runTransaction(async tx=>{
-    const refs=ids.map(id=>db.collection('orders').doc(id));
-    const docs=await Promise.all(refs.map(ref=>tx.get(ref)));
-    const accepted=[];const skipped=[];
-    for(let i=0;i<docs.length;i++){
-      const doc=docs[i],orderId=ids[i];
-      if(!doc.exists){skipped.push({orderId,reason:'order_not_found'});continue;}
-      const order={id:doc.id,...doc.data()};
-      if(!isFinancePlatformPayoutOrder(order)){skipped.push({orderId,reason:'not_paid_jko_order'});continue;}
-      if(String(order.settlementStatus||'pending').toLowerCase()==='settled'){skipped.push({orderId,reason:'already_settled'});continue;}
-      const amounts=getFinanceJkoAmounts(order);
-      const rider=getFinanceRiderIdentity(order);
-      if(!rider.riderKey){skipped.push({orderId,reason:'rider_identity_missing'});continue;}
-      if(amounts.payoutTotal<=0){skipped.push({orderId,reason:'no_payout_amount'});continue;}
-      const paymentMeta=getFinancePlatformPaymentMeta(order);
-      accepted.push({ref:doc.ref,orderId,amounts,paymentMeta});
+async function settleFinanceJkoOrders({
+  orderIds = [],
+  settledBy = 'finance_center',
+} = {}) {
+  const cleanOrderIds = Array.from(
+    new Set(
+      (Array.isArray(orderIds) ? orderIds : [])
+        .map(value =>
+          String(value || '')
+            .trim()
+            .toUpperCase()
+        )
+        .filter(Boolean)
+    )
+  );
+
+  if (!cleanOrderIds.length) {
+    const error = new Error('SETTLEMENT_ORDER_IDS_REQUIRED');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (cleanOrderIds.length > 200) {
+    const error = new Error('SETTLEMENT_TOO_MANY_ORDERS');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const refs = cleanOrderIds.map(orderId =>
+    db.collection('orders').doc(orderId)
+  );
+
+  const docs = await Promise.all(
+    refs.map(ref => ref.get())
+  );
+
+  const validOrders = [];
+  const skippedOrders = [];
+
+  let totalSettledAmount = 0;
+  let totalRiderIncome = 0;
+  let totalAdvancePayment = 0;
+
+  docs.forEach((doc, index) => {
+    const orderId = cleanOrderIds[index];
+
+    if (!doc.exists) {
+      skippedOrders.push({
+        orderId,
+        reason: 'order_not_found',
+      });
+      return;
     }
-    if(!accepted.length||skipped.length){const e=new Error('NO_SETTLEMENT_ORDERS');e.statusCode=409;e.skippedOrders=skipped;throw e;}
-    const now=Date.now();
-    for(const item of accepted){
-      tx.set(item.ref,{
-        settlementStatus:'settled',settledAt:admin.firestore.FieldValue.serverTimestamp(),settledAtMs:now,
-        settledBy:String(settledBy).slice(0,100),settledAmount:item.amounts.payoutTotal,
-        settledRiderIncome:item.amounts.riderIncome,settledAdvancePayment:item.amounts.advancePayment,
-        settlementPaymentMethod:item.paymentMeta.settlementPaymentMethod||'jko',
-        financialUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),financialUpdatedAtMs:now,
-        financeReconciliationStatus:'needs_review'
-      },{merge:true});
-      financeAuditSet(tx,{orderId:item.orderId,type:'platform_payout_confirmed',operator:settledBy,
-        reason:'財務確認平台已完成實際撥款',after:{amount:item.amounts.payoutTotal,paymentMethod:item.paymentMeta.settlementPaymentMethod}});
-    }
-    return {
-      settledOrderCount:accepted.length,settledOrderIds:accepted.map(v=>v.orderId),
-      totalSettledAmount:accepted.reduce((s,v)=>s+v.amounts.payoutTotal,0),
-      totalRiderIncome:accepted.reduce((s,v)=>s+v.amounts.riderIncome,0),
-      totalAdvancePayment:accepted.reduce((s,v)=>s+v.amounts.advancePayment,0),
-      skippedOrderCount:skipped.length,skippedOrders:skipped
+
+    const order = {
+      id: doc.id,
+      ...doc.data(),
     };
+
+    if (!isFinancePlatformPayoutOrder(order)) {
+      skippedOrders.push({
+        orderId,
+        reason: 'not_paid_jko_order',
+      });
+      return;
+    }
+
+    if (
+      String(order.settlementStatus || 'pending')
+        .trim()
+        .toLowerCase() === 'settled'
+    ) {
+      skippedOrders.push({
+        orderId,
+        reason: 'already_settled',
+      });
+      return;
+    }
+
+    const amounts =
+      getFinanceJkoAmounts(order);
+
+    if (amounts.payoutTotal <= 0) {
+      skippedOrders.push({
+        orderId,
+        reason: 'no_payout_amount',
+      });
+      return;
+    }
+
+    const paymentMeta =
+      getFinancePlatformPaymentMeta(order);
+
+    validOrders.push({
+      ref: doc.ref,
+      orderId,
+      ...amounts,
+      settlementPaymentMethod:
+        paymentMeta.settlementPaymentMethod,
+    });
+
+    totalSettledAmount += amounts.payoutTotal;
+    totalRiderIncome += amounts.riderIncome;
+    totalAdvancePayment += amounts.advancePayment;
   });
+
+  if (!validOrders.length) {
+    const error = new Error('NO_SETTLEMENT_ORDERS');
+    error.statusCode = 400;
+    error.skippedOrders = skippedOrders;
+    throw error;
+  }
+
+  const batch = db.batch();
+  const nowMs = Date.now();
+  const safeSettledBy = String(
+    settledBy || 'finance_center'
+  )
+    .trim()
+    .slice(0, 100);
+
+  validOrders.forEach(item => {
+    batch.set(
+      item.ref,
+      {
+        settlementStatus: 'settled',
+        settledAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        settledAtMs: nowMs,
+        settledBy: safeSettledBy,
+        // 正式應撥：騎士收入 + 騎士代墊
+        settledAmount: item.payoutTotal,
+        settledRiderIncome: item.riderIncome,
+        settledAdvancePayment: item.advancePayment,
+        settlementPaymentMethod: item.settlementPaymentMethod || 'jko',
+        financialUpdatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        financialUpdatedAtMs: nowMs,
+      },
+      { merge: true }
+    );
+  });
+
+  await batch.commit();
+
+  return {
+    settledOrderCount: validOrders.length,
+    settledOrderIds: validOrders.map(item => item.orderId),
+    totalSettledAmount: Math.round(totalSettledAmount),
+    totalRiderIncome: Math.round(totalRiderIncome),
+    totalAdvancePayment: Math.round(totalAdvancePayment),
+    skippedOrderCount: skippedOrders.length,
+    skippedOrders,
+  };
 }
 
 // 單筆街口撥款：保留舊 API，相容既有財務中心／外部流程
@@ -16119,7 +16102,10 @@ app.post('/api/admin/settle-order', async (req, res) => {
 
     const result = await settleFinanceJkoOrders({
       orderIds: [orderId],
-      settledBy: financeRequestActor(req),
+      settledBy:
+        req.body?.settledBy ||
+        req.body?.operator ||
+        'finance_center',
     });
 
     return res.json({
@@ -16161,7 +16147,10 @@ app.post('/api/admin/settle-orders', async (req, res) => {
 
     const result = await settleFinanceJkoOrders({
       orderIds: rawOrderIds,
-      settledBy: financeRequestActor(req),
+      settledBy:
+        req.body?.settledBy ||
+        req.body?.operator ||
+        'finance_center',
     });
 
     return res.json({
@@ -16280,7 +16269,11 @@ app.get(
     try {
       // 不使用複合索引：
       // 先取得已完成訂單，再由後端判斷付款方式與回繳狀態。
-      const snap = await financeReadQueryCompletely(db.collection('orders'),'cash-remittances');
+      const snap = await db
+        .collection('orders')
+        .where('status', '==', 'completed')
+        .limit(500)
+        .get();
 
       const riderMap = new Map();
 
@@ -16295,7 +16288,7 @@ app.get(
         };
 
         // 只處理現金訂單
-        if (!['completed','done'].includes(String(order.status||'').toLowerCase()) || !isCashPaymentOrder(order)) {
+        if (!isCashPaymentOrder(order)) {
           return;
         }
 
@@ -16307,9 +16300,80 @@ app.get(
         // ==============================
         // 客人實際交給騎士的現金總額
         // ==============================
-        const cashFinancial=getFinanceCashAmounts(order);
-        const {customerTotal,riderIncome,advancePayment,cashDueToPlatform}=cashFinancial;
-        // Mismatched historical money fields must be audited, not auto-remitted.
+        const customerTotal =
+          getOrderMoneyValue(
+            order,
+            [
+              'customerPayableTotal',
+              'payableTotal',
+              'finalTotal',
+              'total',
+              'riderDisplayTotal',
+              'cashCollectAmount',
+              'cashCollectedAmount',
+              'cashGrossCollected',
+            ]
+          ) || 0;
+
+        // ==============================
+        // 騎士收入
+        // ==============================
+        const riderIncome =
+          getOrderMoneyValue(
+            order,
+            [
+              'riderFee',
+              'driverFee',
+              'riderIncome',
+              'riderEarning',
+              'riderPayout',
+              'riderShare',
+              'fee',
+              'price',
+            ]
+          ) || 0;
+
+        // ==============================
+        // 騎士代墊金額
+        // 這筆錢由騎士從客人現金中收回，
+        // 不屬於平台應收。
+        // ==============================
+        const advancePayment =
+          getOrderMoneyValue(
+            order,
+            [
+              'advancePayment',
+              'advanceAmount',
+              'advancePay',
+              'advanceFee',
+              'cashAdvanceRecovered',
+            ]
+          ) || 0;
+
+        // ==============================
+        // 舊訂單沒有直接儲存平台應收時：
+        //
+        // 客人現金總額
+        // - 騎士代墊款
+        // - 騎士收入
+        // = 騎士應繳回平台
+        // ==============================
+        const fallbackPlatformDue =
+          Math.max(
+            0,
+            Math.round(
+              customerTotal -
+              advancePayment -
+              riderIncome
+            )
+          );
+
+        const cashDueToPlatform =
+          getOrderCashDueToPlatformAmount(
+            order,
+            fallbackPlatformDue
+          );
+
         // 沒有平台應收金額就不需要列入回繳清單
         if (cashDueToPlatform <= 0) {
           return;
@@ -16414,7 +16478,6 @@ app.get(
           riderIncome,
           advancePayment,
           cashDueToPlatform,
-          financeMoneyConflict: cashFinancial.moneyConflict,
           stackTransferSubsidy: Math.max(
             0,
             Math.round(Number(order.stackTransferSubsidy || 0))
@@ -16651,7 +16714,9 @@ app.post('/api/admin/rider-finance-dispatch/hold', async (req, res) => {
     }
 
     const nowMs = Date.now();
-    const operator = financeRequestActor(req);
+    const operator = String(
+      body.operator || body.heldBy || body.adminUserId || 'finance_center'
+    ).trim().slice(0, 100);
     const periodLabel = String(body.periodLabel || '').trim().slice(0, 100);
     const reasonLabel = String(
       body.reasonLabel || '月結應繳回平台費用尚未完成回繳'
@@ -16775,23 +16840,41 @@ app.post('/api/admin/rider-finance-dispatch/release', async (req, res) => {
     }
 
     const nowMs = Date.now();
-    const operator = financeRequestActor(req);
+    const operator = String(
+      body.operator || body.releasedBy || body.adminUserId || 'finance_center'
+    ).trim().slice(0, 100);
     const releaseNote = String(
       body.releaseNote || '財務確認回繳完成，人工恢復派單'
     ).trim().slice(0, 300);
 
-    const releaseBatch=db.batch();
-    releaseBatch.set(riderDoc.ref,{
-      financeDispatchHold:{...currentHold,active:false,state:'RELEASED',releasedAtMs:nowMs,releasedBy:operator,releaseNote},
-      online:false,acceptingOrders:false,dispatchPresenceState:'PAUSED',
-      updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs
-    },{merge:true});
-    const presenceRef=riderV2OperationalRefs(riderDoc.id).presence;
-    releaseBatch.set(presenceRef,{
-      online:false,acceptingOrders:false,backgroundPushReady:false,dispatchPresenceState:'PAUSED',
-      updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs,dataVersion:RIDER_V2_DATA_VERSION
-    },{merge:true});
-    await releaseBatch.commit();
+    await riderDoc.ref.set({
+      financeDispatchHold: {
+        ...currentHold,
+        active: false,
+        state: 'RELEASED',
+        releasedAtMs: nowMs,
+        releasedBy: operator,
+        releaseNote,
+      },
+      // 只解除財務鎖，不代替小U自己上線。
+      // online 維持 false；小U需回到騎士端自行切換「開始接單」。
+      online: false,
+      acceptingOrders: false,
+      dispatchPresenceState: 'PAUSED',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    }, { merge: true });
+
+    const presenceRef = riderV2OperationalRefs(riderDoc.id).presence;
+    await presenceRef.set({
+      online: false,
+      acceptingOrders: false,
+      backgroundPushReady: false,
+      dispatchPresenceState: 'PAUSED',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+      dataVersion: RIDER_V2_DATA_VERSION,
+    }, { merge: true }).catch(() => {});
 
     await createRiderInboxNotification(riderDoc.id, {
       eventKey: `finance_dispatch_release:${nowMs}`,
@@ -16831,62 +16914,358 @@ app.post('/api/admin/rider-finance-dispatch/release', async (req, res) => {
 
 // ===== UBee 財務中心：確認騎士現金已回繳 =====
 
-app.post('/api/admin/cash-remittances/settle',async(req,res)=>{
-  try{
-    const raw=Array.isArray(req.body?.orderIds)?req.body.orderIds:[req.body?.orderId];
-    const orderIds=[...new Set(raw.map(x=>String(x||'').trim().toUpperCase()).filter(Boolean))];
-    if(!orderIds.length)return res.status(400).json({success:false,message:'缺少需要確認回繳的訂單 ID。'});
-    if(orderIds.length>200)return res.status(400).json({success:false,message:'單次最多只能確認 200 筆訂單。'});
-    const actor=financeRequestActor(req);
-    const outcome=await db.runTransaction(async tx=>{
-      const refs=orderIds.map(id=>db.collection('orders').doc(id));
-      const docs=await Promise.all(refs.map(ref=>tx.get(ref)));
-      const accepted=[],skipped=[];
-      for(let i=0;i<docs.length;i++){
-        const doc=docs[i],orderId=orderIds[i];
-        if(!doc.exists){skipped.push({orderId,reason:'order_not_found'});continue;}
-        const order={id:doc.id,...doc.data()};
-        if(!['completed','done'].includes(String(order.status||'').toLowerCase())){skipped.push({orderId,reason:'order_not_completed'});continue;}
-        if(!isCashPaymentOrder(order)){skipped.push({orderId,reason:'not_cash_order'});continue;}
-        if(isCashRemittanceSettled(order)){skipped.push({orderId,reason:'already_settled'});continue;}
-        const rider=getFinanceRiderIdentity(order);
-        if(!rider.riderKey){skipped.push({orderId,reason:'rider_identity_missing'});continue;}
-        const checked=financeRequireMatchingCash(order);
-        if(checked.reason){skipped.push({orderId,reason:checked.reason});continue;}
-        const amount=checked.amounts.cashDueToPlatform;
-        if(amount<=0){skipped.push({orderId,reason:'no_remittance_amount'});continue;}
-        accepted.push({ref:doc.ref,orderId,amount});
+app.post(
+  '/api/admin/cash-remittances/settle',
+  async (req, res) => {
+    try {
+      const body =
+        req.body &&
+        typeof req.body === 'object'
+          ? req.body
+          : {};
+
+      // 支援單筆 orderId，
+      // 也支援財務中心一次傳入多筆 orderIds。
+      const rawOrderIds = Array.isArray(
+        body.orderIds
+      )
+        ? body.orderIds
+        : [
+            body.orderId,
+          ];
+
+      const orderIds =
+        Array.from(
+          new Set(
+            rawOrderIds
+              .map(value =>
+                String(value || '')
+                  .trim()
+                  .toUpperCase()
+              )
+              .filter(Boolean)
+          )
+        );
+
+      if (!orderIds.length) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              '缺少需要確認回繳的訂單 ID。',
+          });
       }
-      if(!accepted.length||skipped.length){const error=new Error('NO_REMITTANCE_ORDERS');error.statusCode=409;error.skippedOrders=skipped;throw error;}
-      const nowMs=Date.now();
-      for(const item of accepted){
-        tx.set(item.ref,{
-          cashRemittanceStatus:'settled',cashRemittedAt:admin.firestore.FieldValue.serverTimestamp(),cashRemittedAtMs:nowMs,
-          cashRemittedBy:actor,cashRemittedAmount:item.amount,
-          platformPaymentMethod:'jkopay',platformFeeStatus:'paid',
-          platformFeePaidAt:admin.firestore.FieldValue.serverTimestamp(),platformFeePaidAtMs:nowMs,
-          settlementStatus:'not_applicable',financialUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
-          financialUpdatedAtMs:nowMs,financeReconciliationStatus:'needs_review'
-        },{merge:true});
-        financeAuditSet(tx,{orderId:item.orderId,type:'cash_remittance_confirmed',operator:actor,
-          reason:'財務確認已收到現金回繳',after:{cashRemittedAmount:item.amount}});
+
+      // 避免一次修改過多訂單，
+      // 同時保留在 Firestore Batch 限制內。
+      if (orderIds.length > 200) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              '單次最多只能確認 200 筆訂單。',
+          });
       }
-      return {settledOrderCount:accepted.length,settledOrderIds:accepted.map(x=>x.orderId),
-        totalRemittedAmount:accepted.reduce((s,x)=>s+x.amount,0),skippedOrderCount:skipped.length,skippedOrders:skipped};
-    });
-    return res.json({success:true,message:'騎士現金回繳已確認。',...outcome});
-  }catch(err){
-    console.error('cash remittance settle failed:',err);
-    return res.status(Number(err.statusCode||500)).json({success:false,
-      message:err.message==='NO_REMITTANCE_ORDERS'?'沒有可安全確認回繳的現金訂單。':'確認騎士現金回繳失敗。',
-      skippedOrders:err.skippedOrders||[],error:err.message});
+
+      const remittedBy =
+        String(
+          body.remittedBy ||
+          body.adminUserId ||
+          body.operator ||
+          'finance_center'
+        )
+          .trim()
+          .slice(0, 100);
+
+      const orderRefs =
+        orderIds.map(orderId =>
+          db
+            .collection('orders')
+            .doc(orderId)
+        );
+
+      const orderDocs =
+        await Promise.all(
+          orderRefs.map(ref =>
+            ref.get()
+          )
+        );
+
+      const validOrders = [];
+      const skippedOrders = [];
+
+      let totalRemittedAmount = 0;
+
+      orderDocs.forEach(
+        (
+          orderDoc,
+          index
+        ) => {
+          const orderId =
+            orderIds[index];
+
+          if (!orderDoc.exists) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'order_not_found',
+            });
+
+            return;
+          }
+
+          const order = {
+            id: orderDoc.id,
+            ...orderDoc.data(),
+          };
+
+          const orderStatus =
+            String(
+              order.status || ''
+            )
+              .trim()
+              .toLowerCase();
+
+          // 只能結算已完成的訂單
+          if (
+            orderStatus !==
+              'completed' &&
+            orderStatus !==
+              'done'
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'order_not_completed',
+            });
+
+            return;
+          }
+
+          // 只能處理現金訂單
+          if (
+            !isCashPaymentOrder(
+              order
+            )
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'not_cash_order',
+            });
+
+            return;
+          }
+
+          // 已經回繳過，不重複處理
+          if (
+            isCashRemittanceSettled(
+              order
+            )
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'already_settled',
+            });
+
+            return;
+          }
+
+          // ==============================
+          // 計算這張訂單應回繳平台金額
+          // ==============================
+
+          const customerTotal =
+            getOrderCustomerPayableTotal(
+              order
+            );
+
+          const advancePayment =
+            getOrderAdvancePaymentAmount(
+              order
+            );
+
+          const riderIncome =
+            getOrderMoneyValue(
+              order,
+              [
+                'riderFee',
+                'driverFee',
+                'riderIncome',
+                'riderEarning',
+                'riderPayout',
+                'riderShare',
+                'fee',
+              ]
+            ) || 0;
+
+          const fallbackPlatformDue =
+            Math.max(
+              0,
+              Math.round(
+                customerTotal -
+                advancePayment -
+                riderIncome
+              )
+            );
+
+          const cashDueToPlatform =
+            getOrderCashDueToPlatformAmount(
+              order,
+              fallbackPlatformDue
+            );
+
+          if (
+            cashDueToPlatform <= 0
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'no_remittance_amount',
+            });
+
+            return;
+          }
+
+          validOrders.push({
+            ref: orderDoc.ref,
+            orderId,
+            cashDueToPlatform,
+          });
+
+          totalRemittedAmount +=
+            cashDueToPlatform;
+        }
+      );
+
+      if (!validOrders.length) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+
+            message:
+              '沒有可確認回繳的現金訂單。',
+
+            settledOrderCount: 0,
+
+            totalRemittedAmount: 0,
+
+            skippedOrders,
+          });
+      }
+
+      const batch =
+        db.batch();
+
+      const nowMs =
+        Date.now();
+
+      validOrders.forEach(item => {
+        batch.set(
+          item.ref,
+          {
+            // 現金回繳正式完成
+            cashRemittanceStatus:
+              'settled',
+
+            cashRemittedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            cashRemittedAtMs:
+              nowMs,
+
+            cashRemittedBy:
+              remittedBy,
+
+            cashRemittedAmount:
+              item.cashDueToPlatform,
+
+            platformPaymentMethod: 'jkopay',
+            platformFeeStatus: 'paid',
+            platformFeePaidAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            platformFeePaidAtMs: nowMs,
+
+            // 現金單不屬於平台撥款流程
+            settlementStatus:
+              'not_applicable',
+
+            financialUpdatedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            financialUpdatedAtMs:
+              nowMs,
+          },
+          {
+            merge: true,
+          }
+        );
+      });
+
+      await batch.commit();
+
+      return res.json({
+        success: true,
+
+        message:
+          '騎士現金回繳已確認。',
+
+        settledOrderCount:
+          validOrders.length,
+
+        settledOrderIds:
+          validOrders.map(
+            item =>
+              item.orderId
+          ),
+
+        totalRemittedAmount:
+          Math.round(
+            totalRemittedAmount
+          ),
+
+        skippedOrderCount:
+          skippedOrders.length,
+
+        skippedOrders,
+      });
+
+    } catch (err) {
+      console.error(
+        '❌ 確認騎士現金回繳失敗：',
+        err
+      );
+
+      return res
+        .status(500)
+        .json({
+          success: false,
+
+          message:
+            '確認騎士現金回繳失敗。',
+
+          error:
+            err.message,
+        });
+    }
   }
-});
+);
 
 // 讀取所有店家應收帳款
 app.get('/api/admin/merchant-receivables', async (req, res) => {
   try {
-    const snap = await financeReadQueryCompletely(db.collection('orders'),'merchant-receivables');
+    const snap = await db.collection('orders')
+      .where('orderType', 'in', ['merchant_dispatch', 'merchant_delivery'])
+      .limit(500)
+      .get();
 
     const merchantMap = new Map();
 
@@ -17020,39 +17399,84 @@ app.get('/api/admin/merchant-receivables', async (req, res) => {
 });
 
 // 將單筆店家應收帳款標記為已結清
-app.post('/api/admin/merchant-receivables/settle-order',async(req,res)=>{
-  try{
-    const orderId=String(req.body?.orderId||'').trim();
-    if(!orderId)return res.status(400).json({success:false,message:'缺少 orderId'});
-    const ref=db.collection('orders').doc(orderId);
-    const result=await db.runTransaction(async tx=>{
-      const doc=await tx.get(ref);
-      if(!doc.exists){const e=new Error('MERCHANT_ORDER_NOT_FOUND');e.statusCode=404;throw e;}
-      const order={id:doc.id,...doc.data()};
-      if(!isMerchantReceivableOrder(order)){const e=new Error('MERCHANT_NOT_RECEIVABLE');e.statusCode=409;throw e;}
-      if(String(order.merchantBillingStatus||'').toLowerCase()==='paid'){
-        const e=new Error('MERCHANT_ALREADY_PAID');e.statusCode=409;throw e;
-      }
-      const amount=getMerchantReceivableAmount(order);
-      if(amount<=0){const e=new Error('MERCHANT_AMOUNT_INVALID');e.statusCode=409;throw e;}
-      const actor=financeRequestActor(req),nowMs=Date.now();
-      tx.update(ref,{
-        merchantBillingStatus:'paid',merchantPaidAmount:amount,
-        merchantBillingSettledAt:admin.firestore.FieldValue.serverTimestamp(),merchantBillingSettledAtMs:nowMs,
-        merchantBillingSettledBy:actor,financialUpdatedAtMs:nowMs,
-        financeReconciliationStatus:'needs_review'
+app.post('/api/admin/merchant-receivables/settle-order', async (req, res) => {
+  try {
+    const { orderId } = req.body || {};
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少 orderId'
       });
-      financeAuditSet(tx,{orderId:doc.id,type:'merchant_receivable_confirmed',operator:actor,
-        reason:'財務確認店家已實際支付款項',after:{merchantPaidAmount:amount}});
-      return {orderId:doc.id,paidAmount:amount};
+    }
+
+    const ref = db.collection('orders').doc(orderId);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到訂單'
+      });
+    }
+
+    const order = {
+      id: doc.id,
+      ...doc.data()
+    };
+
+    if (!isMerchantReceivableOrder(order)) {
+      return res.status(400).json({
+        success: false,
+        message: '此訂單不是可結清的店家派單帳款'
+      });
+    }
+
+    const currentBillingStatus = String(
+      order.merchantBillingStatus || 'unpaid'
+    ).trim().toLowerCase();
+
+    if (currentBillingStatus === 'paid') {
+      return res.status(409).json({
+        success: false,
+        message: '此店家帳款已經結清，請勿重複操作'
+      });
+    }
+
+    const amount = getMerchantReceivableAmount(order);
+
+    if (amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '此訂單缺少正確的店家應付金額'
+      });
+    }
+
+    await ref.update({
+      merchantBillingStatus: 'paid',
+      merchantPaidAmount: amount,
+      merchantBillingSettledAt: admin.firestore.FieldValue.serverTimestamp(),
+      merchantBillingSettledBy: 'admin'
     });
-    return res.json({success:true,message:'店家帳款已標記結清',...result});
-  }catch(err){console.error('merchant finance settlement failed:',err);
-    const map={MERCHANT_ORDER_NOT_FOUND:'找不到訂單',MERCHANT_NOT_RECEIVABLE:'此訂單不是可結清的店家帳款',
-      MERCHANT_ALREADY_PAID:'此店家帳款已經結清，請勿重複操作',MERCHANT_AMOUNT_INVALID:'缺少可驗證的店家應付金額'};
-    return res.status(Number(err.statusCode||500)).json({success:false,message:map[err.message]||'店家帳款結清失敗'});
+
+    res.json({
+      success: true,
+      message: '店家帳款已標記結清',
+      orderId,
+      paidAmount: amount
+    });
+
+  } catch (err) {
+    console.error('settle merchant receivable error:', err);
+
+    res.status(500).json({
+      success: false,
+      message: '店家帳款結清失敗',
+      error: err.message
+    });
   }
 });
+
 
 // 4. 騎士完成訂單列表：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 舊版相容
@@ -47206,7 +47630,6 @@ const UBEE_FINANCE_ADJUSTABLE_FIELDS = Object.freeze({
   riderAdvance: ['advancePayment', 'advanceAmount'],
   riderIncome: ['riderIncome', 'riderFee', 'driverFee'],
   platformIncome: ['platformIncome', 'platformFee'],
-  cashDueToPlatform: ['cashDueToPlatform'],
   waitingFee: ['waitingFee'],
   upstairsFee: ['upstairsFee'],
   additionalFee: ['additionalFee'],
@@ -47239,9 +47662,6 @@ function normalizeFinancePaymentStatus(order = {}) {
     ''
   ).trim().toLowerCase();
 
-  // Explicit refund/cancellation must override stale isPaid flags.
-  if (['refunded','refund_completed'].includes(raw)) return 'refunded';
-  if (['cancelled','void'].includes(raw)) return 'cancelled';
   if (
     ['paid', 'paid_confirmed', 'settled', 'completed'].includes(raw) ||
     order.isPaid === true ||
@@ -47460,8 +47880,7 @@ function buildFinanceClosureSnapshot(order = {}) {
     settlementActual = isCashRemittanceSettled(order)
       ? firstFinanceMoney(order, ['cashRemittedAmount'], settlementExpected)
       : 0;
-    settlementStatus = settlementExpected<=0 && !getFinanceCashAmounts(order).moneyConflict
-      ? 'not_applicable' : (isCashRemittanceSettled(order) ? 'settled' : 'pending');
+    settlementStatus = isCashRemittanceSettled(order) ? 'settled' : 'pending';
   } else if (isFinancePlatformPayoutOrder(order)) {
     settlementExpected = getFinanceJkoAmounts(order).payoutTotal;
     settlementActual = String(order.settlementStatus || '').trim().toLowerCase() === 'settled'
@@ -47507,9 +47926,6 @@ function buildFinanceClosureSnapshot(order = {}) {
     Math.round(expectedPlatformIncome - collectedPlatformIncome)
   );
   const discrepancyReasons = [];
-  if (isCompleted && isCashPaymentOrder(order) && getFinanceCashAmounts(order).moneyConflict) {
-    discrepancyReasons.push('現金應回繳與正式金額公式不一致');
-  }
   if (Math.abs(customerVariance) > 1 && !['unpaid', 'cash_pending'].includes(paymentStatus)) {
     discrepancyReasons.push('客戶實收與最終應收不一致');
   }
@@ -47529,10 +47945,8 @@ function buildFinanceClosureSnapshot(order = {}) {
   if (settlementStatus === 'settled' && Math.abs(settlementVariance) > 1) {
     discrepancyReasons.push('結算金額與應結算金額不一致');
   }
-  if (isCompleted && !isCancelled && finalCustomerTotal <= 0 &&
-    firstFinanceMoney(order,['finalCustomerTotal','finalTotal','customerPayableTotal','payableTotal','total'],0)===0) {
-    // No auto-settlement; zero can be legitimate but must be reviewed as a true zero value.
-    if (order.financeZeroApproved !== true) discrepancyReasons.push('完成訂單最終金額為零，需核准');
+  if (isCompleted && !isCancelled && finalCustomerTotal <= 0) {
+    discrepancyReasons.push('完成訂單缺少最終金額');
   }
   if (isCompleted && !isCancelled && !isCashPaymentOrder(order) && paymentStatus === 'unpaid') {
     discrepancyReasons.push('完成訂單仍顯示未付款');
@@ -47548,7 +47962,7 @@ function buildFinanceClosureSnapshot(order = {}) {
   }
 
   if (String(order.financeReconciliationStatus || '').trim().toLowerCase() === 'reconciled') {
-    reconciliationStatus = discrepancyReasons.length ? 'needs_review' : 'reconciled';
+    reconciliationStatus = 'reconciled';
   }
 
   return {
@@ -47642,10 +48056,9 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
   try {
     const query = String(req.query.q || req.query.query || '').trim().toLowerCase();
     const statusFilter = String(req.query.status || 'all').trim().toLowerCase();
-    const pageSize = Math.min(150, Math.max(20, Number(req.query.pageSize || 80)));
-    const page = Math.max(1, Math.min(100000, Number(req.query.page || 1)));
-    const snap = await financeReadQueryCompletely(db.collection('orders'),'finance-ledger');
-    let allItems = [];
+    const limit = Math.min(1000, Math.max(50, Number(req.query.limit || 500)));
+    const snap = await db.collection('orders').limit(limit).get();
+    let items = [];
     const nowMs = Date.now();
     const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
     const taipeiNow = new Date(nowMs + TAIPEI_OFFSET_MS);
@@ -47662,15 +48075,15 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
         item.rider?.riderName, item.rider?.riderPhone, item.serviceType,
         item.paymentMethod, item.paymentStatus
       ].join(' ').toLowerCase();
-      allItems.push({...item, _searchText:searchable});
+      if (query && !searchable.includes(query)) return;
+      if (statusFilter !== 'all' && item.reconciliationStatus !== statusFilter) return;
+      items.push(item);
     });
 
-    allItems.sort((a, b) => Number(b.completedAtMs || b.createdAtMs || 0) - Number(a.completedAtMs || a.createdAtMs || 0));
-    const items=allItems.filter(item=>(!query||item._searchText.includes(query))&&
-      (statusFilter==='all'||item.reconciliationStatus===statusFilter));
+    items.sort((a, b) => Number(b.completedAtMs || b.createdAtMs || 0) - Number(a.completedAtMs || a.createdAtMs || 0));
 
     const summary = {
-      totalOrders: allItems.length,
+      totalOrders: items.length,
       needsReviewCount: 0,
       unpaidCount: 0,
       pendingSettlementCount: 0,
@@ -47689,7 +48102,7 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
       totalVarianceAmount: 0,
     };
 
-    allItems.forEach(item => {
+    items.forEach(item => {
       if (item.reconciliationStatus === 'needs_review') summary.needsReviewCount += 1;
       if (item.reconciliationStatus === 'unpaid') {
         summary.unpaidCount += 1;
@@ -47730,10 +48143,7 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
       if (typeof summary[key] === 'number') summary[key] = Math.round(summary[key]);
     });
 
-    const safeOrders=items.slice((page-1)*pageSize,page*pageSize).map(({_searchText,...item})=>item);
-    return res.json({success:true,updatedAtMs:nowMs,summary,orders:safeOrders,
-      page,pageSize,totalMatching:items.length,pageCount:Math.max(1,Math.ceil(items.length/pageSize)),
-      isComplete:true});
+    return res.json({ success: true, updatedAtMs: nowMs, summary, orders: items.slice(0, 500) });
   } catch (error) {
     console.error('finance ledger error:', error);
     return res.status(500).json({ success: false, message: '讀取訂單財務總帳失敗。', error: error.message });
@@ -47766,124 +48176,138 @@ app.get('/api/admin/finance-orders/:orderId', async (req, res) => {
   }
 });
 
-app.post('/api/admin/finance-orders/:orderId/adjust',async(req,res)=>{
-  try{
-    const field=String(req.body?.field||'').trim();
-    const reason=String(req.body?.reason||'').trim();
-    const value=financeNumber(req.body?.value,NaN);
-    const operator=financeRequestActor(req);
-    if(!UBEE_FINANCE_ADJUSTABLE_FIELDS[field])return res.status(400).json({success:false,message:'不支援此財務欄位。'});
-    if(req.body?.value===null||req.body?.value===undefined||req.body?.value===''||!Number.isFinite(value)||value<0||
-      !Number.isInteger(Number(req.body.value)))return res.status(400).json({success:false,message:'金額必須是有效的非負整數。'});
-    if(reason.length<(field==='cashDueToPlatform'?10:2))return res.status(400).json({success:false,message:'現金應回繳更正需至少 10 字的原因；其他調整需填寫原因。'});
-    const doc=await getFinanceOrderDoc(req.params.orderId);
-    if(!doc)return res.status(404).json({success:false,message:'找不到訂單。'});
-    const result=await db.runTransaction(async tx=>{
-      const current=await tx.get(doc.ref);
-      const before={id:current.id,...current.data()};
-      const beforeSnapshot=buildFinanceClosureSnapshot(before);
-      if(beforeSnapshot.settlementStatus==='settled'){
-        const err=new Error('SETTLED_FINANCE_ORDER_IMMUTABLE');err.statusCode=409;throw err;
-      }
-      const nowMs=Date.now();
-      const update={financialUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),financialUpdatedAtMs:nowMs,
-        financeLastAdjustmentReason:reason.slice(0,500),financeLastAdjustedBy:operator,
-        financeAdjustmentCount:admin.firestore.FieldValue.increment(1),financeReconciliationStatus:'needs_review'};
-      for(const target of UBEE_FINANCE_ADJUSTABLE_FIELDS[field])update[target]=value;
-      const after={...before,...update};
-      const afterSnapshot=buildFinanceClosureSnapshot(after);
-      tx.set(doc.ref,update,{merge:true});
-      financeAuditSet(tx,{orderId:doc.id,type:'amount_adjustment',operator,reason,
-        before:{field,value:beforeSnapshot[field]??null,snapshot:beforeSnapshot},
-        after:{field,value,snapshot:afterSnapshot}});
-      return afterSnapshot;
+app.post('/api/admin/finance-orders/:orderId/adjust', async (req, res) => {
+  try {
+    const field = String(req.body?.field || '').trim();
+    const reason = String(req.body?.reason || '').trim();
+    const operator = String(req.body?.operator || 'finance_center').trim().slice(0, 100);
+    const value = financeNumber(req.body?.value, NaN);
+    if (!UBEE_FINANCE_ADJUSTABLE_FIELDS[field]) {
+      return res.status(400).json({ success: false, message: '不支援此財務欄位。' });
+    }
+    if (!Number.isFinite(value) || value < 0) {
+      return res.status(400).json({ success: false, message: '金額必須是大於或等於 0 的數字。' });
+    }
+    if (reason.length < 2) {
+      return res.status(400).json({ success: false, message: '請填寫金額調整原因。' });
+    }
+    const doc = await getFinanceOrderDoc(req.params.orderId);
+    if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
+    const beforeOrder = { id: doc.id, ...doc.data() };
+    const beforeSnapshot = buildFinanceClosureSnapshot(beforeOrder);
+    const update = {
+      financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      financialUpdatedAtMs: Date.now(),
+      financeLastAdjustmentReason: reason.slice(0, 500),
+      financeLastAdjustedBy: operator,
+      financeAdjustmentCount: admin.firestore.FieldValue.increment(1),
+      financeReconciliationStatus: 'needs_review',
+    };
+    UBEE_FINANCE_ADJUSTABLE_FIELDS[field].forEach(target => { update[target] = value; });
+    await doc.ref.set(update, { merge: true });
+    const updatedDoc = await doc.ref.get();
+    const afterOrder = { id: updatedDoc.id, ...updatedDoc.data() };
+    const afterSnapshot = buildFinanceClosureSnapshot(afterOrder);
+    await writeFinanceAuditLog({
+      orderId: doc.id,
+      type: 'amount_adjustment',
+      operator,
+      reason,
+      before: { field, value: beforeSnapshot[field] ?? null, snapshot: beforeSnapshot },
+      after: { field, value, snapshot: afterSnapshot },
     });
-    return res.json({success:true,message:'金額已修改，需重新對帳。',order:result});
-  }catch(error){console.error('finance adjust failed:',error);return res.status(Number(error.statusCode||500)).json({success:false,
-    message:error.message==='SETTLED_FINANCE_ORDER_IMMUTABLE'?'已完成實際結算的帳款不得直接改寫，請走沖銷與更正流程。':'調整財務金額失敗。'});}
+    return res.json({ success: true, message: '財務金額已更新，訂單已標記為待重新對帳。', order: afterSnapshot });
+  } catch (error) {
+    console.error('finance adjust error:', error);
+    return res.status(500).json({ success: false, message: '調整財務金額失敗。', error: error.message });
+  }
 });
 
-app.post('/api/admin/finance-orders/:orderId/payment-status',async(req,res)=>{
-  try{
-    const allowed=new Set(['unpaid','partial','paid','cash_pending','cash_collected','refunded','cancelled']);
-    const status=String(req.body?.status||'').trim().toLowerCase();
-    const reason=String(req.body?.reason||'').trim();
-    const operator=financeRequestActor(req);
-    const paidAmount=req.body?.paidAmount===undefined?null:financeNumber(req.body.paidAmount,NaN);
-    if(!allowed.has(status)||reason.length<2||paidAmount!==null&&(!Number.isFinite(paidAmount)||paidAmount<0))return res.status(400).json({success:false,message:'付款狀態、實收金額或修改原因不正確。'});
-    const doc=await getFinanceOrderDoc(req.params.orderId);
-    if(!doc)return res.status(404).json({success:false,message:'找不到訂單。'});
-    const result=await db.runTransaction(async tx=>{
-      const current=await tx.get(doc.ref);
-      const before={id:current.id,...current.data()};
-      const beforeSnapshot=buildFinanceClosureSnapshot(before);
-      if(beforeSnapshot.settlementStatus==='settled'){
-        const err=new Error('SETTLED_FINANCE_ORDER_IMMUTABLE');err.statusCode=409;throw err;
-      }
-      const nowMs=Date.now();
-      const update={financePaymentStatus:status,paymentStatus:status==='cash_collected'?'cash_on_delivery':status,
-        isPaid:['paid','cash_collected'].includes(status),financialUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
-        financialUpdatedAtMs:nowMs,financeReconciliationStatus:'needs_review'};
-      if(paidAmount!==null){update.actualPaidAmount=paidAmount;update.paidAmount=paidAmount;}
-      // Only claim a payment timestamp if manually declaring paid NOW.
-      if(['paid','cash_collected'].includes(status))update.financePaidAtMs=nowMs;
-      tx.set(doc.ref,update,{merge:true});
-      const after={...before,...update};
-      const afterSnapshot=buildFinanceClosureSnapshot(after);
-      financeAuditSet(tx,{orderId:doc.id,type:'payment_status_change',operator,reason,
-        before:{paymentStatus:beforeSnapshot.paymentStatus,amount:beforeSnapshot.actualPaidAmount},
-        after:{paymentStatus:status,amount:afterSnapshot.actualPaidAmount}});
-      return afterSnapshot;
+app.post('/api/admin/finance-orders/:orderId/payment-status', async (req, res) => {
+  try {
+    const allowed = new Set(['unpaid', 'partial', 'paid', 'cash_pending', 'cash_collected', 'refunded', 'cancelled']);
+    const status = String(req.body?.status || '').trim().toLowerCase();
+    const operator = String(req.body?.operator || 'finance_center').trim().slice(0, 100);
+    const reason = String(req.body?.reason || '').trim();
+    const paidAmount = req.body?.paidAmount === undefined ? null : financeNumber(req.body.paidAmount, NaN);
+    if (!allowed.has(status)) return res.status(400).json({ success: false, message: '付款狀態不正確。' });
+    if (reason.length < 2) return res.status(400).json({ success: false, message: '請填寫付款狀態修改原因。' });
+    if (paidAmount !== null && (!Number.isFinite(paidAmount) || paidAmount < 0)) {
+      return res.status(400).json({ success: false, message: '實收金額格式不正確。' });
+    }
+    const doc = await getFinanceOrderDoc(req.params.orderId);
+    if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
+    const beforeOrder = { id: doc.id, ...doc.data() };
+    const update = {
+      financePaymentStatus: status,
+      paymentStatus: status === 'cash_collected' ? 'cash_on_delivery' : status,
+      isPaid: ['paid', 'cash_collected'].includes(status),
+      financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      financialUpdatedAtMs: Date.now(),
+      financeReconciliationStatus: 'needs_review',
+    };
+    if (paidAmount !== null) {
+      update.actualPaidAmount = paidAmount;
+      update.paidAmount = paidAmount;
+    }
+    await doc.ref.set(update, { merge: true });
+    const updatedDoc = await doc.ref.get();
+    const afterOrder = { id: updatedDoc.id, ...updatedDoc.data() };
+    await writeFinanceAuditLog({
+      orderId: doc.id,
+      type: 'payment_status_change',
+      operator,
+      reason,
+      before: { paymentStatus: normalizeFinancePaymentStatus(beforeOrder), actualPaidAmount: getFinanceActualPaidAmount(beforeOrder, getFinanceFinalCustomerTotal(beforeOrder)) },
+      after: { paymentStatus: status, actualPaidAmount: getFinanceActualPaidAmount(afterOrder, getFinanceFinalCustomerTotal(afterOrder)) },
     });
-    return res.json({success:true,message:'付款狀態已更新。',order:result});
-  }catch(error){console.error('finance payment update failed:',error);return res.status(Number(error.statusCode||500)).json({success:false,
-    message:error.message==='SETTLED_FINANCE_ORDER_IMMUTABLE'?'已結算訂單不得直接改寫付款狀態。':'付款狀態更新失敗。'});}
+    return res.json({ success: true, message: '付款狀態已更新。', order: buildFinanceClosureSnapshot(afterOrder) });
+  } catch (error) {
+    console.error('finance payment status error:', error);
+    return res.status(500).json({ success: false, message: '更新付款狀態失敗。', error: error.message });
+  }
 });
 
-app.post('/api/admin/finance-orders/:orderId/reconcile',async(req,res)=>{
-  try{
-    const note=String(req.body?.note||'').trim();
-    const force=req.body?.force===true;
-    const operator=financeRequestActor(req);
-    // Force is an exception process, never a way to confirm money received or disbursed.
-    if(force&&note.length<10)return res.status(400).json({success:false,message:'強制對帳須至少填寫 10 字的完整原因。'});
-    const doc=await getFinanceOrderDoc(req.params.orderId);
-    if(!doc)return res.status(404).json({success:false,message:'找不到訂單。'});
-    const result=await db.runTransaction(async tx=>{
-      const current=await tx.get(doc.ref);
-      const order={id:current.id,...current.data()};
-      const snap=buildFinanceClosureSnapshot(order);
-      if(!['completed','done','cancelled','canceled','merchant_cancelled'].includes(snap.orderStatus)){
-        const err=new Error('ORDER_NOT_FINAL');err.statusCode=409;throw err;
-      }
-      // Both normal and forced reconciliation require the REAL settlement step to be completed.
-      if(['pending','unpaid'].includes(snap.settlementStatus)||
-        ['unpaid','cash_pending','partial'].includes(snap.paymentStatus)){
-        const err=new Error('FINANCE_UNSETTLED');err.statusCode=409;throw err;
-      }
-      if(snap.discrepancyReasons.includes('現金應回繳與正式金額公式不一致')){
-        const err=new Error('FINANCE_CASH_CONFLICT');err.statusCode=409;throw err;
-      }
-      if(snap.discrepancyReasons.length&&!force){
-        const err=new Error('FINANCE_DISCREPANCY_EXISTS');err.statusCode=409;err.reasons=snap.discrepancyReasons;throw err;
-      }
-      const nowMs=Date.now();
-      tx.set(doc.ref,{
-        financeReconciliationStatus:'reconciled',financeReconciliationNote:note.slice(0,1000),
-        financeReconciledBy:operator,financeReconciledAt:admin.firestore.FieldValue.serverTimestamp(),
-        financeReconciledAtMs:nowMs,financeCustomerVariance:snap.customerVariance,
-        financePlatformVariance:snap.platformVariance,financeSettlementVariance:snap.settlementVariance,
-        financialUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),financialUpdatedAtMs:nowMs
-      },{merge:true});
-      financeAuditSet(tx,{orderId:doc.id,type:force&&snap.discrepancyReasons.length?'forced_reconciliation':'reconciliation',
-        operator,reason:note||(force?'強制完成對帳':'完成對帳'),before:snap,
-        after:{reconciliationStatus:'reconciled'},metadata:{force,discrepancyReasons:snap.discrepancyReasons}});
-      return {...snap,reconciliationStatus:'reconciled'};
+app.post('/api/admin/finance-orders/:orderId/reconcile', async (req, res) => {
+  try {
+    const operator = String(req.body?.operator || 'finance_center').trim().slice(0, 100);
+    const note = String(req.body?.note || '').trim();
+    const force = req.body?.force === true;
+    const doc = await getFinanceOrderDoc(req.params.orderId);
+    if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
+    const order = { id: doc.id, ...doc.data() };
+    const snapshot = buildFinanceClosureSnapshot(order);
+    if (snapshot.discrepancyReasons.length && !force) {
+      return res.status(409).json({ success: false, code: 'FINANCE_DISCREPANCY_EXISTS', message: '這筆訂單仍有財務差異，請先修正或勾選強制結案。', discrepancyReasons: snapshot.discrepancyReasons, order: snapshot });
+    }
+    const nowMs = Date.now();
+    await doc.ref.set({
+      financeReconciliationStatus: 'reconciled',
+      financeReconciliationNote: note.slice(0, 1000),
+      financeReconciledBy: operator,
+      financeReconciledAt: admin.firestore.FieldValue.serverTimestamp(),
+      financeReconciledAtMs: nowMs,
+      financeCustomerVariance: snapshot.customerVariance,
+      financePlatformVariance: snapshot.platformVariance,
+      financeSettlementVariance: snapshot.settlementVariance,
+      financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      financialUpdatedAtMs: nowMs,
+    }, { merge: true });
+    await writeFinanceAuditLog({
+      orderId: doc.id,
+      type: force && snapshot.discrepancyReasons.length ? 'forced_reconciliation' : 'reconciliation',
+      operator,
+      reason: note || (force ? '強制完成對帳' : '完成對帳'),
+      before: snapshot,
+      after: { reconciliationStatus: 'reconciled' },
+      metadata: { force, discrepancyReasons: snapshot.discrepancyReasons },
     });
-    return res.json({success:true,message:'訂單財務已完成對帳。',order:result});
-  }catch(error){console.error('finance reconcile failed:',error);const map={ORDER_NOT_FINAL:'訂單尚未結束，不能對帳。',
-    FINANCE_UNSETTLED:'仍有未收款或未完成實際結算，不能對帳。',FINANCE_CASH_CONFLICT:'現金應回繳與正式金額衝突，不能強制對帳。',FINANCE_DISCREPANCY_EXISTS:'這筆訂單仍有財務差異，請先處理或申請強制對帳。'};
-    return res.status(Number(error.statusCode||500)).json({success:false,message:map[error.message]||'完成財務對帳失敗。',discrepancyReasons:error.reasons||[]});}
+    const updatedDoc = await doc.ref.get();
+    return res.json({ success: true, message: '訂單財務已完成對帳。', order: buildFinanceClosureSnapshot({ id: updatedDoc.id, ...updatedDoc.data() }) });
+  } catch (error) {
+    console.error('finance reconcile error:', error);
+    return res.status(500).json({ success: false, message: '完成財務對帳失敗。', error: error.message });
+  }
 });
 
 // =====================================================
