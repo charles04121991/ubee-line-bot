@@ -1,3 +1,4 @@
+<!-- UBee Finance V4.5.0｜Production Safety Hotfix｜Candidate / NOT DEPLOYED -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -11,7 +12,7 @@
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee 跑腿｜財務結算中心 V4</title>
+<title>UBee 跑腿｜財務結算中心 V4.5.0</title>
 <style>
 :root{
   --bg:#f4f5f7;
@@ -164,7 +165,7 @@ summary::-webkit-details-marker{display:none}
   <header class="topbar">
     <div>
       <div class="brand">UBee <span class="bee">財務結算中心</span></div>
-      <div class="sub">訂單財務閉環、現金回繳與平台待撥款分流管理。回繳狀態與撥款狀態只由平台財務端確認，不由小U自行歸零。</div>
+      <div class="sub">財務結算 V4.5.0：訂單財務閉環、現金回繳與平台待撥款分流管理。回繳狀態與撥款狀態只由平台財務端確認，不由小U自行歸零。</div>
     </div>
     <div class="top-actions">
       <div class="status-pill" id="systemStatus"><span class="status-dot"></span><span id="systemStatusText">連線檢查中</span></div>
@@ -172,6 +173,13 @@ summary::-webkit-details-marker{display:none}
     </div>
   </header>
 
+  <section class="panel" id="financeAuthPanel" style="display:none;margin-bottom:16px;border-color:#f9c975">
+    <div class="panel-head"><div><div class="panel-title">財務管理裝置安全授權</div><div class="panel-sub" id="financeAuthMessage">正在驗證此裝置的管理資格。</div></div></div>
+    <div class="panel-body">
+      <div class="section-note">正式財務操作採裝置授權：首次啟用時輸入由部署管理員保管的一次性啟用碼。完成後使用安全 Cookie，自動保持裝置資格，不需每次登入。未授權裝置無法讀寫財務 API。</div>
+      <div class="toolbar"><input id="financeEnrollCode" class="search" type="password" autocomplete="off" placeholder="僅首次啟用：管理員提供的一次性裝置啟用碼"><button class="btn yellow" type="button" onclick="enrollFinanceDevice()">首次啟用此裝置</button><button class="btn" onclick="checkFinanceSession()">重新驗證</button></div>
+    </div>
+  </section>
   <nav class="tabs" id="tabs">
     <button class="tab active" data-view="overview">財務總覽</button>
     <button class="tab" data-view="cash">現金回繳</button>
@@ -179,7 +187,6 @@ summary::-webkit-details-marker{display:none}
     <button class="tab" data-view="alerts">異常提醒 <span id="alertTabCount"></span></button>
     <button class="tab" data-view="history">結算紀錄</button>
     <button class="tab" data-view="ledger">訂單財務</button>
-    <button class="tab" data-view="riders">小U V4 資格</button>
   </nav>
 
   <section class="kpis">
@@ -259,7 +266,7 @@ summary::-webkit-details-marker{display:none}
         <div class="panel-head">
           <div><div class="panel-title">訂單財務總帳</div><div class="panel-sub">初始估價、最終應收、平台應得／已收／待收、小U收入、追加費用與對帳差異完整閉環。</div></div>
           <div class="toolbar">
-            <select id="financeStatusFilter" class="finance-status-select" onchange="loadFinanceLedger(true)">
+            <select id="financeStatusFilter" class="finance-status-select" onchange="resetFinanceLedgerPage()">
               <option value="all">全部狀態</option>
               <option value="needs_review">待檢查</option>
               <option value="unpaid">未收款</option>
@@ -267,14 +274,14 @@ summary::-webkit-details-marker{display:none}
               <option value="ready">可對帳</option>
               <option value="reconciled">已對帳</option>
             </select>
-            <input id="financeSearch" class="search" placeholder="搜尋訂單、小U、客戶或店家" oninput="renderFinanceLedger()">
+            <input id="financeSearch" class="search" placeholder="搜尋訂單、小U、客戶或店家" oninput="scheduleFinanceLedgerSearch()">
             <button class="btn small" onclick="loadFinanceLedger(true)">更新</button>
           </div>
         </div>
         <div class="panel-body">
           <div class="v4-admin-note">所有金額修改都必須填寫原因，後端會保留修改人、修改前後數值、時間與對帳紀錄。完成對帳不會改動派單、騎士審核或通知流程。</div>
           <div class="finance-summary-grid">
-            <div class="finance-summary-card"><span>今日客戶實收</span><strong id="financeTodayRevenue">$0</strong></div>
+            <div class="finance-summary-card"><span>今日完成單已付</span><strong id="financeTodayRevenue">$0</strong></div>
             <div class="finance-summary-card"><span>今日平台應得</span><strong id="financeTodayPlatform">$0</strong></div>
             <div class="finance-summary-card"><span>今日小U收入</span><strong id="financeTodayRider">$0</strong></div>
             <div class="finance-summary-card"><span>今日保底補貼</span><strong id="financeTodayGuarantee">$0</strong></div>
@@ -285,24 +292,12 @@ summary::-webkit-details-marker{display:none}
             <div class="finance-summary-card"><span>平台累計已收</span><strong id="financePlatformCollected">$0</strong></div>
             <div class="finance-summary-card"><span>平台累計待收</span><strong id="financePlatformOutstanding">$0</strong></div>
           </div>
+          <div class="toolbar" style="justify-content:space-between;margin-bottom:12px"><span id="financePageInfo" class="panel-sub">載入完整帳本中…</span><span><button class="btn small" onclick="changeFinancePage(-1)">上一頁</button> <button class="btn small" onclick="changeFinancePage(1)">下一頁</button></span></div>
           <div id="financeLedgerList" class="finance-ledger-list"><div class="empty">正在讀取訂單財務總帳...</div></div>
         </div>
       </div>
     </section>
 
-    <section class="view" id="view-riders">
-      <div class="panel">
-        <div class="panel-head">
-          <div><div class="panel-title">小U V4 資格與治理</div><div class="panel-sub">小U接單資格、違規／重新教育、L1～L4 等級與專業認證管理。</div></div>
-          <div class="toolbar"><input id="v4RiderSearch" class="search" placeholder="搜尋姓名／電話／Rider ID" oninput="renderV4Riders()"><button class="btn small" onclick="loadV4Riders(true)">更新</button></div>
-        </div>
-        <div class="panel-body">
-          <div class="v4-admin-note">此頁為高權限管理功能。請在 Render 設定 <b>UBEE_RIDER_V4_ADMIN_KEY</b>；瀏覽器只會把管理金鑰保存在目前分頁的 sessionStorage。</div>
-          <div class="v4-key-row"><input id="v4AdminKey" type="password" placeholder="輸入 V4 管理金鑰"><button class="btn primary" onclick="saveV4AdminKey()">套用金鑰</button></div>
-          <div id="v4RiderList" class="v4-rider-grid"><div class="empty">輸入管理金鑰後即可讀取小U資格。</div></div>
-        </div>
-      </div>
-    </section>
   </main>
 </div>
 
@@ -317,17 +312,63 @@ summary::-webkit-details-marker{display:none}
 
 <script>
 const API_BASE = window.location.origin;
+let financeCsrfToken='';
+let financeAuthorized=false;
+function financeAuthGate(message){
+  financeAuthorized=false;financeCsrfToken='';
+  document.getElementById('financeAuthPanel').style.display='block';
+  document.getElementById('financeAuthMessage').textContent=message||'此裝置尚未取得授權。';
+  document.getElementById('tabs').style.display='none';
+  document.querySelector('.kpis').style.display='none';
+  document.querySelector('main').style.display='none';
+}
+function financeAuthReady(){
+  financeAuthorized=true;
+  document.getElementById('financeAuthPanel').style.display='none';
+  document.getElementById('tabs').style.display='';
+  document.querySelector('.kpis').style.display='';
+  document.querySelector('main').style.display='';
+}
+async function checkFinanceSession(){
+  try{
+    const res=await fetch(`${API_BASE}/api/admin/finance-auth/session`,{cache:'no-store',credentials:'same-origin'});
+    const data=await readJson(res);
+    financeCsrfToken=String(data.csrfToken||'');
+    if(!financeCsrfToken)throw new Error('未取得安全操作授權。');
+    financeAuthReady();
+    await refreshAll(false);
+  }catch(err){financeAuthGate(err.message);}
+}
+async function enrollFinanceDevice(){
+  const input=document.getElementById('financeEnrollCode');
+  const code=String(input?.value||'');
+  if(code.length<32){showToast('首次裝置啟用碼格式不正確。');return;}
+  try{
+    const res=await fetch(`${API_BASE}/api/admin/finance-auth/enroll`,{
+      method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',cache:'no-store',
+      body:JSON.stringify({enrollmentCode:code})
+    });
+    const data=await readJson(res);
+    input.value='';
+    financeCsrfToken=String(data.csrfToken||'');
+    if(data.success!==true||!financeCsrfToken)throw new Error('財務授權尚未完成。');
+    financeAuthReady();await refreshAll(true);showToast('財務裝置已安全啟用。');
+  }catch(err){input.value='';financeAuthGate(err.message);}
+}
+
 const state = {
   view:'overview',
   overview:null,
   cash:null,
   jko:null,
-  ridersV4:null,
   finance:null,
   financeDetail:null,
   loading:false,
 };
 
+function encodeFinanceAttr(value){
+  return encodeURIComponent(String(value??'')).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
+}
 function money(value){
   return '$' + Math.round(Number(value || 0)).toLocaleString('zh-TW');
 }
@@ -371,21 +412,26 @@ function showToast(message){
 async function readJson(res){
   const data = await res.json().catch(()=>({}));
   if(!res.ok || data.success === false){
+    if(res.status===401||res.status===403&&String(data.code||'').startsWith('FINANCE_')){
+      financeAuthGate(data.message||'財務裝置授權失效。');
+    }
     throw new Error(data.message || data.error || `HTTP ${res.status}`);
   }
   return data;
 }
 async function getJson(path){
   const sep = path.includes('?') ? '&' : '?';
+  if(!financeAuthorized)throw new Error('此裝置尚未授權財務存取。');
   const res = await fetch(`${API_BASE}${path}${sep}t=${Date.now()}`,{
-    cache:'no-store'
+    cache:'no-store',credentials:'same-origin'
   });
   return readJson(res);
 }
 async function postJson(path,body){
+  if(!financeAuthorized||!financeCsrfToken)throw new Error('財務裝置安全驗證尚未完成。');
   const res = await fetch(`${API_BASE}${path}`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
+    method:'POST',credentials:'same-origin',cache:'no-store',
+    headers:{'Content-Type':'application/json','x-ubee-finance-csrf':financeCsrfToken},
     body:JSON.stringify(body || {})
   });
   return readJson(res);
@@ -399,7 +445,6 @@ function switchView(view){
   if(view==='alerts') renderAlerts();
   if(view==='history') renderHistory();
   if(view==='ledger' && !state.finance) loadFinanceLedger();
-  if(view==='riders' && !state.ridersV4) loadV4Riders();
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));
 
@@ -489,19 +534,36 @@ function renderFinanceLedger(){
       <div class="finance-mini-grid"><div class="finance-mini"><span>初始估價</span><strong>${money(o.initialEstimatedTotal)}</strong></div><div class="finance-mini"><span>客戶實收</span><strong>${money(o.actualPaidAmount)}</strong></div><div class="finance-mini"><span>小U應得</span><strong>${money(Number(o.riderIncome||0)+Number(o.riderAdvance||0))}</strong></div><div class="finance-mini"><span>平台應得</span><strong>${money(o.expectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台已收</span><strong>${money(o.collectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台待收</span><strong>${money(o.outstandingPlatformIncome)}</strong></div></div>
       ${Number(o.feeBreakdown?.multiStopFee||0)>0||Number(o.riderAdvance||0)>0||Number(o.stackTransferSubsidy||0)>0?`<div class="section-note" style="margin-top:10px;margin-bottom:0">${Number(o.feeBreakdown?.multiStopFee||0)>0?`<strong>多點配送費：</strong>${money(o.feeBreakdown.multiStopFee)}`:''}${Number(o.feeBreakdown?.multiStopFee||0)>0&&(Number(o.riderAdvance||0)>0||Number(o.stackTransferSubsidy||0)>0)?'　｜　':''}${Number(o.riderAdvance||0)>0?`<strong>小U代墊：</strong>${money(o.riderAdvance)}`:''}${Number(o.riderAdvance||0)>0&&Number(o.stackTransferSubsidy||0)>0?'　｜　':''}${Number(o.stackTransferSubsidy||0)>0?`<strong>平台轉場補貼：</strong>${money(o.stackTransferSubsidy)}`:''}</div>`:''}
       ${variance?`<div class="finance-discrepancy">差異總額 ${money(variance)}${o.discrepancyReasons?.length?`：${esc(o.discrepancyReasons.join('、'))}`:''}</div>`:''}
-      <div class="finance-actions"><button class="btn small primary" onclick="openFinanceOrder('${esc(o.orderId)}')">查看／調整</button>${o.reconciliationStatus!=='reconciled'?`<button class="btn small yellow" onclick="quickReconcile('${esc(o.orderId)}')">完成對帳</button>`:''}</div>
+      <div class="finance-actions"><button class="btn small primary" onclick="openFinanceOrder('${encodeFinanceAttr(o.orderId)}')">查看／調整</button>${o.reconciliationStatus!=='reconciled'?`<button class="btn small yellow" onclick="quickReconcile('${encodeFinanceAttr(o.orderId)}')">完成對帳</button>`:''}</div>
     </article>`;
   }).join('');
 }
+let financeLedgerPage=1;
+let financeSearchTimer=null;
+function resetFinanceLedgerPage(){financeLedgerPage=1;loadFinanceLedger(true);}
+function scheduleFinanceLedgerSearch(){clearTimeout(financeSearchTimer);financeSearchTimer=setTimeout(()=>{financeLedgerPage=1;loadFinanceLedger(true);},300);}
+function changeFinancePage(offset){
+  const max=Number(state.finance?.pageCount||1);
+  const target=Math.max(1,Math.min(max,financeLedgerPage+offset));
+  if(target!==financeLedgerPage){financeLedgerPage=target;loadFinanceLedger(true);}
+}
 async function loadFinanceLedger(showMessage=false){
   const filter=String(document.getElementById('financeStatusFilter')?.value||'all');
-  const el=document.getElementById('financeLedgerList');if(el&&!showMessage)el.innerHTML='<div class="empty">正在讀取訂單財務總帳...</div>';
-  try{state.finance=await getJson(`/api/admin/finance-ledger?status=${encodeURIComponent(filter)}&limit=800`);renderFinanceKpis();renderFinanceLedger();if(showMessage)showToast('訂單財務總帳已更新');}
-  catch(err){if(el)el.innerHTML=`<div class="empty">讀取財務總帳失敗：${esc(err.message)}</div>`;if(showMessage)showToast('讀取財務總帳失敗：'+err.message);}
+  const q=String(document.getElementById('financeSearch')?.value||'').trim();
+  const el=document.getElementById('financeLedgerList');
+  if(el&&!showMessage)el.innerHTML='<div class="empty">正在讀取訂單財務總帳...</div>';
+  try{
+    state.finance=await getJson(`/api/admin/finance-ledger?status=${encodeURIComponent(filter)}&q=${encodeURIComponent(q)}&page=${financeLedgerPage}&pageSize=80`);
+    renderFinanceKpis();renderFinanceLedger();
+    const info=document.getElementById('financePageInfo');
+    if(info)info.textContent=`符合 ${Number(state.finance.totalMatching||0)} 筆・第 ${state.finance.page||1} / ${state.finance.pageCount||1} 頁（總帳 ${Number(state.finance.summary?.totalOrders||0)} 筆）`;
+    if(showMessage)showToast('訂單財務總帳已更新');
+  }catch(err){if(el)el.innerHTML=`<div class="empty">讀取財務總帳失敗：${esc(err.message)}</div>`;if(showMessage)showToast('讀取財務總帳失敗：'+err.message);}
 }
 function closeFinanceModal(){document.getElementById('financeModalBackdrop')?.classList.remove('show');state.financeDetail=null;}
 function financeDetailItem(label,value,cls=''){return `<div class="finance-detail-item"><span>${esc(label)}</span><strong class="${cls}">${esc(value)}</strong></div>`;}
 async function openFinanceOrder(orderId){
+  orderId=decodeURIComponent(orderId||'');
   try{
     const data=await getJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}`);state.financeDetail=data;
     const o=data.order||{};document.getElementById('financeModalTitle').textContent=`訂單 ${o.orderNo||o.orderId}`;document.getElementById('financeModalSub').textContent=`${financeStatusLabel(o.reconciliationStatus)}・${o.paymentMethod||'-'}・${o.paymentStatus||'-'}`;
@@ -525,28 +587,35 @@ async function openFinanceOrder(orderId){
         ${financeDetailItem('退款',money(fees.refundAmount))}${financeDetailItem('結算狀態',o.settlementStatus||'-')}
       </div>
       ${reasons.length?`<div class="finance-discrepancy"><b>尚有差異：</b>${esc(reasons.join('、'))}</div>`:''}
-      <div class="finance-form"><div class="panel-title">調整金額</div><div class="finance-form-row"><select id="financeAdjustField" class="finance-input"><option value="finalCustomerTotal">最終應收</option><option value="actualPaidAmount">客戶實收</option><option value="riderAdvance">小U代墊</option><option value="riderIncome">小U任務收入</option><option value="platformIncome">平台收入</option><option value="waitingFee">等待費</option><option value="upstairsFee">上樓費</option><option value="additionalFee">追加費用</option><option value="cancellationFee">取消費</option><option value="discountAmount">折扣</option><option value="refundAmount">退款</option></select><input id="financeAdjustValue" class="finance-input" type="number" min="0" step="1" placeholder="新金額"></div><input id="financeOperator" class="finance-input" value="finance_center" placeholder="處理人員"><textarea id="financeAdjustReason" class="finance-textarea" placeholder="必填：金額調整原因"></textarea><button class="btn primary" onclick="submitFinanceAdjustment('${esc(o.orderId)}')">儲存金額調整</button></div>
-      <div class="finance-form"><div class="panel-title">付款狀態</div><div class="finance-form-row"><select id="financePaymentStatus" class="finance-input"><option value="unpaid">未付款</option><option value="partial">部分付款</option><option value="paid">已付款</option><option value="cash_pending">現金待收</option><option value="cash_collected">現金已收</option><option value="refunded">已退款</option><option value="cancelled">已取消</option></select><input id="financePaidAmount" class="finance-input" type="number" min="0" step="1" value="${Number(o.actualPaidAmount||0)}" placeholder="實收金額"></div><textarea id="financePaymentReason" class="finance-textarea" placeholder="必填：付款狀態修改原因"></textarea><button class="btn blue" onclick="submitPaymentStatus('${esc(o.orderId)}')">更新付款狀態</button></div>
-      <div class="finance-form"><div class="panel-title">對帳結案</div><textarea id="financeReconcileNote" class="finance-textarea" placeholder="對帳備註"></textarea><label style="font-size:12px;font-weight:900"><input id="financeForceReconcile" type="checkbox" style="width:auto"> 即使仍有差異，也由財務人工確認強制結案</label><button class="btn yellow" onclick="submitFinanceReconcile('${esc(o.orderId)}')">完成財務對帳</button></div>
+      <div class="finance-form"><div class="panel-title">調整金額</div><div class="panel-sub">現金應回繳欄位僅供歷史異常對帳更正；更改帳面金額不代表已收到實際款項。</div><div class="finance-form-row"><select id="financeAdjustField" class="finance-input"><option value="finalCustomerTotal">最終應收</option><option value="actualPaidAmount">客戶實收</option><option value="riderAdvance">小U代墊</option><option value="riderIncome">小U任務收入</option><option value="platformIncome">平台收入</option><option value="cashDueToPlatform">現金應回繳（歷史異常更正）</option><option value="waitingFee">等待費</option><option value="upstairsFee">上樓費</option><option value="additionalFee">追加費用</option><option value="cancellationFee">取消費</option><option value="discountAmount">折扣</option><option value="refundAmount">退款</option></select><input id="financeAdjustValue" class="finance-input" type="number" min="0" step="1" placeholder="新金額"></div><input id="financeOperator" class="finance-input" value="finance_center" placeholder="處理人員"><textarea id="financeAdjustReason" class="finance-textarea" placeholder="必填：金額調整原因"></textarea><button class="btn primary" onclick="submitFinanceAdjustment('${encodeFinanceAttr(o.orderId)}')">儲存金額調整</button></div>
+      <div class="finance-form"><div class="panel-title">付款狀態</div><div class="finance-form-row"><select id="financePaymentStatus" class="finance-input"><option value="unpaid">未付款</option><option value="partial">部分付款</option><option value="paid">已付款</option><option value="cash_pending">現金待收</option><option value="cash_collected">現金已收</option><option value="refunded">已退款</option><option value="cancelled">已取消</option></select><input id="financePaidAmount" class="finance-input" type="number" min="0" step="1" value="${Number(o.actualPaidAmount||0)}" placeholder="實收金額"></div><textarea id="financePaymentReason" class="finance-textarea" placeholder="必填：付款狀態修改原因"></textarea><button class="btn blue" onclick="submitPaymentStatus('${encodeFinanceAttr(o.orderId)}')">更新付款狀態</button></div>
+      <div class="finance-form"><div class="panel-title">對帳結案</div><textarea id="financeReconcileNote" class="finance-textarea" placeholder="對帳備註"></textarea><label style="font-size:12px;font-weight:900"><input id="financeForceReconcile" type="checkbox" style="width:auto"> 即使仍有差異，也由財務人工確認強制結案</label><button class="btn yellow" onclick="submitFinanceReconcile('${encodeFinanceAttr(o.orderId)}')">完成財務對帳</button></div>
       <div class="finance-form"><div class="panel-title">財務操作紀錄</div><div class="finance-audit-list">${(data.audit||[]).length?(data.audit||[]).map(a=>`<div class="finance-audit-item"><b>${esc(a.type||'財務更新')}</b>・${esc(a.operator||'-')}・${esc(formatTime(a.createdAtMs))}<br>${esc(a.reason||'')}</div>`).join(''):'<div class="empty">目前沒有人工財務操作紀錄。</div>'}</div></div>`;
     document.getElementById('financePaymentStatus').value=o.paymentStatus||'unpaid';document.getElementById('financeModalBackdrop').classList.add('show');
   }catch(err){alert('讀取財務明細失敗：'+err.message);}
 }
 async function submitFinanceAdjustment(orderId){
-  const field=document.getElementById('financeAdjustField').value;const value=Number(document.getElementById('financeAdjustValue').value);const reason=document.getElementById('financeAdjustReason').value.trim();const operator=document.getElementById('financeOperator').value.trim()||'finance_center';
-  if(!Number.isFinite(value)||value<0){alert('請輸入正確的新金額。');return;}if(reason.length<2){alert('請填寫金額調整原因。');return;}
+  orderId=decodeURIComponent(orderId||'');
+  const field=document.getElementById('financeAdjustField').value;
+  if(document.getElementById('financeAdjustValue').value.trim()===''){alert('請輸入新金額，不能留空。');return;}
+  const value=Number(document.getElementById('financeAdjustValue').value);const reason=document.getElementById('financeAdjustReason').value.trim();const operator=document.getElementById('financeOperator').value.trim()||'finance_center';
+  if(!Number.isFinite(value)||value<0){alert('請輸入正確的新金額。');return;}if(reason.length<(field==='cashDueToPlatform'?10:2)){alert('請填寫更正原因；現金應回繳更正至少 10 字。');return;}
   try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/adjust`,{field,value,reason,operator});showToast('財務金額已更新');await loadFinanceLedger(true);await openFinanceOrder(orderId);}catch(err){alert('調整失敗：'+err.message);}
 }
 async function submitPaymentStatus(orderId){
+  orderId=decodeURIComponent(orderId||'');
   const status=document.getElementById('financePaymentStatus').value;const paidAmount=Number(document.getElementById('financePaidAmount').value||0);const reason=document.getElementById('financePaymentReason').value.trim();const operator=document.getElementById('financeOperator')?.value.trim()||'finance_center';if(reason.length<2){alert('請填寫付款狀態修改原因。');return;}
   try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/payment-status`,{status,paidAmount,reason,operator});showToast('付款狀態已更新');await loadFinanceLedger(true);await openFinanceOrder(orderId);}catch(err){alert('更新付款狀態失敗：'+err.message);}
 }
 async function submitFinanceReconcile(orderId){
-  const note=document.getElementById('financeReconcileNote').value.trim();const force=document.getElementById('financeForceReconcile').checked;const operator=document.getElementById('financeOperator')?.value.trim()||'finance_center';
+  orderId=decodeURIComponent(orderId||'');
+  const note=document.getElementById('financeReconcileNote').value.trim();const force=document.getElementById('financeForceReconcile').checked;
+  if(force&&note.length<10){alert('強制對帳請填寫至少 10 字的原因。');return;}const operator=document.getElementById('financeOperator')?.value.trim()||'finance_center';
   if(!confirm(force?'確認強制完成此筆財務對帳？':'確認完成此筆財務對帳？'))return;
   try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/reconcile`,{note,force,operator});showToast('財務對帳已完成');closeFinanceModal();await loadFinanceLedger(true);}catch(err){alert('對帳失敗：'+err.message);}
 }
 async function quickReconcile(orderId){
+  orderId=decodeURIComponent(orderId||'');
   if(!confirm(`確認將訂單 ${orderId} 完成財務對帳？\n若仍有差異，系統會阻擋並要求進入明細處理。`))return;
   try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/reconcile`,{note:'財務中心快速對帳',force:false,operator:'finance_center'});showToast('財務對帳已完成');await loadFinanceLedger(true);}catch(err){if(String(err.message).includes('仍有財務差異'))openFinanceOrder(orderId);else alert('對帳失敗：'+err.message);}
 }
@@ -617,7 +686,7 @@ function renderCash(){
     const hold = rider.financeDispatchHold||{};
     const held = hold.active===true;
     const due = Math.max(0,Number(rider.cashDueToPlatform||0));
-    const riderPayload = encodeURIComponent(JSON.stringify(financeRiderPayload(rider)));
+    const riderPayload = encodeFinanceAttr(JSON.stringify(financeRiderPayload(rider)));
     const financeAction = held
       ? (due<=0
           ? `<button class="btn green" onclick="releaseFinanceDispatch('${riderPayload}',this)">恢復派單</button>`
@@ -626,7 +695,7 @@ function renderCash(){
           ? `<button class="btn orange" onclick="holdFinanceDispatch('${riderPayload}',${due},this)">暫停派單</button>`
           : '');
     const settleAction = orderIds.length
-      ? `<button class="btn red" onclick='settleCashBatch(${JSON.stringify(JSON.stringify(orderIds))},${JSON.stringify(rider.riderName||'此小U')},${due},this)'>確認此小U全部已回繳</button>`
+      ? `<button class="btn red" onclick="settleCashBatch('${encodeFinanceAttr(JSON.stringify(orderIds))}','${encodeFinanceAttr(rider.riderName||'此小U')}',${due},this)">確認此小U全部已回繳</button>`
       : '';
     return `<article class="rider-card cash">
       <div class="rider-head">
@@ -648,7 +717,7 @@ function renderCash(){
           <div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome)}</span></div>
           ${Number(order.stackTransferSubsidy||0)>0?`<div class="row"><span class="label">平台轉場補貼</span><span class="value">${money(order.stackTransferSubsidy)}</span></div>`:''}
           <div class="row"><span class="label">應回繳平台</span><span class="value amount-red">${money(order.cashDueToPlatform)}</span></div>
-        </div><button class="btn red small" onclick="settleCashSingle('${esc(order.id||'')}',${Number(order.cashDueToPlatform||0)},this)">確認此筆已回繳</button></div>`).join('')}
+        </div>${order.financeMoneyConflict?'<div class="finance-discrepancy">正式金額與已記錄應回繳不一致，請先前往訂單財務總帳人工對帳；此筆禁止直接回繳。</div>':`<button class="btn red small" onclick="settleCashSingle('${encodeFinanceAttr(order.id||'')}',${Number(order.cashDueToPlatform||0)},this)">確認此筆已回繳</button>`}</div>`).join('')}
       </div></details>`:''}
     </article>`;
   }).join('');
@@ -678,12 +747,14 @@ async function releaseFinanceDispatch(riderPayloadEncoded,button){
 }
 
 async function settleCashSingle(orderId,amount,button){
+  orderId=decodeURIComponent(orderId||'');
   if(!orderId) return;
   if(!confirm(`確認已收到此筆現金回繳？\n\n訂單：${orderId}\n回繳金額：${money(amount)}\n\n確認後會同步從小U應回繳金額扣除。`)) return;
   await settleCash([orderId],button);
 }
 async function settleCashBatch(orderIdsJson,riderName,amount,button){
-  let ids=[]; try{ids=JSON.parse(orderIdsJson||'[]')}catch(e){}
+  let ids=[]; try{ids=JSON.parse(decodeURIComponent(orderIdsJson||''))}catch(e){}
+  riderName=decodeURIComponent(riderName||'');
   if(!ids.length) return;
   if(!confirm(`確認已收到「${riderName}」全部現金回繳？\n\n共 ${ids.length} 筆\n回繳總額：${money(amount)}\n\n此操作會一次結清這些訂單。`)) return;
   await settleCash(ids,button);
@@ -723,18 +794,20 @@ function renderJko(){
     const ids=orders.map(o=>String(o.id||'')).filter(Boolean);
     return `<article class="rider-card jko"><div class="rider-head"><div><div class="rider-name">${esc(rider.riderName||'未設定小U姓名')}</div><div class="rider-meta">電話：${esc(rider.riderPhone||'-')}<br>識別：${esc(rider.riderId||rider.riderDocId||rider.riderLineUserId||rider.riderKey||'-')}</div></div><div class="rider-total jko"><strong>${money(rider.payoutTotal)}</strong><span>${Number(rider.orderCount||orders.length)} 筆待撥款</span></div></div>
       <div class="summary-row"><div class="summary-mini"><span>小U任務收入</span><strong>${money(rider.riderIncomeTotal)}</strong></div><div class="summary-mini"><span>小U代墊款</span><strong>${money(rider.advancePaymentTotal)}</strong></div><div class="summary-mini"><span>平台實際應撥</span><strong style="color:var(--blue)">${money(rider.payoutTotal)}</strong></div></div>
-      <div class="rider-actions"><button class="btn blue" onclick='settleJkoBatch(${JSON.stringify(JSON.stringify(ids))},${JSON.stringify(rider.riderName||'此小U')},${Number(rider.payoutTotal||0)},this)'>確認已撥給此小U全部款項</button></div>
-      <details><summary>查看 ${orders.length} 筆待撥款明細</summary><div class="order-list">${orders.map(order=>`<div class="order-card"><div class="order-top"><div class="order-no">${esc(order.orderNo||order.id||'-')}</div><span class="tag jko">${esc(order.paymentMethodLabel||'平台待撥')}</span></div><div class="rows"><div class="row"><span class="label">完成時間</span><span class="value">${esc(formatTime(order.completedAt||order.updatedAt))}</span></div><div class="row"><span class="label">款項來源</span><span class="value">${esc(order.paymentMethodLabel||order.paymentMethod||'-')}</span></div><div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome||order.riderFee)}</span></div>${Number(order.stackTransferSubsidy||0)>0?`<div class="row"><span class="label">平台轉場補貼</span><span class="value">${money(order.stackTransferSubsidy)}</span></div>`:''}<div class="row"><span class="label">小U代墊款</span><span class="value">${money(order.advancePayment)}</span></div><div class="row"><span class="label">平台應撥</span><span class="value amount-blue">${money(order.payoutTotal)}</span></div></div><button class="btn blue small" onclick="settleJkoSingle('${esc(order.id||'')}',${Number(order.payoutTotal||0)},this)">確認此筆已撥款</button></div>`).join('')}</div></details>
+      <div class="rider-actions"><button class="btn blue" onclick="settleJkoBatch('${encodeFinanceAttr(JSON.stringify(ids))}','${encodeFinanceAttr(rider.riderName||'此小U')}',${Number(rider.payoutTotal||0)},this)">確認已撥給此小U全部款項</button></div>
+      <details><summary>查看 ${orders.length} 筆待撥款明細</summary><div class="order-list">${orders.map(order=>`<div class="order-card"><div class="order-top"><div class="order-no">${esc(order.orderNo||order.id||'-')}</div><span class="tag jko">${esc(order.paymentMethodLabel||'平台待撥')}</span></div><div class="rows"><div class="row"><span class="label">完成時間</span><span class="value">${esc(formatTime(order.completedAt||order.updatedAt))}</span></div><div class="row"><span class="label">款項來源</span><span class="value">${esc(order.paymentMethodLabel||order.paymentMethod||'-')}</span></div><div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome||order.riderFee)}</span></div>${Number(order.stackTransferSubsidy||0)>0?`<div class="row"><span class="label">平台轉場補貼</span><span class="value">${money(order.stackTransferSubsidy)}</span></div>`:''}<div class="row"><span class="label">小U代墊款</span><span class="value">${money(order.advancePayment)}</span></div><div class="row"><span class="label">平台應撥</span><span class="value amount-blue">${money(order.payoutTotal)}</span></div></div><button class="btn blue small" onclick="settleJkoSingle('${encodeFinanceAttr(order.id||'')}',${Number(order.payoutTotal||0)},this)">確認此筆已撥款</button></div>`).join('')}</div></details>
     </article>`;
   }).join('');
 }
 async function settleJkoSingle(orderId,amount,button){
+  orderId=decodeURIComponent(orderId||'');
   if(!orderId)return;
   if(!confirm(`確認已經撥款給小U？\n\n訂單：${orderId}\n應撥總額：${money(amount)}\n\n此金額包含小U任務收入（含符合條件的平台轉場補貼）與代墊款。`))return;
   await settleJko([orderId],button);
 }
 async function settleJkoBatch(orderIdsJson,riderName,amount,button){
-  let ids=[];try{ids=JSON.parse(orderIdsJson||'[]')}catch(e){}
+  let ids=[];try{ids=JSON.parse(decodeURIComponent(orderIdsJson||''))}catch(e){}
+  riderName=decodeURIComponent(riderName||'');
   if(!ids.length)return;
   if(!confirm(`確認已經撥給「${riderName}」全部待撥款？\n\n共 ${ids.length} 筆\n撥款總額：${money(amount)}\n\n確認後會一次轉為已結算。`))return;
   await settleJko(ids,button);
@@ -745,35 +818,12 @@ async function settleJko(orderIds,button){
     const path=orderIds.length===1?'/api/admin/settle-order':'/api/admin/settle-orders';
     const body=orderIds.length===1?{orderId:orderIds[0],settledBy:'finance_center'}:{orderIds,settledBy:'finance_center'};
     const data=await postJson(path,body);
-    showToast(`平台撥款已確認：${data.settledOrderCount||1} 筆・${money(data.totalSettledAmount||data.settledAmount)}`);
+    showToast(`平台撥款確認 ${data.settledOrderCount||0} 筆・${money(data.totalSettledAmount)}${data.skippedOrderCount?'，'+data.skippedOrderCount+' 筆未結算':''}`);
     await Promise.all([loadSettlements(true),loadOverview(true)]);
   }catch(err){alert('確認平台撥款失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
 }
 
 
-
-function getV4AdminKey(){return String(sessionStorage.getItem('ubee_v4_admin_key')||'').trim();}
-function saveV4AdminKey(){const input=document.getElementById('v4AdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);loadV4Riders(true).catch(()=>{});}
-async function v4AdminFetch(path,options={}){const key=getV4AdminKey();if(!key)throw new Error('請先輸入 V4 管理金鑰。');const headers={...(options.headers||{}),'x-ubee-admin-key':key};if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';const res=await fetch(`${API_BASE}${path}`,{...options,headers,cache:'no-store'});return readJson(res);}
-async function loadV4Riders(showMessage=false){
-  const el=document.getElementById('v4RiderList'); if(!el)return;
-  const saved=getV4AdminKey();const input=document.getElementById('v4AdminKey');if(saved&&input&&!input.value)input.value=saved;
-  if(!saved){el.innerHTML='<div class="empty">請先輸入 V4 管理金鑰。</div>';return;}
-  el.innerHTML='<div class="empty">正在讀取小U V4 資格...</div>';
-  try{state.ridersV4=await v4AdminFetch('/api/admin/rider-v4/list?t='+Date.now());renderV4Riders();if(showMessage)showToast('V4 小U資格已更新');}catch(err){el.innerHTML=`<div class="empty">讀取失敗：${esc(err.message)}</div>`;}
-}
-function renderV4Riders(){
-  const el=document.getElementById('v4RiderList');if(!el)return;const q=normalizeSearch(document.getElementById('v4RiderSearch')?.value);let riders=Array.isArray(state.ridersV4?.riders)?state.ridersV4.riders:[];riders=riders.filter(r=>[r.name,r.phone,r.riderId,r.id].map(normalizeSearch).some(v=>v.includes(q)));
-  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的小U。</div>';return;}
-  const certLabels={basic:'L1基礎',high_value_advance:'高額代墊',cake_flower:'蛋糕花束',car_delivery:'汽車配送',business_documents:'商務文件',multi_stop:'多點配送'};
-  el.innerHTML=riders.map(r=>{const certs=r.certifications||{};const chips=Object.keys(certLabels).map(k=>`<span class="v4-cert ${certs[k]===true?'on':''}">${certs[k]===true?'✓':'○'} ${esc(certLabels[k])}</span>`).join('');return `<article class="v4-rider-card"><div class="v4-rider-top"><div><div class="rider-name">${esc(r.name||'未設定姓名')}</div><div class="rider-meta">${esc(r.phone||'-')}<br>${esc(r.riderId||r.id||'-')}</div></div><div><span class="v4-life ${esc(r.lifecycleStatus||'')}">${esc(r.lifecycleStatus||'-')}</span><div style="text-align:right;margin-top:7px;font-weight:1000">${esc(r.riderLevel||'L0')}</div></div></div><div class="summary-row"><div class="summary-mini"><span>接單資格</span><strong>${r.canAcceptOrders?'可接單':'受限'}</strong></div><div class="summary-mini"><span>警告</span><strong>${Number(r.governance?.warningCount||0)}</strong></div><div class="summary-mini"><span>測驗</span><strong>${Number(r.onboarding?.quizScore||0)}分</strong></div></div><div class="v4-cert-list">${chips}</div><div class="v4-action-grid"><button class="btn small" onclick="v4Action('${esc(r.riderId||r.id)}','warn')">警告</button><button class="btn small yellow" onclick="v4Action('${esc(r.riderId||r.id)}','retraining')">重新教育</button><button class="btn small" onclick="v4Action('${esc(r.riderId||r.id)}','restrict')">限制</button><button class="btn small red" onclick="v4Action('${esc(r.riderId||r.id)}','suspend')">暫停</button><button class="btn small blue" onclick="v4Action('${esc(r.riderId||r.id)}','restore')">恢復</button><button class="btn small" onclick="setV4Level('${esc(r.riderId||r.id)}')">等級</button><button class="btn small" onclick="setV4Cert('${esc(r.riderId||r.id)}')">認證</button></div></article>`}).join('');
-}
-async function v4Action(riderId,action){
-  let reason='';let value='';if(['warn','retraining','restrict','suspend'].includes(action)){reason=prompt('請輸入原因／說明：','')||'';if(!reason.trim())return;}if(action==='retraining'){value=prompt('指定重新教育課程代碼：','general_rules')||'general_rules';}if(action==='restore'&&!confirm('確認恢復此小U接單資格？'))return;
-  try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action,reason,value})});showToast('V4 資格已更新');await loadV4Riders();}catch(err){alert('操作失敗：'+err.message);}
-}
-async function setV4Level(riderId){const value=(prompt('設定等級：L1 / L2 / L3 / L4\nL4 需後端驗證已完成 12 堂核心教學與 80 分以上測驗。','L1')||'').toUpperCase();if(!['L1','L2','L3','L4'].includes(value))return;try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action:'set_level',value})});await loadV4Riders();showToast('等級已更新');}catch(err){alert(err.message);}}
-async function setV4Cert(riderId){const cert=prompt('認證代碼：\nhigh_value_advance\ncake_flower\ncar_delivery\nbusiness_documents\nmulti_stop','high_value_advance');if(!cert)return;const grant=confirm('按「確定」＝授予認證；按「取消」＝撤銷認證。');try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action:grant?'grant_cert':'revoke_cert',value:cert})});await loadV4Riders();showToast('認證已更新');}catch(err){alert(err.message);}}
 
 async function healthCheck(){
   const box=document.getElementById('systemStatus');
@@ -802,7 +852,8 @@ window.addEventListener('online',()=>refreshAll(true));
 window.addEventListener('offline',()=>healthCheck());
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')healthCheck();});
 
-refreshAll(false);
+financeAuthGate('正在確認此裝置的管理資格…');
+checkFinanceSession();
 </script>
 </body>
 </html>
