@@ -24351,9 +24351,94 @@ async function notifyRiderApplicationReviewUpdate(
   };
 }
 
+
+// ============================================================
+// UBee Rider Review V4.1.0 RC3 (candidate): Google account authorization
+// Keyless for review UI; legacy Rider V4 admin key middleware is unchanged
+// for other admin routes. Default-deny until config is explicitly set.
+// ============================================================
+const UBEE_REVIEW_GOOGLE_ALLOWED_EMAILS = new Set(
+  String(process.env.UBEE_RIDER_REVIEW_ADMIN_EMAILS || '')
+    .split(',').map(v => v.trim().toLowerCase()).filter(Boolean)
+);
+const UBEE_REVIEW_WEB_API_KEY = String(process.env.UBEE_RIDER_REVIEW_WEB_API_KEY || '').trim();
+const UBEE_REVIEW_AUTH_DOMAIN = String(process.env.UBEE_RIDER_REVIEW_AUTH_DOMAIN || '').trim();
+const UBEE_REVIEW_PROJECT_ID = String(process.env.FIREBASE_PROJECT_ID || '').trim();
+function ubeeReviewGoogleConfigured() {
+  return UBEE_REVIEW_GOOGLE_ALLOWED_EMAILS.size > 0 &&
+    Boolean(UBEE_REVIEW_WEB_API_KEY && UBEE_REVIEW_AUTH_DOMAIN && UBEE_REVIEW_PROJECT_ID);
+}
+function ubeeReviewNoStore(res) {
+  res.setHeader('Cache-Control', 'no-store, private');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+}
+// Public *client configuration* contains no server secret or authorized email list.
+app.get('/api/admin/rider-review/auth-config', (req, res) => {
+  ubeeReviewNoStore(res);
+  const ready = ubeeReviewGoogleConfigured();
+  return res.json({
+    success:true,
+    mode:'google',
+    ready,
+    firebaseConfig:ready ? {
+      apiKey:UBEE_REVIEW_WEB_API_KEY,
+      authDomain:UBEE_REVIEW_AUTH_DOMAIN,
+      projectId:UBEE_REVIEW_PROJECT_ID,
+    } : null,
+  });
+});
+async function requireRiderReviewGoogleAdmin(req, res, next) {
+  ubeeReviewNoStore(res);
+  // Opt-in, short-term migration only. Disabled by default. Remove after new UI is verified.
+  // This prevents existing open RC2 tabs from losing access between releases.
+  if (String(process.env.UBEE_RIDER_REVIEW_LEGACY_MIGRATION || '') === 'true') {
+    const supplied = String(req.headers['x-ubee-admin-key'] || '');
+    const expected = UBEE_RIDER_V4_ADMIN_KEY;
+    if (expected && supplied && supplied.length === expected.length &&
+        crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) {
+      req.riderReviewIdentity = {uid:'', email:'legacy-key-operator', provider:'legacy-key'};
+      return next();
+    }
+  }
+  if (!ubeeReviewGoogleConfigured()) {
+    return res.status(503).json({success:false, code:'REVIEW_AUTH_NOT_CONFIGURED',
+      message:'小U審核中心的 Google 管理員授權尚未完成設定。'});
+  }
+  const match = /^Bearer\s+([^\s]+)$/i.exec(String(req.headers.authorization || '').trim());
+  if (!match) {
+    return res.status(401).json({success:false, code:'REVIEW_LOGIN_REQUIRED',
+      message:'請使用已授權的 Google 帳號登入審核中心。'});
+  }
+  try {
+    const decoded = await admin.auth().verifyIdToken(match[1], true);
+    const email = String(decoded.email || '').trim().toLowerCase();
+    const provider = String(decoded.firebase?.sign_in_provider || '');
+    if (!email || decoded.email_verified !== true || provider !== 'google.com' ||
+        !UBEE_REVIEW_GOOGLE_ALLOWED_EMAILS.has(email)) {
+      return res.status(403).json({success:false, code:'REVIEW_ACCESS_DENIED',
+        message:'此 Google 帳號未獲授權使用小U審核中心。'});
+    }
+    req.riderReviewIdentity = {uid:String(decoded.uid || ''), email, provider:'google.com'};
+    return next();
+  } catch (error) {
+    if (error?.code === 'auth/id-token-expired' || error?.code === 'auth/id-token-revoked' ||
+        error?.code === 'auth/argument-error' || error?.code === 'auth/invalid-id-token') {
+      return res.status(401).json({success:false, code:'REVIEW_TOKEN_INVALID',
+        message:'Google 登入已過期，請重新登入。'});
+    }
+    console.error('Rider Review Google token verification failed:', error?.code || error?.message);
+    return res.status(401).json({success:false, code:'REVIEW_TOKEN_VERIFY_FAILED',
+      message:'目前無法驗證管理員身分，請稍後重試。'});
+  }
+}
+app.get('/api/admin/rider-review/me', requireRiderReviewGoogleAdmin, (req,res) => {
+  ubeeReviewNoStore(res);
+  return res.json({success:true, email:req.riderReviewIdentity.email, provider:'google.com'});
+});
+
 app.get(
   '/api/admin/rider-review/applications',
-  requireRiderV4AdminKey,
+  requireRiderReviewGoogleAdmin,
   async (req, res) => {
     try {
       const queryText = cleanText(req.query?.q || '', 100).toLowerCase();
@@ -24510,7 +24595,7 @@ app.get(
 
 app.get(
   '/api/admin/rider-review/applications/:riderId',
-  requireRiderV4AdminKey,
+  requireRiderReviewGoogleAdmin,
   async (req, res) => {
     try {
       const applicationDoc = await getRiderApplicationDocumentById(
@@ -24540,14 +24625,13 @@ app.get(
 
 app.post(
   '/api/admin/rider-review/applications/:riderId/action',
-  requireRiderV4AdminKey,
+  requireRiderReviewGoogleAdmin,
   async (req, res) => {
     try {
       const action = String(req.body?.action || '').trim().toLowerCase();
-      const operator = cleanText(
-        req.body?.operator || 'rider_review_admin',
-        100
-      );
+      const operator = req.riderReviewIdentity.provider === 'legacy-key' ?
+        cleanText(req.body?.operator || 'rider_review_admin',100) :
+        req.riderReviewIdentity.email; // Google: verified server-side identity
       const reason = cleanText(req.body?.reason || '', 1000);
       const applicationDoc = await getRiderApplicationDocumentById(
         req.params.riderId
