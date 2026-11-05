@@ -19785,6 +19785,14 @@ function dispatchConsoleV641Ms(value){
   if(typeof value==='string'){const date=Date.parse(value);return Number.isFinite(date)?date:0;}
   return 0;
 }
+function dispatchConsoleV641Amount(...values){
+  for(const v of values){
+    if(v===null||v===undefined||v==='')continue;
+    const n=Number(v);
+    if(Number.isFinite(n))return n;
+  }
+  return null; // missing != zero; UI must not invent financial values
+}
 function dispatchConsoleV641Order(doc){
   const o=doc.data()||{};
   const status=String(o.status||'');
@@ -19821,10 +19829,10 @@ function dispatchConsoleV641Order(doc){
     pickedUpAtMs:Number(o.pickedUpAtMs||0)||dispatchConsoleV641Ms(o.pickedUpAt),
     arrivedDropoffAtMs:Number(o.arrivedDropoffAtMs||0)||dispatchConsoleV641Ms(o.arrivedDropoffAt),
     completedAtMs:Number(o.completedAtMs||0)||dispatchConsoleV641Ms(o.completedAt),
-    total:Number(o.total||o.customerPayableTotal||o.finalTotal||0),
-    riderIncome:Number(o.riderIncome||o.riderFee||o.driverFee||0),
-    platformFee:Number(o.platformFee||o.platformIncome||0),
-    advancePayment:Number(o.advancePayment||o.advancePaymentAmount||0),
+    total:dispatchConsoleV641Amount(o.total,o.customerPayableTotal,o.finalTotal),
+    riderIncome:dispatchConsoleV641Amount(o.riderIncome,o.riderFee,o.driverFee),
+    platformFee:dispatchConsoleV641Amount(o.platformFee,o.platformIncome),
+    advancePayment:dispatchConsoleV641Amount(o.advancePayment,o.advancePaymentAmount),
     finance:(()=>{try{return typeof buildFinanceClosureSnapshot==='function'?buildFinanceClosureSnapshot(o):null;}catch(_){return null;}})(),
     // UI display only. Server transaction routes remain authoritative for all writes.
     actions:{
@@ -19921,7 +19929,7 @@ app.get('/api/dispatch/console/riders',async(req,res)=>{
       const healthReason=busy?'目前有進行中訂單':p.liveForeground?'前景在線':p.backgroundReachable?'背景可接收 Push':p.declaredOnline?'宣告在線，但目前不可達':'離線或暫停接單';
       return {riderId:id,riderDocId:d.id,name:String(r.name||r.riderName||''),phone:String(r.phone||''),district:String(r.district||r.cityDistrict||''),serviceArea:String(r.serviceArea||r.area||''),
         declaredOnline:p.declaredOnline===true,online,liveForeground:p.liveForeground===true,backgroundReachable:p.backgroundReachable===true,
-        acceptingOrders:online&&!busy,busy,currentOrderId:task,healthOrderId:task,
+        acceptingOrders:online&&!busy&&r.acceptingOrders!==false,busy,currentOrderId:task,healthOrderId:task,
         locationUpdatedAtMs,locationAgeMs:locationUpdatedAtMs?Math.max(0,now-locationUpdatedAtMs):null,
         lastActiveAtMs,connectionState,healthReason};
     }).filter(Boolean);
