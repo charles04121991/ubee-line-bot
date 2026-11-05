@@ -19755,6 +19755,195 @@ app.use('/api/dispatch',verifyDispatchAdminV6);
 app.get('/api/dispatch/auth/check',(req,res)=>res.json({success:true,authenticated:true,version:'V6.0.1'}));
 
 // ============================================================
+// UBee Dispatch V6.4.1 RC2: 專用只讀清單 API（已受上方 verifyDispatchAdminV6 保護）
+// 目的：避免舊 dashboard 最近 800 筆 / 前 150 筆即時單的截斷；
+// 不改寫訂單、騎士、財務、派單或狀態流轉；不建立第二套派單邏輯。
+// 僅提供前端分類及安全顯示提示，正式操作一律交由原有交易 API 決定。
+// ============================================================
+const UBEE_DISPATCH_CONSOLE_V641_STATUS = Object.freeze({
+  waiting:Object.freeze(['pending_dispatch','pending','waiting','searching','dispatching','redispatching']),
+  pickup:Object.freeze(['accepted','going_to_pickup','heading_to_pickup','arrived_pickup']),
+  delivery:Object.freeze(['picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff','queued','delivering','in_delivery','in_progress']),
+});
+const UBEE_DISPATCH_CONSOLE_V641_LIVE = Object.freeze([
+  ...UBEE_DISPATCH_CONSOLE_V641_STATUS.waiting,
+  ...UBEE_DISPATCH_CONSOLE_V641_STATUS.pickup,
+  ...UBEE_DISPATCH_CONSOLE_V641_STATUS.delivery,
+]);
+function dispatchConsoleV641Bucket(status){
+  const key=String(status||'').trim().toLowerCase();
+  for(const [bucket,statuses] of Object.entries(UBEE_DISPATCH_CONSOLE_V641_STATUS)){
+    if(statuses.includes(key))return bucket;
+  }
+  return ['completed','done'].includes(key)?'completed':
+    ['cancelled','canceled','failed','void'].includes(key)?'cancelled':'other';
+}
+function dispatchConsoleV641Ms(value){
+  if(typeof value==='number')return Number.isFinite(value)?value:0;
+  if(value && typeof value.toMillis==='function')return value.toMillis();
+  if(value && typeof value.seconds==='number')return value.seconds*1000;
+  if(typeof value==='string'){const date=Date.parse(value);return Number.isFinite(date)?date:0;}
+  return 0;
+}
+function dispatchConsoleV641Order(doc){
+  const o=doc.data()||{};
+  const status=String(o.status||'');
+  return {
+    id:doc.id,orderNo:String(o.orderNo||doc.id),status,
+    bucket:dispatchConsoleV641Bucket(status),
+    statusLabel:(()=>{try{return typeof getStatusLabel==='function'?getStatusLabel(status):status;}catch(_){return status;}})(),
+    serviceType:String(o.serviceType||o.serviceCategory||''),
+    serviceCategory:String(o.serviceCategory||''),
+    pickupAddress:String(o.pickupAddress||o.fromAddress||''),
+    dropoffAddress:String(o.dropoffAddress||o.toAddress||''),
+    pickupDistrict:String(o.pickupDistrict||''),
+    customerName:String(o.customerName||o.contactName||''),
+    customerPhone:String(o.customerPhone||o.contactPhone||''),
+    riderName:String(o.riderName||o.driverName||''),
+    riderId:String(o.riderId||''),riderDocId:String(o.riderDocId||''),
+    note:String(o.note||''),
+    item:String(o.item||''),
+    taskDetails:o.taskDetails&&typeof o.taskDetails==='object'?o.taskDetails:{},
+    taskExecutionReady:o.taskExecutionReady===true,
+    taskExecutionMissing:Array.isArray(o.taskExecutionMissing)?o.taskExecutionMissing.slice(0,30):[],
+    taskExecutionReport:o.taskExecutionReport&&typeof o.taskExecutionReport==='object'?o.taskExecutionReport:{},
+    arrivalProofs:o.arrivalProofs&&typeof o.arrivalProofs==='object'?o.arrivalProofs:{},
+    deliveryStops:Array.isArray(o.deliveryStops)?o.deliveryStops.slice(0,30).map(s=>({
+      dropoffAddress:String(s.dropoffAddress||s.address||''),
+      customerName:String(s.customerName||s.receiverName||''),
+      status:String(s.status||''),index:Number(s.index||0),
+      arrivedAtMs:Number(s.arrivedAtMs||0),completedAtMs:Number(s.completedAtMs||0)
+    })):[],
+    riderLocationUpdatedAtMs:Number(o.riderLocationUpdatedAtMs||0),
+    createdAtMs:Number(o.createdAtMs||0)||dispatchConsoleV641Ms(o.createdAt),
+    acceptedAtMs:Number(o.acceptedAtMs||0)||dispatchConsoleV641Ms(o.acceptedAt),
+    arrivedPickupAtMs:Number(o.arrivedPickupAtMs||0)||dispatchConsoleV641Ms(o.arrivedPickupAt),
+    pickedUpAtMs:Number(o.pickedUpAtMs||0)||dispatchConsoleV641Ms(o.pickedUpAt),
+    arrivedDropoffAtMs:Number(o.arrivedDropoffAtMs||0)||dispatchConsoleV641Ms(o.arrivedDropoffAt),
+    completedAtMs:Number(o.completedAtMs||0)||dispatchConsoleV641Ms(o.completedAt),
+    total:Number(o.total||o.customerPayableTotal||o.finalTotal||0),
+    riderIncome:Number(o.riderIncome||o.riderFee||o.driverFee||0),
+    platformFee:Number(o.platformFee||o.platformIncome||0),
+    advancePayment:Number(o.advancePayment||o.advancePaymentAmount||0),
+    finance:(()=>{try{return typeof buildFinanceClosureSnapshot==='function'?buildFinanceClosureSnapshot(o):null;}catch(_){return null;}})(),
+    // UI display only. Server transaction routes remain authoritative for all writes.
+    actions:{
+      assign:status==='pending_dispatch',
+      redispatch:status==='pending_dispatch',
+      unassign:['accepted','going_to_pickup','heading_to_pickup'].includes(status),
+      recover:['accepted','going_to_pickup','heading_to_pickup'].includes(status),
+    }
+  };
+}
+app.get('/api/dispatch/console/orders',async(req,res)=>{
+  try{
+    // Firestore status IN 單欄查詢，避免既有 dashboard 按近期單裁切。
+    // 上限具明確 partial 標記，不能誤報所有即時單都已讀完。
+    const limit=1200;
+    const snap=await db.collection('orders').where('status','in',UBEE_DISPATCH_CONSOLE_V641_LIVE).limit(limit).get();
+    const rows=snap.docs.map(dispatchConsoleV641Order)
+      .sort((a,b)=>(b.createdAtMs||0)-(a.createdAtMs||0));
+    res.setHeader('Cache-Control','no-store, private');
+    res.json({success:true,version:'V6.4.1',generatedAtMs:Date.now(),
+      orders:rows,partial:snap.size===limit,limit,
+      message:snap.size===limit?'結果達單次讀取上限，可能尚有未列出的進行中訂單。':''});
+  }catch(error){console.error('Dispatch console live list:',error?.message||error);
+    res.status(500).json({success:false,message:'調度即時訂單查詢失敗，請保留舊版並查看 Render 日誌。'});}
+});
+// 所有記錄依 Firestore 文件識別碼排序分頁：不依賴 createdAt，兼容早期缺少日期的訂單。
+app.get('/api/dispatch/console/history',async(req,res)=>{
+  try{
+    const size=Math.min(50,Math.max(10,Number.parseInt(req.query.limit,10)||40));
+    const cursor=String(req.query.cursor||'').trim();
+    if(cursor&&!/^[A-Za-z0-9_-]{1,120}$/.test(cursor))return res.status(400).json({success:false,message:'分頁游標格式錯誤。'});
+    let query=db.collection('orders').orderBy(admin.firestore.FieldPath.documentId()).limit(size+1);
+    if(cursor)query=query.startAfter(cursor);
+    const snap=await query.get();const more=snap.size>size;
+    const docs=snap.docs.slice(0,size);
+    res.setHeader('Cache-Control','no-store, private');
+    res.json({success:true,items:docs.map(dispatchConsoleV641Order),
+      nextCursor:more&&docs.length?docs[docs.length-1].id:null,
+      sort:'document_id_ascending',generatedAtMs:Date.now()});
+  }catch(error){console.error('Dispatch console history:',error?.message||error);
+    res.status(500).json({success:false,message:'歷史訂單查詢失敗。'});}
+});
+app.get('/api/dispatch/console/order/:orderId',async(req,res)=>{
+  const id=String(req.params.orderId||'').trim();
+  if(!/^[A-Za-z0-9_-]{1,120}$/.test(id))return res.status(400).json({success:false,message:'訂單編號格式錯誤。'});
+  try{let doc=await db.collection('orders').doc(id).get();
+    if(!doc.exists&&id!==id.toUpperCase())doc=await db.collection('orders').doc(id.toUpperCase()).get();
+    if(!doc.exists)return res.status(404).json({success:false,message:'找不到該訂單。'});
+    res.setHeader('Cache-Control','no-store, private');
+    res.json({success:true,order:dispatchConsoleV641Order(doc)});
+  }catch(error){console.error('Dispatch console order:',error?.message||error);
+    res.status(500).json({success:false,message:'訂單查詢失敗。'});}
+});
+
+
+// ============================================================
+
+// UBee Dispatch V6.4.1 RC2: 簡化小U讀取，避免新版前端執行舊控制塔預測。
+// 使用既有 Rider Presence V2 為在線真相來源，任務中只依有效訂單歸屬判定。
+app.get('/api/dispatch/console/riders',async(req,res)=>{
+  try{
+    const now=Date.now();
+    const [riderSnap,presenceSnap,locationSnap,taskSnap]=await Promise.all([
+      db.collection(RIDER_V2_COLLECTIONS.riders).limit(5000).get(),
+      db.collection(RIDER_V2_COLLECTIONS.presence).limit(5000).get(),
+      db.collection(RIDER_V2_COLLECTIONS.locations).limit(5000).get(),
+      db.collection('orders').where('status','in',[
+        ...UBEE_DISPATCH_CONSOLE_V641_STATUS.pickup,
+        ...UBEE_DISPATCH_CONSOLE_V641_STATUS.delivery,
+      ]).limit(2000).get(),
+    ]);
+    const presence=new Map(presenceSnap.docs.map(d=>[d.id,d.data()||{}]));
+    const locations=new Map(locationSnap.docs.map(d=>[d.id,d.data()||{}]));
+    const assigned=new Map();
+    for(const d of taskSnap.docs){
+      const o=d.data()||{};
+      for(const k of [o.riderDocId,o.riderId,o.riderPhone]){
+        const key=String(k||'').trim().toLowerCase();
+        if(key)assigned.set(key,d.id);
+      }
+    }
+    const riders=riderSnap.docs.map(d=>{
+      const master=d.data()||{};
+      const r={...master,...(locations.get(d.id)||{}),...(presence.get(d.id)||{})};
+      if(!(r.approved===true||String(r.status||'').toLowerCase()==='approved'))return null;
+      const p=getRiderPresenceV2(r,now);
+      const id=String(r.riderId||d.id);
+      const task=[d.id,id,r.phone].map(x=>assigned.get(String(x||'').trim().toLowerCase())).find(Boolean)||'';
+      const busy=Boolean(task);
+      const online=p.reachableForDispatch===true;
+      const locationUpdatedAtMs=Number(r.locationUpdatedAtMs||0)||dispatchConsoleV641Ms(r.locationUpdatedAt)||dispatchConsoleV641Ms(r.currentLocation?.updatedAt);
+      const lastActiveAtMs=Number(r.lastActiveMs||r.onlineUpdatedAtMs||0)||dispatchConsoleV641Ms(r.lastActive)||dispatchConsoleV641Ms(r.onlineUpdatedAt);
+      const connectionState=p.liveForeground?'LIVE':p.backgroundReachable?'BACKGROUND_PUSH':lastActiveAtMs?'STALE':'UNKNOWN';
+      const healthReason=busy?'目前有進行中訂單':p.liveForeground?'前景在線':p.backgroundReachable?'背景可接收 Push':p.declaredOnline?'宣告在線，但目前不可達':'離線或暫停接單';
+      return {riderId:id,riderDocId:d.id,name:String(r.name||r.riderName||''),phone:String(r.phone||''),district:String(r.district||r.cityDistrict||''),serviceArea:String(r.serviceArea||r.area||''),
+        declaredOnline:p.declaredOnline===true,online,liveForeground:p.liveForeground===true,backgroundReachable:p.backgroundReachable===true,
+        acceptingOrders:online&&!busy,busy,currentOrderId:task,healthOrderId:task,
+        locationUpdatedAtMs,locationAgeMs:locationUpdatedAtMs?Math.max(0,now-locationUpdatedAtMs):null,
+        lastActiveAtMs,connectionState,healthReason};
+    }).filter(Boolean);
+    const partial=taskSnap.size===2000||riderSnap.size===5000||presenceSnap.size===5000||locationSnap.size===5000;
+    res.setHeader('Cache-Control','no-store, private');
+    res.json({success:true,riders,generatedAtMs:now,partial,
+      message:partial?'資料已達讀取上限，請檢查是否有未顯示的小U或任務。':''});
+  }catch(error){console.error('Dispatch console riders:',error?.message||error);
+    res.status(500).json({success:false,message:'小U狀態讀取失敗。'});}
+});
+app.get('/api/dispatch/console/incidents',async(req,res)=>{
+  try{
+    const snap=await db.collection('dispatchIncidents').limit(500).get();
+    const incidents=snap.docs.map(serializeDispatchIncident)
+      .sort((a,b)=>(b.updatedAtMs||0)-(a.updatedAtMs||0));
+    res.setHeader('Cache-Control','no-store, private');
+    res.json({success:true,incidents,partial:snap.size===500,generatedAtMs:Date.now(),
+      incidentTypes:Object.entries(UBEE_DISPATCH_INCIDENT_TYPES).map(([value,meta])=>({value,label:meta.label,defaultSeverity:meta.defaultSeverity}))});
+  }catch(error){console.error('Dispatch console incidents:',error?.message||error);
+    res.status(500).json({success:false,message:'異常案件讀取失敗。'});}
+});
+
 // UBee 調度中心：即時監控 Dashboard API
 // 僅恢復調度中心讀取資料，不修改派單／接單／財務核心流程。
 // 必須放在 express.static(...) 之前。
