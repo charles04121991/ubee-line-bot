@@ -22644,16 +22644,16 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    if (
-      String(lineId || '').trim() &&
-      (
-        String(lineId || '').trim().length < 2 ||
-        String(lineId || '').trim().length > 60
-      )
-    ) {
+    // Financial Eligibility V1 / Mandatory Application: enforce mandatory LINE ID only
+    // on the native nine-step application contract, leaving older shared clients intact.
+    const isNativeRequiredApplication = String(applicationSource || '').trim() === 'rider_web_native_onboarding_v1_9_step';
+    const normalizedLineId = String(lineId || '').trim();
+    if ((isNativeRequiredApplication && !normalizedLineId) ||
+        (normalizedLineId && (normalizedLineId.length < 2 || normalizedLineId.length > 60))) {
       return res.status(400).json({
         success: false,
-        message: 'LINE ID 長度不正確，請重新確認。',
+        code: 'RIDER_APPLICATION_LINE_ID_REQUIRED',
+        message: '請填寫有效 LINE ID（2～60 字）；小U申請資料均為必填。',
       });
     }
 
@@ -22745,7 +22745,9 @@ app.post('/api/rider/register', async (req, res) => {
     }
     const warningAccountReconfirmedValid = confirmationV1 && warningAccountReconfirmed === true;
     const declarationComplete = declarationV1 && photoAuthenticityDeclared === true && ['YES','NO'].includes(warningAccountValue);
-    const declarationManualReview = !declarationComplete || !warningAccountReconfirmedValid || warningAccountValue === 'YES';
+    const financialAutoRejected = warningAccountValue === 'YES';
+    const declarationManualReview = !declarationComplete || !warningAccountReconfirmedValid;
+    const financialAutoRejectReason = '依據本次自行申報之銀行／郵局警示帳戶狀態，目前不符合 UBee 小U申請資格。若日後警示帳戶已正式解除，請聯繫 UBee 提供相關證明申請重新審查。';
 
     const riderId = cleanPhone;
     const resolvedGrowthReferral = referralCode
@@ -22832,13 +22834,17 @@ app.post('/api/rider/register', async (req, res) => {
         warningAccountStatus: declarationComplete ? warningAccountValue : 'UNKNOWN',
         verificationStatus: 'self_declared_not_verified',
         declarationVersion: declarationV1 ? 'rider-application-declarations-v1' : 'legacy-missing',
-        reviewStatus: declarationManualReview ? 'manual_review_required' : 'pending',
+        reviewStatus: financialAutoRejected ? 'ineligible_self_declared' : (declarationManualReview ? 'manual_review_required' : 'pending'),
+        eligibilityStatus: financialAutoRejected ? 'ineligible' : 'eligible_for_review',
+        clearanceVerified: false,
         declaredAtMs: declarationComplete ? nowMs : null,
         reconfirmed: warningAccountReconfirmedValid,
         confirmationVersion: confirmationV1 ? 'warning-account-confirm-v1' : 'legacy-no-reconfirmation',
         reconfirmedAtMs: warningAccountReconfirmedValid ? nowMs : null,
       },
-      applicationDeclarationReviewRequired: declarationManualReview,
+      applicationDeclarationReviewRequired: !financialAutoRejected && declarationManualReview,
+      financialEligibilityAutoRejected: financialAutoRejected,
+      financialEligibilityRuleVersion: 'financial-eligibility-v1',
 
       documents: documentValidation.documents,
       requiredDocumentKeys,
@@ -22850,9 +22856,14 @@ app.post('/api/rider/register', async (req, res) => {
       documentReviewStatus: 'pending',
 
       approved: false,
-      status: 'submitted',
-      reviewStatus: 'under_review',
-      lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+      status: financialAutoRejected ? 'rejected' : 'submitted',
+      reviewStatus: financialAutoRejected ? 'rejected' : 'under_review',
+      lifecycleStatus: financialAutoRejected ? RIDER_V4_LIFECYCLE.REJECTED : RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+      rejectionReason: financialAutoRejected ? financialAutoRejectReason : '',
+      rejectionCode: financialAutoRejected ? 'FINANCIAL_WARNING_ACCOUNT_SELF_DECLARED' : '',
+      rejectedBy: financialAutoRejected ? 'system_financial_eligibility_v1' : '',
+      rejectedAt: financialAutoRejected ? admin.firestore.FieldValue.serverTimestamp() : null,
+      rejectedAtMs: financialAutoRejected ? nowMs : null,
       canAcceptOrders: false,
       riderLevel: 'L0',
       onboardingRequired: true,
@@ -22891,7 +22902,7 @@ app.post('/api/rider/register', async (req, res) => {
       ),
 
       adminNotifySent: false,
-      adminNotifyStatus: 'pending',
+      adminNotifyStatus: financialAutoRejected ? 'skipped_auto_rejected' : 'pending',
 
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -22929,7 +22940,7 @@ app.post('/api/rider/register', async (req, res) => {
           application: oldData,
           message:
             oldStatus === 'rejected'
-              ? '此手機號碼的新版申請曾被拒絕，請聯繫 UBee 辦公室協助處理。'
+              ? '此手機號碼的新版申請未通過，請聯繫 UBee 確認重新審查資格。'
               : oldStatus === 'training' || oldStatus === 'approved'
                 ? '此手機號碼已通過新版小U審核。'
                 : '此手機號碼已送出新版申請，請等待 UBee 審核。',
@@ -22984,6 +22995,8 @@ app.post('/api/rider/register', async (req, res) => {
         alreadyExists: true,
         riderId: duplicatePayload.riderId,
         status: duplicatePayload.status,
+        autoRejected: duplicatePayload.application?.financialEligibilityAutoRejected === true,
+        rejectionCode: String(duplicatePayload.application?.rejectionCode || ''),
         collection: RIDER_V2_COLLECTIONS.applications,
         applicationCollection: RIDER_V2_COLLECTIONS.applications,
         adminNotifySent: duplicateNotifySent,
@@ -23000,6 +23013,34 @@ app.post('/api/rider/register', async (req, res) => {
       applicationCollection: RIDER_V2_COLLECTIONS.applications,
       documentsComplete: true,
     });
+
+    // YES: persist applicant record and immediate rejection; no human review-group queue.
+    if (financialAutoRejected) {
+      try {
+        await writeRiderApplicationReviewEvent({
+          application, type:'reject', operator:'system_financial_eligibility_v1',
+          reason:financialAutoRejectReason,
+          metadata:{ automatic:true, code:'FINANCIAL_WARNING_ACCOUNT_SELF_DECLARED' },
+        });
+      } catch (eventError) {
+        console.warn('⚠️ 自動資格判定稽核事件寫入失敗：', eventError?.message || eventError);
+      }
+      try {
+        await notifyRiderApplicationReviewUpdate(application, 'rejected', financialAutoRejectReason, { automatic:true, rule:'financial-eligibility-v1' });
+      } catch (notifyError) {
+        console.warn('⚠️ 自動未通過通知寫入失敗：', notifyError?.message || notifyError);
+      }
+      return res.json({
+        success:true, riderId,
+        status:'rejected', reviewStatus:'rejected',
+        autoRejected:true, rejectionCode:'FINANCIAL_WARNING_ACCOUNT_SELF_DECLARED',
+        collection:RIDER_V2_COLLECTIONS.applications,
+        applicationCollection:RIDER_V2_COLLECTIONS.applications,
+        officialRiderCreated:false,
+        adminNotifySent:false, adminNotifyStatus:'skipped_auto_rejected',
+        message:financialAutoRejectReason,
+      });
+    }
 
     const notifyResult = await pushRiderReviewToAdminGroupWithRetry({
       ...application,
@@ -24801,6 +24842,14 @@ app.post(
       }
 
       if (action === 'approve') {
+        // The sole financial eligibility hard lock; applies to old/new and reopened records.
+        if (String(application.financialRiskDeclaration?.warningAccountStatus || '').toUpperCase() === 'YES' &&
+            application.financialRiskDeclaration?.clearanceVerified !== true) {
+          return res.status(409).json({
+            success:false, code:'RIDER_FINANCIAL_WARNING_ACCOUNT_INELIGIBLE',
+            message:'申請人自述警示帳戶尚未有正式解除查證紀錄，禁止核准或建立正式小U資格。',
+          });
+        }
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
             success: false,
@@ -25163,8 +25212,29 @@ app.post(
           });
         }
 
+        // A previously declared YES remains recorded; admin must explicitly attest
+        // that the official warning status is now cleared and document the evidence.
+        const financialWarningYes = String(application.financialRiskDeclaration?.warningAccountStatus || '').toUpperCase() === 'YES';
+        const financialClearanceEvidence = cleanText(req.body?.financialClearanceEvidence || '', 500);
+        if (financialWarningYes &&
+            (req.body?.financialClearanceVerified !== true || !financialClearanceEvidence || !reason)) {
+          return res.status(409).json({
+            success:false, code:'RIDER_FINANCIAL_CLEARANCE_EVIDENCE_REQUIRED',
+            message:'此申請曾自述警示帳戶。重新開啟前，管理員必須確認正式解除、填寫證明摘要與重新審查原因。',
+          });
+        }
+
         await applicationDoc.ref.set(
           {
+            ...(financialWarningYes ? {
+              'financialRiskDeclaration.clearanceVerified': true,
+              'financialRiskDeclaration.reviewStatus': 'cleared_verified',
+              'financialRiskDeclaration.eligibilityStatus': 'eligible_for_review',
+              'financialRiskDeclaration.clearanceEvidenceSummary': financialClearanceEvidence,
+              'financialRiskDeclaration.clearanceVerifiedBy': operator,
+              'financialRiskDeclaration.clearanceVerifiedAtMs': nowMs,
+              financialEligibilityAutoRejected: false,
+            } : {}),
             status: 'under_review',
             reviewStatus: 'under_review',
             lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
@@ -25186,6 +25256,8 @@ app.post(
           application: freshApplication,
           type: 'reopen',
           operator,
+          reason,
+          metadata:{ financialClearanceVerified: financialWarningYes, financialClearanceEvidenceSummary:financialClearanceEvidence },
         });
         await notifyRiderApplicationReviewUpdate(
           freshApplication,
