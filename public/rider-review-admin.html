@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee 小U申請審核管理 V4.1.0 — Native Rider Review Console RC3</title>
+<title>UBee 小U申請審核管理 V4.1.0 — Trusted Device Review Console RC4</title>
 <meta name="theme-color" content="#171e2b" />
 <style>
 :root{--bg:#f4f6f8;--card:#fff;--text:#111827;--muted:#6b7280;--line:rgba(15,23,42,.10);--yellow:#facc15;--yellow-deep:#eab308;--green:#16a34a;--blue:#2563eb;--orange:#f97316;--red:#dc2626;--shadow:0 18px 50px rgba(15,23,42,.10)}
@@ -19,7 +19,7 @@
 @media(max-width:700px){.topbar{padding:10px 12px}.brand-subtitle,.operator-pill{display:none}.top-actions .btn:first-of-type{display:none}.application-list{grid-template-columns:1fr}.detail{padding:12px}.hero{padding:17px}.hero-title{font-size:25px}.hero-meta,.info-grid,.verification-summary,.documents,.batch-grid{grid-template-columns:1fr}.sticky-inner{grid-template-columns:1fr 1fr}.sticky-note{grid-column:1/-1}}
 
 
-/* V4.1.0 RC3: Native Review Workspace UI - no backend, API, or review rules touched. */
+/* V4.1.0 RC4: Native Review Workspace UI - no backend, API, or review rules touched. */
 :root{
   --bg:#f2f4f8;--card:#ffffff;--text:#172033;--muted:#66758a;
   --line:#e4e9f0;--yellow:#facc15;--yellow-deep:#d7a900;
@@ -149,7 +149,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 </style>
 </head>
 <body>
-<header class="topbar"><div class="brand"><div class="brand-mark">U</div><div><div class="brand-title">UBee Rider Review <span class="brand-title-sub">｜小U申請審核管理</span></div><div class="brand-subtitle">Rider Qualification &amp; Document Operations</div></div><span class="version-tag">RC3 · KEYLESS REVIEW</span></div><div class="top-actions"><div class="operator-pill" id="operatorPill">尚未登入</div><button class="btn ghost" id="refreshButton" onclick="loadApplications()">重新整理</button><button class="btn ghost" onclick="logoutAdmin()">登出</button></div></header>
+<header class="topbar"><div class="brand"><div class="brand-mark">U</div><div><div class="brand-title">UBee Rider Review <span class="brand-title-sub">｜小U申請審核管理</span></div><div class="brand-subtitle">Rider Qualification &amp; Document Operations</div></div><span class="version-tag">RC4 · TRUSTED DEVICE</span></div><div class="top-actions"><div class="operator-pill" id="operatorPill">裝置驗證中</div><button class="btn ghost" id="refreshButton" onclick="loadApplications()">重新整理</button></div></header>
 <div class="mobile-switchbar" aria-label="手機版工作區切換"><button id="mobileListTab" type="button" class="active" onclick="showReviewPane('list')" aria-pressed="true">案件列表</button><button id="mobileDetailTab" type="button" onclick="showReviewPane('detail')" aria-pressed="false">審核詳情</button></div>
 <main class="layout" id="mainLayout"><nav class="console-rail" aria-label="小U資格審核導覽">
 <div class="rail-brand"><span class="rail-brand-mark">U</span><span class="rail-brand-label">Review Workspace</span></div>
@@ -161,51 +161,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <div class="rail-divider"></div><div class="rail-kicker">監控與紀錄</div>
 <button class="rail-link" data-filter="risk" type="button" onclick="reviewNavigate('risk')" title="有風險"><span class="rail-icon" aria-hidden="true">⚑</span><span class="rail-label">風險待處理</span></button>
 <button class="rail-link" data-filter="rejected" type="button" onclick="reviewNavigate('rejected')" title="已拒絕"><span class="rail-icon" aria-hidden="true">⊘</span><span class="rail-label">已拒絕案件</span></button>
-<div class="rail-foot">UBee · Internal Operations<br>資料與權限以現行後端為準<br>V4.1.0 RC3 · UI Candidate</div></nav><aside class="sidebar"><div class="queue-heading"><div><div class="queue-title">案件審核佇列</div><div class="queue-caption">查詢申請者、審核驗證與補件進度</div></div><span class="queue-live">LIVE DATA</span></div><div class="sidebar-head"><div class="search-row"><input class="input" id="searchInput" placeholder="搜尋姓名、手機、地區或車牌" onkeydown="handleSearchKey(event)"><button class="btn primary" onclick="loadApplications()">搜尋</button></div><div class="stats-grid" id="statsGrid"></div><div class="queue-filter-label"><span>審核狀態</span><span>快速篩選</span></div><div class="filter-tabs"><button class="filter-tab active" onclick="setStatusFilter('all',this)">全部</button><button class="filter-tab" onclick="setStatusFilter('pending',this)">待審核</button><button class="filter-tab" onclick="setStatusFilter('needs_supplement',this)">待補件</button><button class="filter-tab" onclick="setStatusFilter('approved',this)">已通過</button><button class="filter-tab" onclick="setStatusFilter('rejected',this)">已拒絕</button><button class="filter-tab" onclick="setLocalRiskFilter(this)">有風險</button></div><div class="count-line" id="countLine">尚未載入申請資料</div></div><div class="application-list" id="applicationList"></div></aside><section class="detail" id="detailPanel"><div class="empty-state"><div><div class="empty-icon">▤</div><div style="font-size:22px;font-weight:1000;color:#111827">選擇案件，開始審核</div><div style="margin-top:8px;line-height:1.65;font-weight:700">查看小U大頭照、申請資料、三大驗證、風險與審核紀錄。</div></div></div></section></main>
-<div class="login-overlay" id="loginOverlay"><form class="login-card" onsubmit="loginAdmin(event)"><div class="login-mark">U</div><div class="login-title">進入小U審核管理</div><div class="login-copy">請使用已授權的 Google 管理員帳號登入。首次登入後，瀏覽器可保留登入狀態，不必再輸入管理金鑰。</div><div class="login-fields"><button class="btn primary" id="loginButton" type="submit">使用 Google 帳號登入</button></div><div id="loginMessage"></div></form></div><div class="toast hidden" id="toast"></div>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<div class="rail-foot">UBee · Internal Operations<br>資料與權限以現行後端為準<br>V4.1.0 RC4 · UI Candidate</div></nav><aside class="sidebar"><div class="queue-heading"><div><div class="queue-title">案件審核佇列</div><div class="queue-caption">查詢申請者、審核驗證與補件進度</div></div><span class="queue-live">LIVE DATA</span></div><div class="sidebar-head"><div class="search-row"><input class="input" id="searchInput" placeholder="搜尋姓名、手機、地區或車牌" onkeydown="handleSearchKey(event)"><button class="btn primary" onclick="loadApplications()">搜尋</button></div><div class="stats-grid" id="statsGrid"></div><div class="queue-filter-label"><span>審核狀態</span><span>快速篩選</span></div><div class="filter-tabs"><button class="filter-tab active" onclick="setStatusFilter('all',this)">全部</button><button class="filter-tab" onclick="setStatusFilter('pending',this)">待審核</button><button class="filter-tab" onclick="setStatusFilter('needs_supplement',this)">待補件</button><button class="filter-tab" onclick="setStatusFilter('approved',this)">已通過</button><button class="filter-tab" onclick="setStatusFilter('rejected',this)">已拒絕</button><button class="filter-tab" onclick="setLocalRiskFilter(this)">有風險</button></div><div class="count-line" id="countLine">尚未載入申請資料</div></div><div class="application-list" id="applicationList"></div></aside><section class="detail" id="detailPanel"><div class="empty-state"><div><div class="empty-icon">▤</div><div style="font-size:22px;font-weight:1000;color:#111827">選擇案件，開始審核</div><div style="margin-top:8px;line-height:1.65;font-weight:700">查看小U大頭照、申請資料、三大驗證、風險與審核紀錄。</div></div></div></section></main>
+<div class="toast hidden" id="toast"></div>
 <script>
-const API_BASE=location.protocol.startsWith('http')?location.origin:'https://ubee-line-bot-2-zezw.onrender.com';
-const STORAGE_KEY='ubee_rider_review_admin_key',OPERATOR_KEY='ubee_rider_review_operator';
-let reviewFirebaseAuth=null, reviewAuthSerial=0;
-// RC4-HF1: 既有版本曾持久保存管理密碼，不再載入，並於啟動時移除。
-localStorage.removeItem(STORAGE_KEY);
-sessionStorage.removeItem(STORAGE_KEY); // retire old admin-key client storage
+const API_BASE=location.origin;
+// RC4: no browser-managed admin key or interactive login. Cloudflare device policy supplies identity.
 const STATUS_LABELS={submitted:'已送出',pending:'待審核',under_review:'審核中',needs_supplement:'待補件',approved:'已通過',training:'數位入職',active:'已開通',rejected:'已拒絕'};
 const DOCUMENT_STATUS_LABELS={pending:'審核中',approved:'已通過',needs_supplement:'需要補件'};
 const GROUP_STATUS_LABELS={pending:'審核中',approved:'已通過',needs_supplement:'需要補件',not_required:'不適用'};
 const EVENT_LABELS={mark_profile_photo:'大頭照個別審核',mark_document:'更新文件狀態',approve_group:'整組驗證通過',request_supplement:'要求補件',approve_all:'確認所有驗證並通過',approve:'通過申請',credential_maintenance_approved:'證件複審完成並恢復資格',reject:'拒絕申請',reopen:'重新開啟',save_review_note:'儲存審核備註',supplement_submitted:'申請者已補件'};
 const SUPPLEMENT_REASONS=['照片模糊','證件反光','證件四角不完整','資料與申請內容不符','證件已過期','強制險已過期','車牌資料不一致','需要重新拍攝','其他原因'];
-let operatorName='',statusFilter='all',localRiskOnly=false,applications=[],selectedRiderId='',selectedApplication=null,detailRequestSerial=0,reviewActionBusy=false,applicationListRequestSerial=0;
+let operatorName='trusted_device',statusFilter='all',localRiskOnly=false,applications=[],selectedRiderId='',selectedApplication=null,detailRequestSerial=0,reviewActionBusy=false,applicationListRequestSerial=0;
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function formatDateTime(v){const ms=Number(v||0);if(!ms)return'尚未記錄';try{return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ms));}catch(_){return new Date(ms).toLocaleString('zh-TW');}}
-async function getAdminHeaders(json=false){if(!reviewFirebaseAuth?.currentUser)throw new Error('尚未完成管理員登入。');const token=await reviewFirebaseAuth.currentUser.getIdToken();const h={'Authorization':`Bearer ${token}`};if(json)h['Content-Type']='application/json';return h;}
-async function apiFetch(path,options={}){const response=await fetch(`${API_BASE}${path}`,{cache:'no-store',...options,headers:{...(await getAdminHeaders(Boolean(options.body))),...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false){const e=new Error(data.message||`HTTP ${response.status}`);e.status=response.status;throw e;}return data;}
-function setLoading(v){document.getElementById('mainLayout')?.classList.toggle('loading',v);document.getElementById('refreshButton').disabled=v;}function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>t.classList.add('hidden'),3500);}function showLoginMessage(m,type='error'){document.getElementById('loginMessage').innerHTML=m?`<div class="message ${escapeHtml(type)}" style="margin-top:12px">${escapeHtml(m)}</div>`:'';}
-async function loginAdmin(event){
-  event?.preventDefault();
-  if(!reviewFirebaseAuth){showLoginMessage('Google 管理員授權尚未準備完成。');return;}
-  loginButton.disabled=true;loginButton.textContent='正在開啟 Google 登入…';
-  try{
-    const provider=new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({prompt:'select_account'});
-    await reviewFirebaseAuth.signInWithPopup(provider);
-  }catch(e){showLoginMessage(e?.message||'Google 登入失敗。請確認 Firebase 已啟用 Google 登入，且管理網域已加入授權網域。');}
-  finally{loginButton.disabled=false;loginButton.textContent='使用 Google 帳號登入';}
-}
-async function logoutAdmin(){
-  ++reviewAuthSerial;
-  selectedRiderId='';selectedApplication=null;detailRequestSerial++;applicationListRequestSerial++;
-  applications=[];loginOverlay.classList.remove('hidden');operatorPill.textContent='尚未登入';
-  try{await reviewFirebaseAuth?.signOut();}catch(e){showLoginMessage('登出時發生問題，請重新整理網頁。');}
-}
+function getAdminHeaders(json=false){return json?{'Content-Type':'application/json'}:{};}
+async function apiFetch(path,options={}){const response=await fetch(`${API_BASE}${path}`,{cache:'no-store',credentials:'same-origin',...options,headers:{...getAdminHeaders(Boolean(options.body)),...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false){const e=new Error(data.message||`HTTP ${response.status}`);e.status=response.status;throw e;}return data;}
+function setLoading(v){document.getElementById('mainLayout')?.classList.toggle('loading',v);document.getElementById('refreshButton').disabled=v;}function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>t.classList.add('hidden'),3500);}function showAccessError(message){operatorPill.textContent='未獲授權';applicationList.innerHTML=`<div class="message error">${escapeHtml(message||'此裝置尚未取得審核授權。')}</div>`;}
 function setStatusFilter(status,button){statusFilter=status;localRiskOnly=false;document.querySelectorAll('.filter-tab').forEach(x=>x.classList.toggle('active',x===button));loadApplications();}function setLocalRiskFilter(button){localRiskOnly=true;statusFilter='all';document.querySelectorAll('.filter-tab').forEach(x=>x.classList.toggle('active',x===button));loadApplications();}function handleSearchKey(event){if(event.key==='Enter')loadApplications();}
-function getApplicationStatus(item){const lifecycle=String(item.lifecycleStatus||'').toLowerCase(),status=String(item.status||item.reviewStatus||'submitted').toLowerCase();if(lifecycle==='rejected'||status==='rejected')return'rejected';if(status==='needs_supplement'||Number(item.documentSummary?.supplementCount||0)>0)return'needs_supplement';if(lifecycle==='active')return'active';if(lifecycle==='training')return'training';return status;}
+function getApplicationStatus(item){const lifecycle=String(item.lifecycleStatus||'').toLowerCase(),status=String(item.status||item.reviewStatus||'submitted').toLowerCase();if(Number(item.documentSummary?.supplementCount||0)>0||item.credentialMaintenanceActive===true)return'needs_supplement';if(lifecycle==='active')return'active';if(lifecycle==='training')return'training';if(lifecycle==='rejected')return'rejected';return status;}
 function renderStats(stats={}){const items=[['待審核',stats.pending||0],['待補件',stats.needsSupplement||0],['已通過',stats.approved||0],['已拒絕',stats.rejected||0],['有風險',stats.riskApplications||0],['全部',stats.total||0]];statsGrid.innerHTML=items.map(([label,value])=>`<div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${Number(value||0)}</div></div>`).join('');}
-async function loadApplications(){if(!reviewFirebaseAuth?.currentUser)return;const serial=++applicationListRequestSerial;const q=String(searchInput.value||'').trim();setLoading(true);try{const params=new URLSearchParams({status:statusFilter,q,t:String(Date.now())});const data=await apiFetch(`/api/admin/rider-review/applications?${params}`);if(serial!==applicationListRequestSerial||!reviewFirebaseAuth?.currentUser)return;applications=Array.isArray(data.applications)?data.applications:[];renderStats(data.stats||{});renderApplicationList();countLine.textContent=`共 ${localRiskOnly?applications.filter(x=>Number(x.riskCount||0)>0).length:applications.length} 筆申請`;}catch(e){if(serial!==applicationListRequestSerial)return;if(e.status===401){logoutAdmin();showLoginMessage('Google 管理員授權已失效，請重新登入。');return;}applicationList.innerHTML=`<div class="message error">${escapeHtml(e.message||'讀取申請失敗')}</div>`;}finally{if(serial===applicationListRequestSerial)setLoading(false);}}
+async function loadApplications(){const serial=++applicationListRequestSerial;const q=String(searchInput.value||'').trim();setLoading(true);try{const params=new URLSearchParams({status:statusFilter,q,t:String(Date.now())});const data=await apiFetch(`/api/admin/rider-review/applications?${params}`);if(serial!==applicationListRequestSerial)return;applications=Array.isArray(data.applications)?data.applications:[];renderStats(data.stats||{});renderApplicationList();countLine.textContent=`共 ${localRiskOnly?applications.filter(x=>Number(x.riskCount||0)>0).length:applications.length} 筆申請`;}catch(e){if(serial!==applicationListRequestSerial)return;if(e.status===401||e.status===403||e.status===503){showAccessError(e.message);return;}applicationList.innerHTML=`<div class="message error">${escapeHtml(e.message||'讀取申請失敗')}</div>`;}finally{if(serial===applicationListRequestSerial)setLoading(false);}}
 function renderApplicationList(){const rows=localRiskOnly?applications.filter(x=>Number(x.riskCount||0)>0):applications;if(!rows.length){applicationList.innerHTML='<div class="message success">目前沒有符合條件的申請。</div>';return;}applicationList.innerHTML=rows.map(item=>{const status=getApplicationStatus(item),groups=Array.isArray(item.verificationGroups)?item.verificationGroups.filter(g=>g.required):[];return `<button class="application-card ${selectedRiderId===item.riderId?'active':''}" onclick="openApplication('${escapeHtml(item.riderId)}')"><div class="card-head"><div><div class="card-name">${escapeHtml(item.name||'未命名申請')}</div><div class="card-id">${escapeHtml(item.phone||item.riderId)}</div></div><span class="status-pill ${escapeHtml(status)}">${escapeHtml(STATUS_LABELS[status]||status)}</span></div><div class="card-copy"><div>${escapeHtml(item.district||'居住地區未填')}</div><div>${escapeHtml(item.vehicle||'-')}・${escapeHtml(item.plateNumber||'無車牌')}</div><div>驗證 ${Number(item.documentSummary?.approvedGroupCount||0)}／${Number(item.documentSummary?.requiredGroupCount||groups.length||0)} 組通過</div><div>${escapeHtml(formatDateTime(item.updatedAtMs||item.submittedAtMs))}${Number(item.riskCount||0)>0?`・<span class="risk-badge">${Number(item.riskCount)} 項風險</span>`:''}</div></div><div class="group-mini">${groups.map(g=>`<span class="${escapeHtml(g.status)}">${escapeHtml(g.label)}・${escapeHtml(GROUP_STATUS_LABELS[g.status]||g.status)}</span>`).join('')}</div></button>`;}).join('');}
-async function openApplication(riderId){if(!riderId||reviewActionBusy)return;const serial=++detailRequestSerial;selectedRiderId=String(riderId);selectedApplication=null;renderApplicationList();detailPanel.innerHTML='<div class="empty-state"><div><div class="empty-icon">⏳</div><div style="font-size:20px;font-weight:1000">正在載入申請明細</div></div></div>';try{const data=await apiFetch(`/api/admin/rider-review/applications/${encodeURIComponent(riderId)}?t=${Date.now()}`);if(serial!==detailRequestSerial||selectedRiderId!==String(riderId)||!reviewFirebaseAuth?.currentUser)return;const receivedId=String(data.application?.riderId||data.application?.id||'');if(receivedId!==String(riderId))throw new Error('申請編號與回應不一致，請重新查詢。');selectedApplication=data.application;renderApplicationDetail(selectedApplication);const url=new URL(location.href);url.searchParams.set('riderId',riderId);history.replaceState(null,'',url);}catch(e){if(serial===detailRequestSerial)detailPanel.innerHTML=`<div class="message error">${escapeHtml(e.message||'讀取申請明細失敗')}</div>`;}}
+async function openApplication(riderId){if(!riderId||reviewActionBusy)return;const serial=++detailRequestSerial;selectedRiderId=String(riderId);selectedApplication=null;renderApplicationList();detailPanel.innerHTML='<div class="empty-state"><div><div class="empty-icon">⏳</div><div style="font-size:20px;font-weight:1000">正在載入申請明細</div></div></div>';try{const data=await apiFetch(`/api/admin/rider-review/applications/${encodeURIComponent(riderId)}?t=${Date.now()}`);if(serial!==detailRequestSerial||selectedRiderId!==String(riderId))return;const receivedId=String(data.application?.riderId||data.application?.id||'');if(receivedId!==String(riderId))throw new Error('申請編號與回應不一致，請重新查詢。');selectedApplication=data.application;renderApplicationDetail(selectedApplication);const url=new URL(location.href);url.searchParams.set('riderId',riderId);history.replaceState(null,'',url);}catch(e){if(serial===detailRequestSerial)detailPanel.innerHTML=`<div class="message error">${escapeHtml(e.message||'讀取申請明細失敗')}</div>`;}}
 function infoItem(label,value){return `<div class="info-item"><div class="meta-label">${escapeHtml(label)}</div><div class="meta-value">${escapeHtml(value||'-')}</div></div>`;}
 function renderVerificationSummary(groups=[]){return `<div class="verification-summary">${groups.map(group=>`<div class="verification-summary-card ${escapeHtml(group.status||'pending')}"><div class="section-title-row"><div><div class="verification-name">${escapeHtml(group.label)}</div><div class="verification-copy">${escapeHtml(group.description||'')}</div></div><span class="status-pill ${escapeHtml(group.status||'pending')}">${escapeHtml(GROUP_STATUS_LABELS[group.status]||group.status)}</span></div><div class="verification-count">${group.required?`${Number(group.approvedCount||0)}／${Number(group.totalCount||0)} 項通過`:'此配送工具不需要'}</div></div>`).join('')}</div>`;}
 function renderDocumentCard(item,isFinal,isRejected){const status=String(item.reviewStatus||'pending'),reviewDisabled=isFinal||isRejected,preview=item.previewUrl?`<img src="${escapeHtml(item.previewUrl)}" alt="${escapeHtml(item.label)}">`:`<div class="document-preview-copy">找不到預覽檔案。</div>`;return `<article class="document-card"><div class="document-preview">${preview}</div><div class="document-content"><div class="document-title-row"><div><div class="document-title">${escapeHtml(item.label)}</div><div class="document-file">${escapeHtml(item.originalName||'檔名未記錄')}・${Math.max(0,Math.round(Number(item.sizeBytes||0)/1024))} KB</div></div><span class="status-pill ${escapeHtml(status)}">${escapeHtml(DOCUMENT_STATUS_LABELS[status]||status)}</span></div>${item.reviewReason?`<div class="reason-box">補件原因：${escapeHtml(item.reviewReason)}</div>`:''}<div class="document-actions"><button class="view-btn" ${item.previewUrl?'':'disabled'} onclick="openDocumentPreview('${escapeHtml(item.previewUrl||'')}')">開啟原檔</button><button class="approve-btn" ${reviewDisabled?'disabled':''} onclick="markDocument('${escapeHtml(item.documentKey)}','approved')">標記通過</button><button class="supplement-btn" ${isRejected?'disabled':''} onclick="selectDocumentForSupplement('${escapeHtml(item.documentKey)}')">加入補件</button><button class="reset-btn" ${reviewDisabled?'disabled':''} onclick="markDocument('${escapeHtml(item.documentKey)}','pending')">恢復待審核</button></div></div></article>`;}
@@ -223,7 +200,7 @@ async function postAction(payload){
   if(reviewActionBusy)throw new Error('上一項審核操作尚未完成，請勿重複送出。');
   reviewActionBusy=true;
   try{
-    const data=await apiFetch(`/api/admin/rider-review/applications/${encodeURIComponent(riderId)}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operator:operatorName,...payload})});
+    const data=await apiFetch(`/api/admin/rider-review/applications/${encodeURIComponent(riderId)}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const returnedId=String(data.application?.riderId||data.application?.id||'');
     if(returnedId&&returnedId!==riderId)throw new Error('伺服器回傳了不同的申請者，已停止畫面更新。');
     return data;
@@ -243,41 +220,9 @@ function selectDocumentForSupplement(key){const box=document.getElementById(`bat
 async function requestBatchSupplement(){const keys=[...document.querySelectorAll('.batchSupplementDocument:checked')].map(x=>x.value),preset=String(batchReasonPreset?.value||'').trim(),custom=String(batchReasonCustom?.value||'').trim(),reason=[preset,custom].filter(Boolean).join('：');if(!keys.length)return alert('請至少選擇一項需要補件的資料（可包含大頭照）。');if(!reason)return alert('請選擇或輸入補件原因。');const documents=Object.fromEntries(keys.map(key=>[key,reason]));const isOfficial=selectedApplication?.approved===true||selectedApplication?.credentialMaintenanceActive===true||['training','approved','active'].includes(String(selectedApplication?.status||'').toLowerCase())||['TRAINING','ACTIVE','RESTRICTED'].includes(String(selectedApplication?.lifecycleStatus||'').toUpperCase());const warning=isOfficial?'\n\n【重要】此申請已通過或有正式小U資格。送出後會依資格複審機制暫停新任務承接，直至全部驗證重新通過。':'';if(!confirm(`確定要求補件？\n項目：${keys.join('、')}\n原因：${reason}${warning}`))return;setLoading(true);try{await refreshAfterAction(await postAction({action:'request_supplement',documents,reason}),'補件要求已送出。');}catch(e){alert(e.message||'送出補件要求失敗。');}finally{setLoading(false);}}
 async function saveReviewNote(){const reason=String(document.getElementById('internalReviewNote')?.value||'').trim();setLoading(true);try{await refreshAfterAction(await postAction({action:'save_review_note',reason}),'審核備註已儲存。');}catch(e){alert(e.message||'儲存備註失敗。');}finally{setLoading(false);}}
 async function performOverallAction(action){const reason=String(document.getElementById('overallReason')?.value||'').trim();if(action==='reject'&&!reason)return alert('拒絕申請時必須填寫原因。');if(action==='approve'&&selectedApplication?.profilePhotoRequired===true&&!selectedApplication?.profilePhoto?.storagePath)return alert('缺少小U大頭照，不能正式通過。');if(!confirm(action==='approve'?(selectedApplication?.credentialMaintenanceActive===true?'確定完成正式小U證件複審，依原資格條件恢復？':'確定通過此小U申請，並建立正式資料進入數位入職？'):action==='reject'?'確定拒絕此小U申請？':'確定重新開啟此申請？'))return;setLoading(true);try{await refreshAfterAction(await postAction({action,reason}),'審核狀態已更新。');}catch(e){alert(e.message||'審核動作失敗。');}finally{setLoading(false);}}
-async function initialize(){
-  loginOverlay.classList.remove('hidden');
-  if(!window.firebase?.auth){showLoginMessage('無法載入 Google 登入元件，請檢查網路與瀏覽器設定。');return;}
-  try{
-    const response=await fetch(`${API_BASE}/api/admin/rider-review/auth-config`,{cache:'no-store'});
-    const data=await response.json();
-    if(!response.ok||data.success!==true||data.ready!==true||!data.firebaseConfig){
-      showLoginMessage('尚未完成 Google 管理員授權設定；為保護小U資料，已禁止未授權存取。');return;
-    }
-    const firebaseApp=firebase.initializeApp(data.firebaseConfig,'ubee-review-console');
-    reviewFirebaseAuth=firebaseApp.auth();
-    await reviewFirebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    reviewFirebaseAuth.onAuthStateChanged(async user=>{
-      const serial=++reviewAuthSerial;
-      if(!user){loginOverlay.classList.remove('hidden');operatorPill.textContent='尚未登入';return;}
-      try{
-        const me=await apiFetch('/api/admin/rider-review/me');
-        if(serial!==reviewAuthSerial)return;
-        operatorName=String(me.email||user.email||'');
-        operatorPill.textContent=`審核人員：${operatorName}`;
-        loginOverlay.classList.add('hidden');showLoginMessage('');
-        await loadApplications();
-        const riderId=new URLSearchParams(location.search).get('riderId');
-        if(riderId&&serial===reviewAuthSerial)await openApplication(riderId);
-      }catch(e){
-        if(serial!==reviewAuthSerial)return;
-        loginOverlay.classList.remove('hidden');
-        showLoginMessage(e.message||'尚未通過小U審核管理授權。');
-        if(e.status===401||e.status===403)await reviewFirebaseAuth.signOut();
-      }
-    });
-  }catch(e){showLoginMessage('Google 管理員授權初始化失敗：'+(e?.message||'未知錯誤'));}
-}
+async function initialize(){operatorPill.textContent='受信任裝置';await loadApplications();if(document.querySelector('.message.error'))return;const riderId=new URLSearchParams(location.search).get('riderId');if(riderId)await openApplication(riderId);}
 
-// V4.1.0 RC3 — purely presentational navigation and responsive workspace controls.
+// V4.1.0 RC4 — purely presentational navigation and responsive workspace controls.
 function showReviewPane(pane){
   const detail=pane==='detail';
   mainLayout.classList.toggle('review-show-detail',detail);
