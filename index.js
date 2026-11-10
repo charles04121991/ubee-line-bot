@@ -617,7 +617,7 @@ async function processUBeeGrowthCompletedOrder(order = {}) {
   const orderId = String(order.id || order.orderId || '').trim();
   if (!orderId) return;
   const customerId = String(order.userId || order.customerId || '').trim();
-  if (customerId) {
+  if (customerId && order.customerAccessMode!=='guest_order' && order.uCoinDisabled!==true) {
     // Customer Growth 已退場：U幣完單／首單獎勵獨立運作，不新增會員等級資料。
     await processUCoinCompletedOrder(order).catch(err => console.warn('U coin completed-order reward:', err.message));
     // 僅結算既有推薦登記（部署後不再接受 customer 推薦碼）；不新增客戶推薦。
@@ -5711,7 +5711,7 @@ async function requireCustomerAuth(req, res, next) {
         success: false,
         authenticated: false,
         code: 'CUSTOMER_LOGIN_REQUIRED',
-        message: '請先登入 UBee 會員帳號。',
+        message: '目前沒有可用的本裝置訂單憑證，請重新確認下單聯絡資料。',
       });
     }
     req.customerAuth = auth;
@@ -6008,6 +6008,57 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
   }
 }
 
+// Customer Guest Order V1: this is an ORDER OWNERSHIP SESSION, not a membership registration.
+// A phone number is contact data only. Possessing a phone number grants NO access to old orders.
+app.post('/api/customer-guest/session', async (req, res) => {
+  res.setHeader('Cache-Control','no-store');
+  try {
+    const name=cleanText(req.body?.name||'',40);
+    const contactPhone=normalizeCustomerPhone(req.body?.phone);
+    if (name.length<2) return res.status(400).json({success:false,code:'GUEST_NAME_INVALID',message:'請填寫至少兩字的下單人姓名。'});
+    if (!isValidCustomerPhone(contactPhone)) return res.status(400).json({success:false,code:'GUEST_PHONE_INVALID',message:'請填寫 09 開頭十碼聯絡電話。'});
+    // Do not turn a legacy member cookie into a guest account or link by phone.
+    const prior=await loadCustomerAuth(req).catch(()=>null);
+    if (prior?.account?.authMode==='guest_order') {
+      await db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(prior.customerId).set({
+        name,guestContactPhone:contactPhone,updatedAtMs:Date.now(),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      },{merge:true});
+      return res.json({success:true,customer:{customerId:prior.customerId,name,phone:contactPhone,authMode:'guest_order'}});
+    }
+    const customerId=`customer_${crypto.randomBytes(16).toString('hex')}`;
+    const rawToken=customerAuthRandomToken(32);
+    const nowMs=Date.now();
+    const accountRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    const sessionRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(customerAuthHash(rawToken));
+    const batch=db.batch();
+    batch.create(accountRef,{
+      customerId,name,phone:'',guestContactPhone:contactPhone,authMode:'guest_order',
+      status:'active',passwordHash:null,passwordConfigured:false,passwordVersion:1,
+      phoneVerified:false,memberNumber:'',identityVerification:{status:'not_verified'},
+      source:'customer-guest-order',schemaVersion:'guest-order-v1',
+      createdAtMs:nowMs,updatedAtMs:nowMs,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp()
+    });
+    batch.create(sessionRef,{
+      customerId,passwordVersion:1,createdAtMs:nowMs,lastSeenAtMs:nowMs,
+      expiresAtMs:nowMs+CUSTOMER_AUTH.sessionTtlMs,revoked:false,
+      ...customerAuthClientFingerprint(req),createdAt:admin.firestore.FieldValue.serverTimestamp()
+    });
+    await batch.commit();
+    setCustomerSessionCookie(req,res,rawToken);
+    return res.status(201).json({success:true,created:true,customer:{customerId,name,phone:contactPhone,authMode:'guest_order'}});
+  }catch(error){console.error('客戶訪客訂單憑證建立失敗',error);return res.status(503).json({success:false,code:'GUEST_SESSION_UNAVAILABLE',message:'目前無法取得安全下單憑證，請稍後再試。'});}
+});
+app.get('/api/customer-guest/me',customerAuthOptional,(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  const a=req.customerAuth;
+  if(!a||a.account?.authMode!=='guest_order')return res.status(401).json({success:false,code:'GUEST_SESSION_REQUIRED',message:'本裝置尚未建立訪客訂單憑證。'});
+  return res.json({success:true,customer:{customerId:a.customerId,name:a.account.name||'',phone:a.account.guestContactPhone||'',authMode:'guest_order'}});
+});
+
+// Legacy routes temporarily retained for previously deployed clients. Do not re-enable member UI.
 app.post('/api/customer-auth/order-session', (req, res) => createCustomerOnboarding(req, res));
 app.post('/api/customer-auth/register', (req, res) => createCustomerOnboarding(req, res, { withPassword:true }));
 
@@ -39974,12 +40025,15 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     req.body.customerId = req.customerAuth.customerId;
     req.body.customerMemberNumber = String(req.customerAuth.account.memberNumber || '');
     req.body.customerName = String(req.customerAuth.account.name || '');
-    req.body.customerPhone = String(req.customerAuth.account.phone || '');
+    req.body.customerPhone = String(req.customerAuth.account.authMode === 'guest_order' ? (req.customerAuth.account.guestContactPhone || '') : (req.customerAuth.account.phone || ''));
+    if(req.customerAuth.account.authMode==='guest_order')req.body.uCoinRedeemWhole=0;
     const trustedSelfOrderIdentityKeys = buildCustomerSelfOrderIdentityKeys(
-      req.customerAuth.account || {},
+      {...req.customerAuth.account, phone:req.customerAuth.account.authMode==='guest_order' ? req.customerAuth.account.guestContactPhone : req.customerAuth.account.phone},
       req.customerAuth.customerId
     );
     const data = createOrderFromApi(req.body);
+    data.customerAccessMode=req.customerAuth.account.authMode==='guest_order'?'guest_order':'legacy_customer';
+    data.uCoinDisabled=data.customerAccessMode==='guest_order';
 
     // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
     data.customerIdentityVerified = isCustomerIdentityVerified(
@@ -40351,6 +40405,9 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   customerId:
     data.customerId,
+
+  customerAccessMode: data.customerAccessMode || 'legacy_customer',
+  uCoinDisabled: data.uCoinDisabled === true,
 
   // Self-Order Hard Lock V4.13：只保存不可逆身分指紋，供派單排除本人使用。
   selfOrderGuard: {
@@ -40812,7 +40869,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     Object.assign(order, buildDispatchOrderMetadata(order, Date.now()));
 
     // 建單前先結清已到期的可用 U幣，避免以過期餘額建立折抵保留。
-    await reconcileExpiredUCoin(req.customerAuth.customerId);
+    if(req.customerAuth.account.authMode!=='guest_order')await reconcileExpiredUCoin(req.customerAuth.customerId);
 
     // Final amount is an optional strict contract for the new customer client.
     if (req.body.checkoutExpectedPayableTotal !== undefined) {
@@ -51192,7 +51249,9 @@ app.post('/api/customer/orders/:orderId/rider-rating', requireCustomerAuth, asyn
       }, { merge:true });
     });
 
-    const uCoinReward = await grantUCoin(
+    const uCoinReward = req.customerAuth?.account?.authMode==='guest_order'
+      ? {granted:false,disabled:true}
+      : await grantUCoin(
       customerId,
       UBEE_UCOIN.ratingUnits,
       'rating',
