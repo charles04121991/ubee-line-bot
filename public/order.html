@@ -1,4 +1,5 @@
-<!-- UBee Customer TC V1.6 — Native Member Experience RC1.3｜Quote Concurrency Hotfix｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
+<!-- CANDIDATE ONLY / NOT DEPLOYABLE: No Member / No UCoin UI staging; backend guest authorization not yet implemented.
+     UBee Customer TC V1.6 — Native Member Experience RC1.3｜Quote Concurrency Hotfix｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
@@ -6594,6 +6595,13 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 
 </style>
 
+<style id="ubee-no-member-candidate-ui">
+/* CANDIDATE ONLY: hide legacy member and UCoin entry points; NOT an authorization change. */
+#ubeeCustomerAuthRoot, #ubeeUCoinCheckout, #flowPageUCoin,
+[data-my-action="ucoin"], [data-my-action="member"],
+[data-primary-shortcut="ucoin"], [data-primary-shortcut="member"],
+#ubeeOrderIdentityLogin, .ubee-ucoin-checkout {display:none!important}
+</style>
 </head>
 <body class="ubee-app-starting" style="background:#ffffff;">
 
@@ -7433,7 +7441,8 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
         const message=passwordSetupRequired
           ? '這支手機已有 UBee 使用身分，但尚未設定密碼。LINE 自動恢復需核對歷史任務或其他已建立的驗證資料；若無法完成，請透過 LINE 客服安全核對，請勿重複建立帳號。'
           : '這支手機已有 UBee 使用身分，請先登入後再繼續送單。';
-        window.UBeeCustomerAuthHost?.show(passwordSetupRequired?'forgot':'login',{phone,message});
+        /* No-member candidate: never launch member login / password recovery. */
+        error.message='此手機號碼已有歷史使用紀錄。免登入下單的後端安全憑證尚待完成，請勿使用本候選版正式送單。';
         if(reject){error.message=message;reject(error)}
         return;
       }
@@ -7448,7 +7457,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
   document.getElementById('ubeeOrderIdentityLogin').addEventListener('click',()=>{
     if(busy)return;
     const phone=normalizePhone(phoneInput.value);const reject=pendingReject;pendingResolve=pendingReject=null;close();
-    window.UBeeCustomerAuthHost?.show('login',{phone,message:'已有 UBee 使用身分時，登入後即可繼續送出任務。'});
+    /* No-member candidate: login entry disabled; server-side guest authorization required. */
     if(reject){const error=new Error('請先登入既有 UBee 使用身分。');error.code='CUSTOMER_EXISTING_LOGIN_REQUIRED';reject(error)}
   });
 
@@ -12802,7 +12811,7 @@ function captureApprovedCustomerCheckoutPricing(){
   const roundMoney = value => Math.max(0, Math.round(Number(value) || 0));
   const base = roundMoney(typeof lastEstimatedTotal !== 'undefined' ? lastEstimatedTotal : 0);
   const advance = roundMoney(quote.advancePayment ?? price.advancePayment ?? (typeof getAdvancePaymentAmount === 'function' ? getAdvancePaymentAmount() : 0));
-  const discount = Math.min(20, roundMoney(window.__ubeeUCoinRedeemWhole || 0));
+  const discount = 0; // No-member candidate: UCoin redemption disabled.
   return {
     base, advance, discount, payable:Math.max(0,base-discount),
     serviceSubtotal:roundMoney(price.serviceSubtotal ?? price.serviceTotal ?? base-advance),
@@ -12898,7 +12907,7 @@ async function createOrder(options = {}){
     }
     btn.innerText = '建立訂單中...';
     const payload = getPayload();
-    payload.uCoinRedeemWhole = Math.max(0, Math.floor(Number(window.__ubeeUCoinRedeemWhole || 0)));
+    payload.uCoinRedeemWhole = 0; // No-member candidate.
     payload.checkoutExpectedPayableTotal = approved.payable;
 
     if(!payload.quoteId){
