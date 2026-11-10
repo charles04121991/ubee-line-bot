@@ -2,7 +2,7 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee Customer TC V1.6 RC1.3：修復確認任務的重複估價競態；保留後端正式金額、會員、免註冊下單、六大服務、U幣及訂單追蹤。",
+  "description": "UBee Customer TC V1.6 RC1.3 免會員／免 U幣第一階段測試候選（尚未完成後端訪客授權，禁止部署）",
   "lang": "zh-TW",
   "start_url": "/order.html?source=pwa&v=20261102-customer-tc-v1-6-native-member-rc1-3",
   "scope": "/",
@@ -36,7 +36,7 @@
     {
       "name": "立即下單",
       "short_name": "下單",
-      "description": "先選擇跑腿服務，再建立新的 UBee 任務。",
+      "description": "選擇跑腿服務，建立新的 UBee 任務。",
       "url": "/order.html?action=new&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-3",
       "icons": [
         {
@@ -49,34 +49,8 @@
     {
       "name": "我的訂單",
       "short_name": "訂單",
-      "description": "查看進行中與歷史訂單。",
+      "description": "查看進行中與歷史訂單（須先完成安全訪客授權實作）。",
       "url": "/order.html?action=tasks&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-3",
-      "icons": [
-        {
-          "src": "/ubee-customer-icon-192.png?v=20261016-brand-icons-v3-1",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "我的U幣",
-      "short_name": "U幣",
-      "description": "查看 U幣餘額、簽到與明細。",
-      "url": "/order.html?action=ucoin&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-3",
-      "icons": [
-        {
-          "src": "/ubee-customer-icon-192.png?v=20261016-brand-icons-v3-1",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "我的",
-      "short_name": "我的",
-      "description": "開啟個人中心與設定。",
-      "url": "/order.html?action=my&source=shortcut&v=20261102-customer-tc-v1-6-native-member-rc1-3",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png?v=20261016-brand-icons-v3-1",
