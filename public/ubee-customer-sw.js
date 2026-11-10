@@ -1,7 +1,7 @@
 /* ============================================================
- * UBee 跑腿｜客戶端 Service Worker｜Native Member Experience TC V1.6 RC1.3 2026-11-02
+ * UBee 跑腿｜客戶端 Service Worker｜Guest Order RC1 candidate 2026-11-10
  * Release: Member Security V1 (optional register + password + LINE recovery) + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261102-customer-tc-v1-6-native-member-rc1-3
+ * Version: 20261110-customer-guest-rc1
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；訂單／通知／U幣仍維持內部深層連結）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261102-customer-tc-v1-6-native-member-rc1-3';
+const UBEE_CUSTOMER_SW_VERSION = '20261110-customer-guest-rc1';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
@@ -103,15 +103,10 @@ async function networkFirstPage(request) {
       ignoreSearch: true
     });
 
-    if (cached) return cached;
-
-    const fallback = await caches.match('/order.html', {
-      ignoreSearch: true
+    // Guest Order: never fall back to an older member-enabled HTML page.
+    return new Response('UBee 目前無法連線，請恢復網路後重新開啟。', {
+      status:503,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}
     });
-
-    if (fallback) return fallback;
-
-    throw error;
   }
 }
 
