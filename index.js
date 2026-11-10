@@ -4473,7 +4473,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =====================================================
-// UBee Customer Account Legacy Helpers｜讀取舊 Session／維持歷史訂單相容
+// UBee Customer Account System｜正式會員驗證＋Identity V1
 // - 可選主動註冊（姓名、手機、密碼），保留首單免註冊；不接入簡訊或聲稱門號已驗證
 // - 密碼：Node.js crypto.scrypt 雜湊
 // - Session：HttpOnly / SameSite=Lax Cookie，伺服器端 Firestore 驗證
@@ -6008,274 +6008,376 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
   }
 }
 
-// ============================================================
-// UBee Customer LINE-only Membership V1 (CANDIDATE / NOT DEPLOYED)
-// No LINE secret or identity token is delivered to browser JavaScript.
-// A legacy guest cookie can ONLY upgrade its own authenticated guest account.
-// ============================================================
-const UBEE_CUSTOMER_LINE_RELEASE = '20261110-customer-line-member-v1-rc1';
-const UBEE_LINE_MEMBER = Object.freeze({
-  channelId: String(process.env.UBEE_LINE_LOGIN_CHANNEL_ID || '').trim(),
-  channelSecret: String(process.env.UBEE_LINE_LOGIN_CHANNEL_SECRET || '').trim(),
-  redirectUri: String(process.env.UBEE_LINE_LOGIN_REDIRECT_URI || '').trim(),
-  oauthTtlMs: 10 * 60 * 1000,
-  pendingTtlMs: 15 * 60 * 1000,
-  maxContacts: 20,
-  termsUrl: String(process.env.UBEE_CUSTOMER_TERMS_URL || '').trim(),
-  privacyUrl: String(process.env.UBEE_CUSTOMER_PRIVACY_URL || '').trim(),
-  termsVersion: String(process.env.UBEE_CUSTOMER_TERMS_VERSION || '').trim(),
-  privacyVersion: String(process.env.UBEE_CUSTOMER_PRIVACY_VERSION || '').trim(),
-});
-const UBEE_LINE_COLLECTIONS = Object.freeze({
-  oauth: 'customerLineOauthStatesV1',
-  pending: 'customerLinePendingV1',
-  identityIndex: 'customerLineIdentityIndexV1',
-  deleteRequests: 'customerDeletionRequestsV1',
-});
-function ubeeLineConfigured(){
-  if(!/^\d+$/.test(UBEE_LINE_MEMBER.channelId) || !UBEE_LINE_MEMBER.channelSecret) return false;
-  try { const uri = new URL(UBEE_LINE_MEMBER.redirectUri); return uri.protocol === 'https:' && uri.pathname === '/api/customer-line/callback'; }
-  catch(_){return false;}
-}
-function ubeeLineLegalReady(){
-  try{
-    const terms=new URL(UBEE_LINE_MEMBER.termsUrl),privacy=new URL(UBEE_LINE_MEMBER.privacyUrl);
-    return terms.protocol==='https:' && privacy.protocol==='https:' &&
-      Boolean(UBEE_LINE_MEMBER.termsVersion && UBEE_LINE_MEMBER.privacyVersion);
-  }catch(_){return false;}
-}
-app.get('/api/customer-line/config',(req,res)=>{
-  res.set('Cache-Control','no-store');
-  return res.json({success:true,loginReady:ubeeLineConfigured(),legalReady:ubeeLineLegalReady(),
-    termsUrl:ubeeLineLegalReady()?UBEE_LINE_MEMBER.termsUrl:'',
-    privacyUrl:ubeeLineLegalReady()?UBEE_LINE_MEMBER.privacyUrl:''});
-});
-function ubeeLineDigest(s){return crypto.createHash('sha256').update(String(s)).digest('hex');}
-function ubeeLineCookie(req,name,value,maxAge){
-  const secure = req.secure || String(req.headers['x-forwarded-proto']||'').split(',')[0].trim()==='https';
-  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(maxAge/1000)}${secure?'; Secure':''}`;
-}
-function ubeeLineSetCookie(req,res,name,value,maxAge){res.append('Set-Cookie',ubeeLineCookie(req,name,value,maxAge));}
-function ubeeLineClearCookie(req,res,name){res.append('Set-Cookie',ubeeLineCookie(req,name,'',0));}
-function ubeeLinePageError(req,res,reason){
-  res.set('Cache-Control','no-store');
-  return res.redirect(303,'/order.html?line_error='+encodeURIComponent(reason));
-}
-function ubeeLineSafeProfileName(s){return cleanText(s||'LINE 會員',50)||'LINE 會員';}
-function ubeeLineOriginOk(req){
-  const origin=String(req.get('origin')||'');
-  if(!origin)return true; // Some iOS Web Clip POSTs do not include Origin.
-  try{const u=new URL(origin);return u.host===req.get('host') && u.protocol==='https:';}catch(_){return false;}
-}
-async function ubeeLinePostForm(url,body){
-  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),12000);
-  try{
-    const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body),signal:controller.signal});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw Error('LINE HTTP '+response.status);
-    return data;
-  }finally{clearTimeout(timer);}
-}
-app.get('/api/customer-line/start',async(req,res)=>{
-  res.set('Cache-Control','no-store');
-  if(!ubeeLineConfigured())return ubeeLinePageError(req,res,'LINE 登入尚未完成正式環境設定。');
-  try{
-    const state=crypto.randomBytes(32).toString('hex');
-    const nonce=crypto.randomBytes(32).toString('hex');
-    const verifier=crypto.randomBytes(32).toString('base64url');
-    const challenge=crypto.createHash('sha256').update(verifier).digest('base64url');
-    const existing=await loadCustomerAuth(req).catch(()=>null);
-    const legacyCustomerId=existing?.account?.authMode==='guest_order' ? existing.customerId : '';
-    await db.collection(UBEE_LINE_COLLECTIONS.oauth).doc(ubeeLineDigest(state)).create({
-      nonce,verifier,legacyCustomerId,createdAtMs:Date.now(),expiresAtMs:Date.now()+UBEE_LINE_MEMBER.oauthTtlMs,expireAt:admin.firestore.Timestamp.fromMillis(Date.now()+UBEE_LINE_MEMBER.oauthTtlMs),
-    });
-    ubeeLineSetCookie(req,res,'ubee_line_oauth',ubeeLineDigest(state),UBEE_LINE_MEMBER.oauthTtlMs);
-    const url=new URL('https://access.line.me/oauth2/v2.1/authorize');
-    for(const [key,value] of Object.entries({response_type:'code',client_id:UBEE_LINE_MEMBER.channelId,redirect_uri:UBEE_LINE_MEMBER.redirectUri,state,scope:'openid profile',nonce,code_challenge:challenge,code_challenge_method:'S256'}))url.searchParams.set(key,value);
-    return res.redirect(302,url.toString());
-  }catch(error){console.error('UBee LINE start failed',error);return ubeeLinePageError(req,res,'LINE 登入暫時無法啟動。');}
-});
-app.get('/api/customer-line/callback',async(req,res)=>{
-  res.set('Cache-Control','no-store');
-  ubeeLineClearCookie(req,res,'ubee_line_oauth');
-  const state=String(req.query.state||''); const code=String(req.query.code||'');
-  if(!ubeeLineConfigured()||!(/^[a-f0-9]{64}$/.test(state))||!code||req.query.error)return ubeeLinePageError(req,res,'LINE 授權已取消或無效。');
-  const stateHash=ubeeLineDigest(state);
-  const cookieHash=String(parseCookies(req).ubee_line_oauth||'');
-  if(cookieHash!==stateHash)return ubeeLinePageError(req,res,'登入安全驗證失敗，請重新點選 LINE 登入。');
-  try{
-    const ref=db.collection(UBEE_LINE_COLLECTIONS.oauth).doc(stateHash);let flow=null;
-    await db.runTransaction(async tx=>{
-      const doc=await tx.get(ref);
-      if(!doc.exists||Number(doc.data()?.expiresAtMs||0)<Date.now())throw Error('OAuth state expired');
-      flow=doc.data();tx.delete(ref); // One-time state; consumed before provider exchange.
-    });
-    const token=await ubeeLinePostForm('https://api.line.me/oauth2/v2.1/token',{
-      grant_type:'authorization_code',code,redirect_uri:UBEE_LINE_MEMBER.redirectUri,
-      client_id:UBEE_LINE_MEMBER.channelId,client_secret:UBEE_LINE_MEMBER.channelSecret,code_verifier:flow.verifier,
-    });
-    if(!token.id_token)throw Error('LINE id_token absent');
-    const verified=await ubeeLinePostForm('https://api.line.me/oauth2/v2.1/verify',{
-      id_token:token.id_token,client_id:UBEE_LINE_MEMBER.channelId,nonce:flow.nonce,
-    });
-    if(verified.iss!=='https://access.line.me'||String(verified.aud)!==UBEE_LINE_MEMBER.channelId||String(verified.nonce)!==flow.nonce||Number(verified.exp||0)*1000<Date.now())throw Error('OIDC claims invalid');
-    const lineId=String(verified.sub||'');
-    if(!/^[a-zA-Z0-9_-]{12,160}$/.test(lineId))throw Error('LINE user ID missing');
-    const name=ubeeLineSafeProfileName(verified.name);
-    const avatarUrl=String(verified.picture||'').startsWith('https://')?String(verified.picture).slice(0,550):'';
-    const indexRef=db.collection(UBEE_LINE_COLLECTIONS.identityIndex).doc(ubeeLineDigest(lineId));
-    const indexed=await indexRef.get();
-    if(indexed.exists){
-      const customerId=String(indexed.data()?.customerId||'');
-      const accountRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
-      const account=await accountRef.get();
-      if(!account.exists||account.data()?.authMode!=='line_login'||account.data()?.status!=='active')throw Error('Linked account unavailable');
-      // Profile-only update; LINE identity is unchanged and remains index-bound.
-      await accountRef.set({name,avatarUrl,updatedAtMs:Date.now()},{merge:true});
-      const session=await createCustomerSession(req,customerId,Number(account.data()?.passwordVersion||1));
-      setCustomerSessionCookie(req,res,session);
-      ubeeLineClearCookie(req,res,'ubee_line_oauth');
-      return res.redirect(303,'/order.html?line=success');
+// Customer Guest Order V1: this is an ORDER OWNERSHIP SESSION, not a membership registration.
+// A phone number is contact data only. Possessing a phone number grants NO access to old orders.
+app.post('/api/customer-guest/session', async (req, res) => {
+  res.setHeader('Cache-Control','no-store');
+  try {
+    const name=cleanText(req.body?.name||'',40);
+    const contactPhone=normalizeCustomerPhone(req.body?.phone);
+    if (name.length<2) return res.status(400).json({success:false,code:'GUEST_NAME_INVALID',message:'請填寫至少兩字的下單人姓名。'});
+    if (!isValidCustomerPhone(contactPhone)) return res.status(400).json({success:false,code:'GUEST_PHONE_INVALID',message:'請填寫 09 開頭十碼聯絡電話。'});
+    // Do not turn a legacy member cookie into a guest account or link by phone.
+    const prior=await loadCustomerAuth(req).catch(()=>null);
+    if (prior?.account?.authMode==='guest_order') {
+      await db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(prior.customerId).set({
+        name,guestContactPhone:contactPhone,updatedAtMs:Date.now(),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      },{merge:true});
+      return res.json({success:true,customer:{customerId:prior.customerId,name,phone:contactPhone,authMode:'guest_order'}});
     }
-    const pendingToken=crypto.randomBytes(32).toString('hex');
-    await db.collection(UBEE_LINE_COLLECTIONS.pending).doc(ubeeLineDigest(pendingToken)).create({
-      lineId,name,avatarUrl,legacyCustomerId:String(flow.legacyCustomerId||''),
-      createdAtMs:Date.now(),expiresAtMs:Date.now()+UBEE_LINE_MEMBER.pendingTtlMs,expireAt:admin.firestore.Timestamp.fromMillis(Date.now()+UBEE_LINE_MEMBER.pendingTtlMs),
+    const customerId=`customer_${crypto.randomBytes(16).toString('hex')}`;
+    const rawToken=customerAuthRandomToken(32);
+    const nowMs=Date.now();
+    const accountRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    const sessionRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(customerAuthHash(rawToken));
+    const batch=db.batch();
+    batch.create(accountRef,{
+      customerId,name,phone:'',guestContactPhone:contactPhone,authMode:'guest_order',
+      status:'active',passwordHash:null,passwordConfigured:false,passwordVersion:1,
+      phoneVerified:false,memberNumber:'',identityVerification:{status:'not_verified'},
+      source:'customer-guest-order',schemaVersion:'guest-order-v1',
+      createdAtMs:nowMs,updatedAtMs:nowMs,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp()
     });
-    ubeeLineSetCookie(req,res,'ubee_line_pending',pendingToken,UBEE_LINE_MEMBER.pendingTtlMs);
-    return res.redirect(303,'/order.html?line=register');
-  }catch(error){console.error('UBee LINE callback rejected',error?.message);return ubeeLinePageError(req,res,'LINE 授權驗證未完成，請重新登入。');}
-});
-app.get('/api/customer-line/me',customerAuthOptional,(req,res)=>{
-  res.set('Cache-Control','no-store');const a=req.customerAuth;
-  if(!a||a.account?.authMode!=='line_login')return res.status(401).json({success:false,code:'LINE_LOGIN_REQUIRED'});
-  return res.json({success:true,authenticated:true,customer:{
-    customerId:a.customerId,name:String(a.account.name||''),avatarUrl:String(a.account.avatarUrl||''),
-    authMode:'line_login',memberNumber:String(a.account.memberNumber||''),
-  }});
-});
-app.get('/api/customer-line/pending',async(req,res)=>{
-  res.set('Cache-Control','no-store');
-  try{const token=String(parseCookies(req).ubee_line_pending||'');if(!/^[a-f0-9]{64}$/.test(token))return res.status(401).json({success:false});
-    const doc=await db.collection(UBEE_LINE_COLLECTIONS.pending).doc(ubeeLineDigest(token)).get();
-    if(!doc.exists||Number(doc.data()?.expiresAtMs||0)<Date.now())return res.status(401).json({success:false});
-    return res.json({success:true,name:doc.data()?.name||'LINE 會員',avatarUrl:doc.data()?.avatarUrl||''});
-  }catch(_){return res.status(503).json({success:false});}
-});
-app.post('/api/customer-line/finish',async(req,res)=>{
-  res.set('Cache-Control','no-store');
-  if(!ubeeLineOriginOk(req))return res.status(403).json({success:false,code:'ORIGIN_FORBIDDEN'});
-  if(!ubeeLineLegalReady())return res.status(503).json({success:false,code:'LEGAL_NOT_CONFIGURED',message:'服務條款與隱私權政策尚未設定，暫時無法完成新會員註冊。'});
-  if(req.body?.acceptTerms!==true||req.body?.acceptPrivacy!==true)return res.status(400).json({success:false,message:'請先確認服務條款與隱私權政策。'});
-  const token=String(parseCookies(req).ubee_line_pending||'');
-  if(!/^[a-f0-9]{64}$/.test(token))return res.status(401).json({success:false,message:'註冊授權已逾時，請重新使用 LINE 登入。'});
-  try{
-    const pendingRef=db.collection(UBEE_LINE_COLLECTIONS.pending).doc(ubeeLineDigest(token));
-    const pendingDoc=await pendingRef.get();
-    if(!pendingDoc.exists||Number(pendingDoc.data()?.expiresAtMs||0)<Date.now())return res.status(401).json({success:false,message:'註冊授權已逾時，請重新使用 LINE 登入。'});
-    const pending=pendingDoc.data();
-    const indexRef=db.collection(UBEE_LINE_COLLECTIONS.identityIndex).doc(ubeeLineDigest(pending.lineId));
-    const legacyId=String(pending.legacyCustomerId||'');
-    const existingAuth=await loadCustomerAuth(req).catch(()=>null);
-    const validUpgrade=Boolean(legacyId&&existingAuth?.customerId===legacyId&&existingAuth?.account?.authMode==='guest_order');
-    const freshId=`customer_${crypto.randomBytes(16).toString('hex')}`;
-    const candidateId=validUpgrade?legacyId:freshId;
-    const name=ubeeLineSafeProfileName(pending.name);
-    let assignedId=candidateId;
-    await db.runTransaction(async tx=>{
-      const [pendingNow,indexNow,legacyNow]=await Promise.all([
-        tx.get(pendingRef),tx.get(indexRef),validUpgrade?tx.get(db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(legacyId)):Promise.resolve(null),
-      ]);
-      if(!pendingNow.exists||Number(pendingNow.data()?.expiresAtMs||0)<Date.now())throw Error('Registration token expired');
-      if(indexNow.exists){
-        // An already-created LINE identity wins, never merge unrelated customers.
-        assignedId=String(indexNow.data()?.customerId||'');
-        if(!/^customer_[a-f0-9]{32}$/.test(assignedId))throw Error('Identity index corrupt');
-        tx.delete(pendingRef);return;
-      }
-      if(validUpgrade&&(!legacyNow?.exists||legacyNow.data()?.authMode!=='guest_order'))throw Error('Legacy customer changed');
-      const accountRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(candidateId);
-      const fields={
-        customerId:candidateId,name,avatarUrl,lineUserId:pending.lineId,
-        authMode:'line_login',status:'active',phone:'',guestContactPhone:'',phoneVerified:false,
-        email:'',passwordHash:null,passwordConfigured:false,passwordVersion: validUpgrade ? Number(legacyNow.data()?.passwordVersion||1)+1 : 1,
-        identityVerification:{status:'not_verified'},schemaVersion:'line-member-v1',
-        lineTermsAcceptedAtMs:Date.now(),linePrivacyAcceptedAtMs:Date.now(),
-        lineTermsVersion:UBEE_LINE_MEMBER.termsVersion,linePrivacyVersion:UBEE_LINE_MEMBER.privacyVersion,
-        updatedAtMs:Date.now(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      };
-      if(validUpgrade)tx.set(accountRef,fields,{merge:true});
-      else tx.create(accountRef,{...fields,memberNumber:'',createdAtMs:Date.now(),createdAt:admin.firestore.FieldValue.serverTimestamp()});
-      tx.create(indexRef,{customerId:candidateId,createdAtMs:Date.now()});
-      tx.delete(pendingRef);
+    batch.create(sessionRef,{
+      customerId,passwordVersion:1,createdAtMs:nowMs,lastSeenAtMs:nowMs,
+      expiresAtMs:nowMs+CUSTOMER_AUTH.sessionTtlMs,revoked:false,
+      ...customerAuthClientFingerprint(req),createdAt:admin.firestore.FieldValue.serverTimestamp()
     });
-    const account=await db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(assignedId).get();
-    if(!account.exists||account.data()?.authMode!=='line_login'||account.data()?.status!=='active')throw Error('Account not active');
-    const session=await createCustomerSession(req,assignedId,Number(account.data()?.passwordVersion||1));
-    setCustomerSessionCookie(req,res,session);ubeeLineClearCookie(req,res,'ubee_line_pending');
-    return res.json({success:true,customer:{customerId:assignedId,name:account.data().name,authMode:'line_login'}});
-  }catch(error){console.error('UBee LINE registration failed',error?.message);return res.status(503).json({success:false,message:'LINE 會員建立暫時無法完成，請稍後再試。'});}
+    await batch.commit();
+    setCustomerSessionCookie(req,res,rawToken);
+    return res.status(201).json({success:true,created:true,customer:{customerId,name,phone:contactPhone,authMode:'guest_order'}});
+  }catch(error){console.error('客戶訪客訂單憑證建立失敗',error);return res.status(503).json({success:false,code:'GUEST_SESSION_UNAVAILABLE',message:'目前無法取得安全下單憑證，請稍後再試。'});}
 });
-// Retain read-only compatibility for existing integrations; only LINE members are authenticated here.
-app.get('/api/customer-auth/me',customerAuthOptional,(req,res)=>{
-  res.set('Cache-Control','no-store');const a=req.customerAuth;
-  if(!a||a.account?.authMode!=='line_login')return res.status(401).json({success:false,authenticated:false,code:'LINE_LOGIN_REQUIRED'});
-  return res.json({success:true,authenticated:true,customer:customerAccountResponse(a.account,a.customerId)});
+app.get('/api/customer-guest/me',customerAuthOptional,(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  const a=req.customerAuth;
+  if(!a||a.account?.authMode!=='guest_order')return res.status(401).json({success:false,code:'GUEST_SESSION_REQUIRED',message:'本裝置尚未建立訪客訂單憑證。'});
+  return res.json({success:true,customer:{customerId:a.customerId,name:a.account.name||'',phone:a.account.guestContactPhone||'',authMode:'guest_order'}});
 });
 
-function ubeeCustomerContactsRef(customerId){return db.collection('customerProfiles').doc(customerId).collection('contacts');}
-function ubeeSafeCustomerContact(raw){
-  const name=cleanText(raw?.name||'',60);
-  const phone=String(raw?.phone||'').replace(/[^\d+]/g,'').slice(0,20);
-  if(!name||!/^09\d{8}$/.test(phone))return null;
-  return {name,phone};
-}
-app.get('/api/customer/contacts',requireCustomerAuth,async(req,res)=>{
-  res.set('Cache-Control','no-store');
-  try{const snap=await ubeeCustomerContactsRef(req.customerAuth.customerId).limit(25).get();
-    const contacts=snap.docs.map(d=>({id:d.id,name:d.data().name||'',phone:d.data().phone||''})).slice(0,UBEE_LINE_MEMBER.maxContacts);
-    return res.json({success:true,contacts});
-  }catch(error){console.error('Contacts GET error',error);return res.status(503).json({success:false,message:'常用聯絡人目前無法載入。'});}
-});
-app.post('/api/customer/contacts',requireCustomerAuth,async(req,res)=>{
-  res.set('Cache-Control','no-store');
-  if(!ubeeLineOriginOk(req))return res.status(403).json({success:false});
-  if(req.customerAuth.account?.authMode!=='line_login')return res.status(403).json({success:false});
-  const contact=ubeeSafeCustomerContact(req.body||{});
-  if(!contact)return res.status(400).json({success:false,message:'請填寫姓名及有效的台灣聯絡電話。'});
-  try{
-    const collection=ubeeCustomerContactsRef(req.customerAuth.customerId);
-    const requested=String(req.body?.id||'');
-    if(requested&&!/^[A-Za-z0-9]{12,40}$/.test(requested))return res.status(400).json({success:false});
-    const ref=requested?collection.doc(requested):collection.doc();
-    await db.runTransaction(async tx=>{
-      if(requested){const old=await tx.get(ref);if(!old.exists)throw Error('Contact not found');}
-      else{
-        const sample=await tx.get(collection.limit(UBEE_LINE_MEMBER.maxContacts+1));
-        if(sample.size>=UBEE_LINE_MEMBER.maxContacts)throw Error('Contact limit reached');
+// Legacy routes temporarily retained for previously deployed clients. Do not re-enable member UI.
+app.post('/api/customer-auth/order-session', (req, res) => createCustomerOnboarding(req, res));
+app.post('/api/customer-auth/register', (req, res) => createCustomerOnboarding(req, res, { withPassword:true }));
+
+// 密碼新增與變更由後端認證 Session，密碼更新後輪替 Session，其他裝置失效。
+app.post('/api/customer-auth/password/update', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const auth = req.customerAuth;
+    const nextPassword = String(req.body?.password || '');
+    const currentPassword = String(req.body?.currentPassword || '');
+    const hash = await hashCustomerPassword(nextPassword, auth.account.phone || '');
+    const oldHash = auth.account.passwordHash;
+    if (oldHash?.hash && !(await verifyCustomerPassword(currentPassword, oldHash))) {
+      throw customerAuthError('目前密碼不正確。', 401, 'CUSTOMER_CURRENT_PASSWORD_INVALID');
+    }
+    if (oldHash?.hash && await verifyCustomerPassword(nextPassword, oldHash)) {
+      throw customerAuthError('新密碼不能與目前密碼相同。', 400, 'CUSTOMER_PASSWORD_REUSE');
+    }
+    const rawToken = customerAuthRandomToken(32);
+    const newSessionRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(customerAuthHash(rawToken));
+    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(auth.customerId);
+    const nowMs = Date.now();
+    let nextVersion;
+    await db.runTransaction(async tx => {
+      const [accountDoc, oldSession] = await Promise.all([tx.get(accountRef), tx.get(auth.sessionRef)]);
+      const account = accountDoc.data() || {};
+      if (!accountDoc.exists || String(account.status || 'active') !== 'active' || !oldSession.exists || oldSession.data()?.revoked === true ||
+          Number(oldSession.data()?.expiresAtMs || 0) <= nowMs ||
+          Number(account.passwordVersion || 1) !== Number(auth.session.passwordVersion || 1)) {
+        throw customerAuthError('登入狀態已變更，請重新登入再試。', 401, 'CUSTOMER_LOGIN_REQUIRED');
       }
-      tx.set(ref,{...contact,updatedAtMs:Date.now(),updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+      if (Boolean(account.passwordHash?.hash) !== Boolean(oldHash?.hash) ||
+          (oldHash?.hash && account.passwordHash.hash !== oldHash.hash)) {
+        throw customerAuthError('密碼已於其他操作中變更，請重新登入。', 409, 'CUSTOMER_PASSWORD_CHANGED');
+      }
+      nextVersion = Number(account.passwordVersion || 1) + 1;
+      tx.set(accountRef, {
+        passwordHash:hash, passwordConfigured:true, authMode:'password', passwordVersion:nextVersion,
+        failedLoginCount:0, lockedUntilMs:0, passwordUpdatedAtMs:nowMs, updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+      tx.set(newSessionRef, {
+        customerId:auth.customerId, passwordVersion:nextVersion, createdAtMs:nowMs,
+        lastSeenAtMs:nowMs, expiresAtMs:nowMs + CUSTOMER_AUTH.sessionTtlMs, revoked:false,
+        ...customerAuthClientFingerprint(req), createdAt:admin.firestore.FieldValue.serverTimestamp()
+      });
+      tx.set(auth.sessionRef, {revoked:true, revokedAtMs:nowMs}, {merge:true});
     });
-    return res.json({success:true,contact:{id:ref.id,...contact}});
-  }catch(error){return res.status(409).json({success:false,message:'儲存聯絡人失敗，請確認是否已達 20 筆上限。'});}
+    setCustomerSessionCookie(req, res, rawToken);
+    const latest = await accountRef.get();
+    return res.json({success:true, passwordConfigured:true, customer:customerAccountResponse(latest.data() || {}, auth.customerId)});
+  } catch (error) { return sendCustomerAuthError(res, error); }
 });
-app.delete('/api/customer/contacts/:id',requireCustomerAuth,async(req,res)=>{
-  res.set('Cache-Control','no-store');if(!ubeeLineOriginOk(req))return res.status(403).json({success:false});
-  if(req.customerAuth.account?.authMode!=='line_login')return res.status(403).json({success:false});
-  const id=String(req.params.id||'');if(!/^[A-Za-z0-9]{12,40}$/.test(id))return res.status(400).json({success:false});
-  try{await ubeeCustomerContactsRef(req.customerAuth.customerId).doc(id).delete();return res.json({success:true});}
-  catch(_){return res.status(503).json({success:false,message:'刪除聯絡人失敗。'});}
+
+app.post('/api/customer-auth/login', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    const password = String(req.body?.password || '');
+    if (!isValidCustomerPhone(phone) || !password) {
+      throw customerAuthError('手機號碼或密碼不正確。', 401, 'CUSTOMER_LOGIN_INVALID');
+    }
+
+    const record = await findCustomerAccountByPhone(phone);
+    if (!record) {
+      throw customerAuthError('手機號碼或密碼不正確。', 401, 'CUSTOMER_LOGIN_INVALID');
+    }
+
+    const nowMs = Date.now();
+    const account = record.account;
+    if (String(account.status || 'active') !== 'active') {
+      throw customerAuthError('此帳號目前無法登入，請聯繫 UBee 客服。', 403, 'CUSTOMER_ACCOUNT_UNAVAILABLE');
+    }
+    if (Number(account.lockedUntilMs || 0) > nowMs) {
+      const minutes = Math.max(1, Math.ceil((Number(account.lockedUntilMs) - nowMs) / 60000));
+      throw customerAuthError(
+        `登入錯誤次數過多，請於 ${minutes} 分鐘後再試。`,
+        423,
+        'CUSTOMER_ACCOUNT_LOCKED'
+      );
+    }
+
+    const passwordOk = await verifyCustomerPassword(password, account.passwordHash);
+    if (!passwordOk) {
+      const failedCount = Number(account.failedLoginCount || 0) + 1;
+      const lockedUntilMs = failedCount >= CUSTOMER_AUTH.maxLoginAttempts
+        ? nowMs + CUSTOMER_AUTH.loginLockMs
+        : 0;
+      await record.ref.set({
+        failedLoginCount: lockedUntilMs ? 0 : failedCount,
+        lockedUntilMs,
+        lastFailedLoginAtMs: nowMs,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      throw customerAuthError(
+        lockedUntilMs
+          ? '登入錯誤次數過多，帳號已暫時鎖定 15 分鐘。'
+          : '手機號碼或密碼不正確。',
+        lockedUntilMs ? 423 : 401,
+        lockedUntilMs ? 'CUSTOMER_ACCOUNT_LOCKED' : 'CUSTOMER_LOGIN_INVALID'
+      );
+    }
+
+    await record.ref.set({
+      failedLoginCount: 0,
+      lockedUntilMs: 0,
+      lastLoginAtMs: nowMs,
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    const rawToken = await createCustomerSession(
+      req,
+      record.customerId,
+      Number(account.passwordVersion || 1)
+    );
+    setCustomerSessionCookie(req, res, rawToken);
+
+    return res.json({
+      success: true,
+      authenticated: true,
+      customer: customerAccountResponse(account, record.customerId),
+    });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
 });
-app.post('/api/customer-line/deletion-request',requireCustomerAuth,async(req,res)=>{
-  res.set('Cache-Control','no-store');if(!ubeeLineOriginOk(req))return res.status(403).json({success:false});
-  if(req.customerAuth.account?.authMode!=='line_login')return res.status(403).json({success:false});
-  if(Date.now()-Number(req.customerAuth.session?.createdAtMs||0)>10*60*1000)return res.status(403).json({success:false,message:'為保護帳號，請先登出並重新透過 LINE 登入後再送出。'});
-  try{
-    await db.collection(UBEE_LINE_COLLECTIONS.deleteRequests).doc(req.customerAuth.customerId).set({
-      customerId:req.customerAuth.customerId,status:'pending_review',requestedAtMs:Date.now(),updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-    },{merge:true});
-    return res.json({success:true,status:'pending_review',message:'已收到刪除申請，將確認未結任務與依法保存資料後處理。'});
-  }catch(error){return res.status(503).json({success:false,message:'申請暫時無法送出。'});}
+
+// 無簡訊會員復原：已登入的裝置產生一次性 LINE 綁定指令（10 分鐘）。
+// 只有真正從 LINE Bot 收到正確指令才會建立 trusted LINE 復原關係。
+app.post('/api/customer-auth/recovery-line/start', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const raw = customerAuthRandomToken(24);
+    const challengeHash = customerAuthHash(raw);
+    const challengeRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLinkChallenges).doc(challengeHash);
+    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    const nowMs = Date.now();
+    await db.runTransaction(async tx => {
+      const doc = await tx.get(accountRef);
+      if (!doc.exists || String(doc.data()?.status || 'active') !== 'active') {
+        throw customerAuthError('會員帳號不可使用。', 403, 'CUSTOMER_ACCOUNT_UNAVAILABLE');
+      }
+      tx.set(accountRef, {recoveryLinkChallengeHash:challengeHash, updatedAtMs:nowMs}, {merge:true});
+      tx.set(challengeRef, {customerId, expiresAtMs:nowMs+600000, used:false, createdAtMs:nowMs,
+        createdAt:admin.firestore.FieldValue.serverTimestamp()});
+    });
+    return res.json({success:true, command:`綁定會員 ${raw}`, expiresAtMs:nowMs+600000});
+  } catch (error) { return sendCustomerAuthError(res, error); }
+});
+
+async function handleCustomerRecoveryLineLink(event, lineUserId, text) {
+  const match = String(text || '').trim().match(/^綁定會員\s+([A-Za-z0-9_-]{32})$/);
+  if (!match) return null;
+  const safeLineId = customerPasswordResetLineUserId(lineUserId);
+  if (!safeLineId || event.source?.type !== 'user') return replyText(event.replyToken, '請在 UBee LINE 官方帳號的一對一對話完成綁定。');
+  const challengeHash = customerAuthHash(match[1]);
+  const challengeRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLinkChallenges).doc(challengeHash);
+  const lineIndexRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLineIndex).doc(customerAuthHash(safeLineId));
+  const nowMs = Date.now();
+  try {
+    await db.runTransaction(async tx => {
+      const [challengeDoc, indexDoc] = await Promise.all([tx.get(challengeRef), tx.get(lineIndexRef)]);
+      const challenge = challengeDoc.data() || {};
+      const customerId = String(challenge.customerId || '');
+      if (!challengeDoc.exists || challenge.used === true || Number(challenge.expiresAtMs || 0) <= nowMs || !/^customer_[a-f0-9]{32}$/.test(customerId)) {
+        throw customerAuthError('綁定指令已過期或無效。', 410, 'CUSTOMER_RECOVERY_LINK_EXPIRED');
+      }
+      const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+      const accountDoc = await tx.get(accountRef);
+      const account = accountDoc.data() || {};
+      if (!accountDoc.exists || String(account.status || 'active') !== 'active' || account.recoveryLinkChallengeHash !== challengeHash) {
+        throw customerAuthError('帳號狀態已變更，請重新取得指令。', 409, 'CUSTOMER_RECOVERY_LINK_INVALID');
+      }
+      if (indexDoc.exists && indexDoc.data()?.customerId !== customerId) {
+        throw customerAuthError('此 LINE 帳號已綁定其他 UBee 會員，請聯繫客服核對。', 409, 'CUSTOMER_RECOVERY_LINE_IN_USE');
+      }
+      // 避免先前已綁定同一顧客的舊索引殘留；只允許本人有 Session 時啟動綁定。
+      const oldLine = customerPasswordResetLineUserId(account.recoveryLineUserId);
+      if (oldLine && oldLine !== safeLineId) {
+        tx.delete(db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLineIndex).doc(customerAuthHash(oldLine)));
+      }
+      tx.set(accountRef, {recoveryLineUserId:safeLineId, recoveryLineTrustedAtMs:nowMs,
+        recoveryLineTrustLevel:'trusted', recoveryLinkChallengeHash:'', updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp()}, {merge:true});
+      tx.set(lineIndexRef, {customerId, lineUserIdHash:customerAuthHash(safeLineId), updatedAtMs:nowMs}, {merge:true});
+      tx.set(challengeRef, {used:true, usedAtMs:nowMs}, {merge:true});
+    });
+    return replyText(event.replyToken, '✅ UBee 會員的 LINE 帳號復原方式已綁定完成。未來忘記密碼，可在此輸入「忘記密碼 09xxxxxxxx」核對。');
+  } catch (error) {
+    return replyText(event.replyToken, error?.message || '目前無法完成綁定，請稍後重試。');
+  }
+}
+
+// =====================================================
+// UBee Customer Password Reset V1｜公開一次性連結 API
+// =====================================================
+app.post('/api/customer-auth/password-reset/validate', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const record = await loadCustomerPasswordResetRecord(req.body?.token);
+    return res.json({
+      success: true,
+      valid: true,
+      maskedPhone: maskCustomerPhone(record.account.phone || ''),
+      expiresAtMs: Number(record.reset.expiresAtMs || 0),
+    });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/password-reset/complete', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const first = await loadCustomerPasswordResetRecord(req.body?.token);
+    const newPasswordHash = await hashCustomerPassword(
+      req.body?.password,
+      first.account.phone || ''
+    );
+
+    const sameAsOld = await verifyCustomerPassword(
+      req.body?.password,
+      first.account.passwordHash
+    );
+    if (sameAsOld) {
+      throw customerAuthError(
+        '新密碼不可與目前密碼相同，請設定另一組密碼。',
+        400,
+        'CUSTOMER_PASSWORD_REUSE'
+      );
+    }
+
+    const nowMs = Date.now();
+    await db.runTransaction(async transaction => {
+      const [tokenDoc, accountDoc] = await Promise.all([
+        transaction.get(first.tokenRef),
+        transaction.get(first.accountRef),
+      ]);
+
+      if (!tokenDoc.exists || !accountDoc.exists) {
+        throw customerAuthError(
+          '這個密碼重設連結無效，請回到 UBee LINE 官方帳號重新輸入「忘記密碼」。',
+          410,
+          'CUSTOMER_PASSWORD_RESET_INVALID'
+        );
+      }
+
+      const reset = tokenDoc.data() || {};
+      const account = accountDoc.data() || {};
+      if (
+        reset.used === true ||
+        reset.revoked === true ||
+        Number(reset.expiresAtMs || 0) <= nowMs ||
+        Number(account.passwordResetVersion || 0) !== Number(reset.resetVersion || -1)
+      ) {
+        throw customerAuthError(
+          '這個密碼重設連結已使用、已過期，或已被新連結取代。',
+          410,
+          'CUSTOMER_PASSWORD_RESET_EXPIRED'
+        );
+      }
+
+      const nextPasswordVersion = Number(account.passwordVersion || 1) + 1;
+      transaction.set(first.accountRef, {
+        passwordHash: newPasswordHash,
+        passwordVersion: nextPasswordVersion,
+        passwordConfigured: true,
+        authMode: 'password',
+        failedLoginCount: 0,
+        lockedUntilMs: 0,
+        lastFailedLoginAtMs: 0,
+        passwordResetCompletedAtMs: nowMs,
+        passwordResetCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(first.tokenRef, {
+        used: true,
+        usedAtMs: nowMs,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    // passwordVersion 已變更，其他裝置上的舊 Session 會全部失效；
+    // 同時清掉目前瀏覽器 Cookie，要求用新密碼重新登入。
+    clearCustomerSessionCookie(req, res);
+
+    return res.json({
+      success: true,
+      reset: true,
+      message: '密碼已重設完成，請使用新密碼重新登入 UBee。',
+    });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.get('/api/customer-auth/me', customerAuthOptional, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!req.customerAuth) {
+    return res.status(401).json({
+      success: false,
+      authenticated: false,
+      code: 'CUSTOMER_LOGIN_REQUIRED',
+      message: '尚未登入 UBee 會員帳號。',
+    });
+  }
+  return res.json({
+    success: true,
+    authenticated: true,
+    customer: customerAccountResponse(
+      req.customerAuth.account,
+      req.customerAuth.customerId
+    ),
+  });
 });
 
 // =====================================================
@@ -6620,7 +6722,7 @@ app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => 
   }
 });
 
-console.log('🔐 UBee Customer LINE Membership V1 RC1 candidate routes initialized');
+console.log('🔐 UBee 客戶會員系統已載入｜忘記密碼：LINE Messaging API Bot 全自動核對＋15分鐘一次性連結｜不使用 LIFF／不使用簡訊');
 
 
 // ==============================
@@ -39913,11 +40015,6 @@ function applyVerifiedStoreDiscoveryToOrder(orderData, storeDiscovery) {
 
 app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req, res) => {
     try {
-    // LINE-only membership: old guest/password sessions may read their preexisting orders,
-    // but MUST NOT create new orders after rollout.
-    if (req.customerAuth?.account?.authMode !== 'line_login') {
-      return res.status(403).json({success:false,code:'LINE_LOGIN_REQUIRED',message:'請先使用 LINE 登入 UBee 再建立新任務。'});
-    }
     if(!req.body || typeof req.body !== 'object'){
     return res.status(400).json({
     success:false,
@@ -39928,17 +40025,15 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     req.body.customerId = req.customerAuth.customerId;
     req.body.customerMemberNumber = String(req.customerAuth.account.memberNumber || '');
     req.body.customerName = String(req.customerAuth.account.name || '');
-    // Telephone belongs to THIS ORDER, never to LINE login identity.
-    const orderContactPhone = normalizeCustomerPhone(req.body.pickupPhone || req.body.dropoffPhone || '');
-    if(!isValidCustomerPhone(orderContactPhone))return res.status(400).json({success:false,code:'ORDER_CONTACT_REQUIRED',message:'請於訂單填寫有效的聯絡手機號碼。'});
-    req.body.customerPhone=orderContactPhone;
-    req.body.uCoinRedeemWhole=0;
-    const trustedSelfOrderIdentityKeys=buildCustomerSelfOrderIdentityKeys(
-      {...req.customerAuth.account,phone:orderContactPhone},req.customerAuth.customerId
+    req.body.customerPhone = String(req.customerAuth.account.authMode === 'guest_order' ? (req.customerAuth.account.guestContactPhone || '') : (req.customerAuth.account.phone || ''));
+    if(req.customerAuth.account.authMode==='guest_order')req.body.uCoinRedeemWhole=0;
+    const trustedSelfOrderIdentityKeys = buildCustomerSelfOrderIdentityKeys(
+      {...req.customerAuth.account, phone:req.customerAuth.account.authMode==='guest_order' ? req.customerAuth.account.guestContactPhone : req.customerAuth.account.phone},
+      req.customerAuth.customerId
     );
-    const data=createOrderFromApi(req.body);
-    data.customerAccessMode='line_member';
-    data.uCoinDisabled=true;
+    const data = createOrderFromApi(req.body);
+    data.customerAccessMode=req.customerAuth.account.authMode==='guest_order'?'guest_order':'legacy_customer';
+    data.uCoinDisabled=data.customerAccessMode==='guest_order';
 
     // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
     data.customerIdentityVerified = isCustomerIdentityVerified(
@@ -51154,7 +51249,7 @@ app.post('/api/customer/orders/:orderId/rider-rating', requireCustomerAuth, asyn
       }, { merge:true });
     });
 
-    const uCoinReward = ['guest_order','line_login'].includes(req.customerAuth?.account?.authMode)
+    const uCoinReward = req.customerAuth?.account?.authMode==='guest_order'
       ? {granted:false,disabled:true}
       : await grantUCoin(
       customerId,
