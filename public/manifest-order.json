@@ -2,9 +2,9 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee 跑腿｜LINE 會員客戶端｜六大跑腿服務、訂單追蹤與常用資料",
+  "description": "UBee 跑腿｜免會員登入客戶端候選｜下單與訂單追蹤",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20261110-customer-line-member-v1-rc1",
+  "start_url": "/order.html?source=pwa&v=20261110-customer-guest-rc1-hf1",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -37,7 +37,7 @@
       "name": "立即下單",
       "short_name": "下單",
       "description": "建立新的 UBee 跑腿任務",
-      "url": "/order.html?action=new&source=shortcut&v=20261110-customer-line-member-v1-rc1",
+      "url": "/order.html?action=new&source=shortcut&v=20261110-customer-guest-rc1-hf1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -49,8 +49,8 @@
     {
       "name": "我的訂單",
       "short_name": "訂單",
-      "description": "查看已登入 LINE 會員的訂單及任務進度",
-      "url": "/order.html?action=tasks&source=shortcut&v=20261110-customer-line-member-v1-rc1",
+      "description": "查看本裝置已建立的訂單及任務進度",
+      "url": "/order.html?action=tasks&source=shortcut&v=20261110-customer-guest-rc1-hf1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
