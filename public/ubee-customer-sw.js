@@ -1,7 +1,7 @@
 /* ============================================================
- * UBee 跑腿｜客戶端 Service Worker｜Guest Order RC1 candidate 2026-11-10
+ * UBee 跑腿｜客戶端 Service Worker｜LINE Membership V1 RC1 candidate 2026-11-10
  * Release: Member Security V1 (optional register + password + LINE recovery) + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261110-customer-guest-rc1-hf1
+ * Version: 20261110-customer-line-member-v1-rc1
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；訂單／通知／U幣仍維持內部深層連結）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261110-customer-guest-rc1-hf1';
+const UBEE_CUSTOMER_SW_VERSION = '20261110-customer-line-member-v1-rc1';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
@@ -22,7 +22,6 @@ const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}-${UBEE_C
 const PAGE_CACHE = `${CACHE_PREFIX}page-${UBEE_CUSTOMER_SW_VERSION}`;
 
 const APP_SHELL = [
-  '/order.html',
   '/manifest-order.json',
   `/ubee-customer-icon-192.png?v=${UBEE_CUSTOMER_ICON_REV}`,
   `/ubee-customer-icon-512.png?v=${UBEE_CUSTOMER_ICON_REV}`
@@ -94,7 +93,7 @@ async function networkFirstPage(request) {
     });
 
     if (response && response.ok) {
-      await putResponse(PAGE_CACHE, request, response);
+      // Authenticated HTML is never cached.
     }
 
     return response;
@@ -103,7 +102,7 @@ async function networkFirstPage(request) {
       ignoreSearch: true
     });
 
-    // Guest Order: never fall back to an older member-enabled HTML page.
+    // LINE Membership: do not show any obsolete guest or password page from offline cache.
     return new Response('UBee 目前無法連線，請恢復網路後重新開啟。', {
       status:503,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}
     });
@@ -169,7 +168,7 @@ self.addEventListener('install', event => {
         })
       );
     } finally {
-      await self.skipWaiting();
+      // Wait for old customer windows to close before activating the new release.
     }
   })());
 });
