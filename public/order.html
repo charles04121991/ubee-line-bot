@@ -1,4 +1,4 @@
-<!-- LINE MEMBERSHIP V1 RC1 CANDIDATE: LINE-only account; staging verification mandatory.
+<!-- GUEST ORDER RC1 CANDIDATE: backend guest order session implemented; production integration testing still mandatory.
      UBee Customer TC V1.6 — Guest Order RC1 candidate｜Quote Concurrency Hotfix｜No Browser Maps SDK｜Single Service Flow｜移除 HF2 重複選服務及初始化誤清草稿，保留原有正式訂單 API / 計價 / 派單 / U幣 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261110-customer-line-member-v1-rc1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261110-customer-guest-rc1-hf1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6732,6 +6732,126 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 
 
 
+<style id="ubee-order-identity-gate-v4-style">
+#ubeeOrderIdentityGate{position:fixed;inset:0;z-index:2147482500;display:none;align-items:flex-end;justify-content:center;background:rgba(15,23,42,.34);padding:0;overscroll-behavior:contain}
+#ubeeOrderIdentityGate.active{display:flex}body.ubee-order-identity-open{overflow:hidden!important}
+.ubee-order-identity-sheet{width:min(100%,520px);background:#fff;border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -16px 44px rgba(15,23,42,.18);transform:translateY(0)}
+.ubee-order-identity-handle{width:38px;height:4px;border-radius:999px;background:#d9dce0;margin:0 auto 16px}.ubee-order-identity-head h2{margin:0;font-size:22px;font-weight:1000}.ubee-order-identity-head p{margin:7px 0 16px;color:#777d83;font-size:14px;font-weight:750;line-height:1.65}.ubee-order-identity-field{margin-top:12px}.ubee-order-identity-field label{display:block;margin-bottom:7px;font-size:14px;font-weight:1000}.ubee-order-identity-field input{width:100%;height:52px;padding:0 14px;border:1px solid #dfe2e6;border-radius:14px;background:#fff;color:#111;font-size:17px!important;font-weight:800;outline:none;transition:border-color .16s ease,box-shadow .16s ease}.ubee-order-identity-field input:focus{border-color:#c9a900;box-shadow:0 0 0 3px rgba(250,204,21,.18)}.ubee-order-identity-field input:disabled{background:#f6f7f8;color:#6f7479}.ubee-order-identity-status{min-height:22px;margin-top:10px;color:#6f7479;font-size:14px;font-weight:800;line-height:1.5}.ubee-order-identity-status.is-error{color:#b42318}.ubee-order-identity-status.is-busy{color:#7a6100}.ubee-order-identity-actions{display:grid;gap:9px;margin-top:14px}.ubee-order-identity-actions button{width:100%;min-height:52px;border-radius:15px;font-size:16px!important;font-weight:1000}.ubee-order-identity-actions button:disabled{opacity:.58;cursor:default}.ubee-order-identity-primary{border:0;background:var(--accent,#facc15);color:#111}.ubee-order-identity-secondary{border:1px solid #dfe2e6;background:#fff;color:#111}.ubee-order-identity-cancel{border:0;background:transparent;color:#777}
+</style>
+<div aria-hidden="true" id="ubeeOrderIdentityGate">
+<div class="ubee-order-identity-sheet" role="dialog" aria-modal="true" aria-labelledby="ubeeOrderIdentityTitle">
+<div class="ubee-order-identity-handle"></div><div class="ubee-order-identity-head"><h2 id="ubeeOrderIdentityTitle">確認下單人資料</h2><p>只需填寫姓名與聯絡電話，不必登入；本裝置將保存安全訂單識別。請勿在共用裝置上使用。</p></div>
+<div class="ubee-order-identity-field"><label for="ubeeOrderIdentityName">下單人姓名</label><input id="ubeeOrderIdentityName" maxlength="40" autocomplete="name" enterkeyhint="next" placeholder="請填寫本人姓名"/></div>
+<div class="ubee-order-identity-field"><label for="ubeeOrderIdentityPhone">下單人手機</label><input id="ubeeOrderIdentityPhone" maxlength="10" inputmode="numeric" autocomplete="tel" enterkeyhint="done" placeholder="09xxxxxxxx" type="tel"/></div>
+<div class="ubee-order-identity-status" id="ubeeOrderIdentityStatus" role="status" aria-live="polite"></div>
+<div class="ubee-order-identity-actions"><button class="ubee-order-identity-primary" id="ubeeOrderIdentityContinue" type="button">確認並繼續送單</button><button class="ubee-order-identity-cancel" id="ubeeOrderIdentityCancel" type="button">取消</button></div>
+</div></div>
+<script id="ubee-order-identity-gate-v4-script">
+(()=>{'use strict';
+  const gate=document.getElementById('ubeeOrderIdentityGate');
+  const nameInput=document.getElementById('ubeeOrderIdentityName');
+  const phoneInput=document.getElementById('ubeeOrderIdentityPhone');
+  const status=document.getElementById('ubeeOrderIdentityStatus');
+  const continueBtn=document.getElementById('ubeeOrderIdentityContinue');
+  const loginBtn=null;
+  const cancelBtn=document.getElementById('ubeeOrderIdentityCancel');
+  if(!gate||!nameInput||!phoneInput||!status||!continueBtn||!cancelBtn)return;
+
+  let pendingResolve=null,pendingReject=null,busy=false;
+  const normalizePhone=value=>String(value||'').replace(/\D/g,'').slice(0,10);
+  const validPhone=value=>/^09\d{8}$/.test(normalizePhone(value));
+  const setStatus=(message='',type='')=>{status.textContent=String(message||'');status.className=`ubee-order-identity-status${type?` ${type}`:''}`};
+  function setBusy(value,message=''){
+    busy=Boolean(value);
+    [nameInput,phoneInput,continueBtn,cancelBtn].forEach(el=>{el.disabled=busy});
+    continueBtn.textContent=busy?'正在建立安全使用身分…':'確認並繼續送單';
+    if(message)setStatus(message,busy?'is-busy':'');
+  }
+  function close(){setBusy(false);gate.classList.remove('active');gate.setAttribute('aria-hidden','true');document.body.classList.remove('ubee-order-identity-open')}
+  function rejectGate(message='已取消建立任務',code='CUSTOMER_IDENTITY_CANCELLED'){
+    if(busy)return;
+    const reject=pendingReject;pendingResolve=pendingReject=null;close();
+    if(reject){const error=new Error(message);error.code=code;reject(error)}
+  }
+  function promoteGuestLocalContext(customerId){
+    const pairs=['ubee_order_draft_v2','ubee_customer_saved_addresses_v2','ubee_order_draft_cleared_v1'];
+    for(const base of pairs){const guest=`${base}:guest`,target=`${base}:${customerId}`;try{const value=localStorage.getItem(guest);if(value!==null&&localStorage.getItem(target)===null)localStorage.setItem(target,value);localStorage.removeItem(guest)}catch(_){}}
+  }
+  async function rawApi(url,options={}){
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),15000);
+    try{
+      const response=await fetch(url,{...options,credentials:'include',cache:'no-store',headers:{Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})},signal:controller.signal});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||data.success===false){const error=new Error(data.message||data.error||`系統暫時無法處理（${response.status}）`);error.code=data.code||'';error.status=response.status;error.payload=data;throw error}
+      return data;
+    }catch(error){if(error.name==='AbortError'){const timeoutError=new Error('連線逾時，請確認網路後再試一次。');timeoutError.code='CUSTOMER_ORDER_SESSION_TIMEOUT';throw timeoutError}throw error}finally{clearTimeout(timer)}
+  }
+  function open(){
+    if(pendingReject)rejectGate();
+    gate.classList.add('active');gate.setAttribute('aria-hidden','false');document.body.classList.add('ubee-order-identity-open');setBusy(false);setStatus('');
+    try{nameInput.value=String(localStorage.getItem('ubee_order_identity_name')||'').slice(0,40);phoneInput.value=normalizePhone(localStorage.getItem('ubee_order_identity_phone')||'')}catch(_){}
+    setTimeout(()=>{(nameInput.value?phoneInput:nameInput).focus()},80);
+    return new Promise((resolve,reject)=>{pendingResolve=resolve;pendingReject=reject});
+  }
+  async function submitIdentity(){
+    if(busy||!pendingResolve)return;
+    const name=String(nameInput.value||'').trim();
+    const phone=normalizePhone(phoneInput.value);phoneInput.value=phone;
+    if(name.length<2){setStatus('請填寫下單人本人姓名。','is-error');nameInput.focus();return}
+    if(!validPhone(phone)){setStatus('請填寫正確的 09 開頭 10 碼手機號碼。','is-error');phoneInput.focus();return}
+    try{localStorage.setItem('ubee_order_identity_name',name);localStorage.setItem('ubee_order_identity_phone',phone)}catch(_){}
+    setBusy(true,'正在建立安全使用身分，完成後會直接繼續送單。');
+    try{
+      const data=await rawApi('/api/customer-guest/session',{method:'POST',body:JSON.stringify({name,phone,serviceCity:(typeof selectedServiceCity!=='undefined'?selectedServiceCity:''),agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})});
+      const customer=data.customer||{};
+      if(!/^customer_[a-f0-9]{32}$/.test(String(customer.customerId||'')))throw new Error('後端未回傳有效的 Customer ID。');
+      // 確保此瀏覽器已真的保存 HttpOnly Session；避免新帳號建立成功卻無法送單。
+      let confirmedMe;
+      try{confirmedMe=await rawApi('/api/customer-guest/me')}
+      catch(_){
+        const cookieError=new Error('訂單憑證已建立，但本裝置無法安全保存。請使用一般瀏覽器並確認 Cookie 功能可用。');
+        cookieError.code='CUSTOMER_SESSION_NOT_PERSISTED';
+        throw cookieError;
+      }
+      if(String(confirmedMe?.customer?.customerId||'')!==String(customer.customerId)){
+        const cookieError=new Error('訪客訂單憑證未能正確保存，請使用一般瀏覽器重試。');
+        cookieError.code='CUSTOMER_SESSION_NOT_PERSISTED';
+        throw cookieError;
+      }
+      promoteGuestLocalContext(customer.customerId);
+      if(typeof currentCustomer!=='undefined')currentCustomer=confirmedMe.customer;
+      if(typeof userId!=='undefined')userId=String(customer.customerId);
+      window.__ubeeCurrentCustomer=confirmedMe.customer;
+      const resolve=pendingResolve;pendingResolve=pendingReject=null;close();resolve?.(String(customer.customerId));
+    }catch(error){
+      setBusy(false);setStatus(error.message||'目前無法建立使用身分，請稍後再試。','is-error');
+    }
+  }
+
+  continueBtn.addEventListener('click',submitIdentity);
+  phoneInput.addEventListener('input',event=>event.target.value=normalizePhone(event.target.value));
+  phoneInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();submitIdentity()}});
+  document.getElementById('ubeeOrderIdentityCancel').addEventListener('click',()=>rejectGate());
+
+
+  window.UBeeOrderIdentityGate=Object.freeze({open,close,isOpen:()=>gate.classList.contains('active')});
+  window.ensureCustomerSessionForOrder=async function(){
+    const existing=(()=>{try{return (typeof currentCustomer!=='undefined'&&currentCustomer)||window.__ubeeCurrentCustomer||null}catch(_){return null}})();
+    if(existing?.authMode==='guest_order'&&/^customer_[a-f0-9]{32}$/.test(String(existing?.customerId||'')))return String(existing.customerId);
+    try{
+      const me=await rawApi('/api/customer-guest/me');
+      if(/^customer_[a-f0-9]{32}$/.test(String(me?.customer?.customerId||''))){
+        if(typeof currentCustomer!=='undefined')currentCustomer=me.customer;
+        if(typeof userId!=='undefined')userId=String(me.customer.customerId);
+        window.__ubeeCurrentCustomer=me.customer;
+        return String(me.customer.customerId);
+      }
+    }catch(error){if(error.status!==401)console.warn('UBee Session 探測失敗：',error)}
+    return open();
+  };
+})();
+</script>
 <div class="app">
 <div class="topbar" id="globalTopbar">
 <!-- 中央 UBee 品牌；四大主頁不提供返回按鈕 -->
@@ -7393,7 +7513,7 @@ let currentCustomer = null;
 function showCustomerAuthConnectionError(message){console.error('UBee 訂單憑證連線異常',message)}
 function redirectToCustomerLogin(){
   currentCustomer=null;userId='';window.__ubeeCurrentCustomer=null;
-  window.UBeeLineAuth?.require?.();
+  console.warn('UBee 本裝置訪客憑證已失效；下次送單時須重新填寫聯絡資料。');
 }
 
 async function customerApiFetch(url, options = {}){
@@ -7411,7 +7531,7 @@ async function customerApiFetch(url, options = {}){
   if(response.status === 401){
     // 背景更新（訂單、通知、成長、地址、雲端草稿）不可強制打開登入畫面。
     // 只有客人主動按「建立訂單」的操作才允許顯示登入提示。
-    const error = new Error(data.message || 'LINE 登入已失效，請重新使用 LINE 登入。');
+    const error = new Error(data.message || '本裝置訂單憑證已失效，請重新確認下單聯絡資料。');
     error.code = data.code || 'CUSTOMER_LOGIN_REQUIRED';
     error.status = 401;
     if(options.authPrompt === true){
@@ -14411,14 +14531,12 @@ function renderOrderList(el, orders, emptyText){
 }
 
 const UBEE_CUSTOMER_ORDER_LIST_CACHE_KEY='ubee_customer_order_list_cache_v1';
-const ubeeScopedOrdersKey=()=>UBEE_CUSTOMER_ORDER_LIST_CACHE_KEY+':'+String(window.__ubeeCurrentCustomer?.customerId||'not-authenticated');
-let ubeeCachedOrdersOwner=null;
 const UBEE_CUSTOMER_ORDER_LIST_CACHE_MS=45000;
 let ubeeCustomerOrdersRequestPromise=null;
 
 function readCustomerOrderListSessionCache(){
   try{
-    const parsed=JSON.parse(sessionStorage.getItem(ubeeScopedOrdersKey())||'null');
+    const parsed=JSON.parse(sessionStorage.getItem(UBEE_CUSTOMER_ORDER_LIST_CACHE_KEY)||'null');
     if(!parsed || !Array.isArray(parsed.orders))return null;
     const fetchedAt=Math.max(0,Number(parsed.fetchedAt||0));
     return {orders:parsed.orders,fetchedAt};
@@ -14426,13 +14544,6 @@ function readCustomerOrderListSessionCache(){
 }
 
 function getCachedCustomerOrders(maxAgeMs=Infinity){
-  const owner=String(window.__ubeeCurrentCustomer?.customerId||'');
-  if(!owner)return null;
-  if(ubeeCachedOrdersOwner!==owner){
-    window.__ubeeCustomerOrdersCache=null;
-    window.__ubeeCustomerOrdersFetchedAt=0;
-    ubeeCachedOrdersOwner=owner;
-  }
   let orders=Array.isArray(window.__ubeeCustomerOrdersCache)?window.__ubeeCustomerOrdersCache:null;
   let fetchedAt=Math.max(0,Number(window.__ubeeCustomerOrdersFetchedAt||0));
   if(!orders){
@@ -14451,14 +14562,11 @@ function getCachedCustomerOrders(maxAgeMs=Infinity){
 }
 
 function saveCustomerOrderListCache(orders){
-  const owner=String(window.__ubeeCurrentCustomer?.customerId||'');
-  if(!owner)return [];
-  ubeeCachedOrdersOwner=owner;
   const safe=Array.isArray(orders)?orders.slice(0,100):[];
   const fetchedAt=Date.now();
   window.__ubeeCustomerOrdersCache=safe;
   window.__ubeeCustomerOrdersFetchedAt=fetchedAt;
-  try{sessionStorage.setItem(ubeeScopedOrdersKey(),JSON.stringify({orders:safe,fetchedAt}));}catch(_){}
+  try{sessionStorage.setItem(UBEE_CUSTOMER_ORDER_LIST_CACHE_KEY,JSON.stringify({orders:safe,fetchedAt}));}catch(_){}
   return safe;
 }
 
@@ -15232,11 +15340,9 @@ async function initPage(options = {}){
   try{
     setSubmitButton('正在載入 UBee...',true);
     currentCustomer=null;userId='';
-    const authResponse=await fetch('/api/customer-line/me',{credentials:'include',cache:'no-store',headers:{Accept:'application/json'}});
+    const authResponse=await fetch('/api/customer-guest/me',{credentials:'include',cache:'no-store',headers:{Accept:'application/json'}});
     const authData=await authResponse.json().catch(()=>({}));
-    if(authResponse.ok&&authData.customer?.authMode==='line_login'&&authData.customer?.customerId){
-      currentCustomer=authData.customer;userId=String(currentCustomer.customerId||'');window.__ubeeCurrentCustomer=currentCustomer;
-    }else{window.__ubeeCurrentCustomer=null;window.UBeeLineAuth?.require?.();setSubmitButton('請先使用 LINE 登入',true);return false;}
+    if(authResponse.ok&&authData.customer?.authMode==='guest_order'&&authData.customer?.customerId){currentCustomer=authData.customer;userId=String(currentCustomer.customerId||'');window.__ubeeCurrentCustomer=currentCustomer}else{window.__ubeeCurrentCustomer=null}
 
     window.UBeeCustomerAuthHost?.hide();setSubmitButton('確認並建立任務',false);handleInitialOpenAction();
     ensureCustomerInitialLocationGate();startHomeServiceStatusRefresh();customerPageInitialized=true;return true;
@@ -15303,7 +15409,6 @@ const UBeeEnhancements = (() => {
   }
 
   function migrateLegacyLocalData(){
-    if(currentCustomer?.authMode==='line_login')return;
     const owner=customerStorageId();
     if(!owner)return;
     const pairs=[[BASE_KEYS.draft,draftKey()],[BASE_KEYS.addresses,addressesKey()]];
@@ -17200,10 +17305,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-form-group"><label class="flow-label" for="flowDetailAddress">完整地址</label><input class="flow-input" id="flowDetailAddress" maxlength="240" readonly=""/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailNote">門牌、樓層及補充說明</label><input class="flow-input" id="flowDetailNote" maxlength="160" placeholder="例如：12號3樓、店名、管理室或入口說明"/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailName" id="flowDetailNameLabel">聯絡人姓名 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailName" maxlength="60" placeholder="取件聯絡人或收件人"/></div>
-<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone" id="flowDetailPhoneLabel">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="09xxxxxxxx"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button><button class="flow-small-btn" id="flowDetailSavedContactButton" type="button">常用聯絡人</button></div></div>
+<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone" id="flowDetailPhoneLabel">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="09xxxxxxxx"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button></div></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailLabel">常用地址名稱</label><input class="flow-input" id="flowDetailLabel" maxlength="40" placeholder="例如：家、公司、店家"/></div>
 <label class="flow-check" style="margin:0"><input id="flowSaveAddress" type="checkbox"/><span>儲存為常用地址，下次可直接選擇。</span></label>
-<label class="flow-check" style="margin:0"><input id="flowSaveContact" type="checkbox"/><span>同時儲存這位聯絡人，下次可直接選擇。</span></label>
 <div class="flow-status" id="flowDetailStatus"></div>
 <button class="flow-primary" id="flowSaveDetail" type="button">儲存地點資訊</button>
 </div>
@@ -17338,10 +17442,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 </div>
 <nav aria-label="主要導覽" class="ubee-primary-bottom-nav" id="ubeePersistentBottomNav">
-<button aria-label="首頁・下單" aria-current="page" class="active" data-nav-target="home" id="flowNavHome" type="button"><span class="flow-nav-icon ubee-home-brand-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M5.5 4.5v10a6.5 6.5 0 0 0 13 0v-10"/></svg></span><span class="ubee-line-nav-label">首頁</span></button>
+<button aria-label="首頁・下單" aria-current="page" class="active" data-nav-target="home" id="flowNavHome" type="button"><span class="flow-nav-icon ubee-home-brand-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M5.5 4.5v10a6.5 6.5 0 0 0 13 0v-10"/></svg></span></button>
 <button aria-label="我的訂單" data-nav-target="task" id="flowNavTask" type="button"><span class="flow-nav-icon">▤</span><span>訂單</span></button>
-<button aria-label="通知" data-nav-target="notify" id="flowNavNotify" type="button"><span class="flow-nav-icon">♧</span><span class="ubee-line-nav-label">通知</span></button>
-<button aria-label="我的" data-nav-target="my" id="flowNavMy" type="button"><span class="flow-nav-icon">♙</span><span class="ubee-line-nav-label">我的</span></button>
 </nav>
 <script id="ubee-production-flow-v4-script">
 (() => {
@@ -17836,14 +17938,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   const UBEE_CUSTOMER_ADDRESS_SESSION_CACHE_KEY='ubee_customer_address_session_cache_v1';
-  const ubeeScopedAddressKey=()=>UBEE_CUSTOMER_ADDRESS_SESSION_CACHE_KEY+':'+String(window.__ubeeCurrentCustomer?.customerId||'not-authenticated');
   const UBEE_CUSTOMER_SAVED_ADDRESS_CACHE_MS=60000;
   let addressListRequestPromise=null;
   let savedAddressRequestPromise=null;
 
   function persistCustomerAddressSessionCache(){
     try{
-      sessionStorage.setItem(ubeeScopedAddressKey(),JSON.stringify({
+      sessionStorage.setItem(UBEE_CUSTOMER_ADDRESS_SESSION_CACHE_KEY,JSON.stringify({
         saved:Array.isArray(state.savedAddresses)?state.savedAddresses:[],
         recent:Array.isArray(state.recentAddresses)?state.recentAddresses:[],
         fetchedAt:Date.now()
@@ -17854,7 +17955,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   function hydrateCustomerAddressCache(){
     if(state.savedAddresses.length || state.recentAddresses.length)return true;
     try{
-      const parsed=JSON.parse(sessionStorage.getItem(ubeeScopedAddressKey())||'null');
+      const parsed=JSON.parse(sessionStorage.getItem(UBEE_CUSTOMER_ADDRESS_SESSION_CACHE_KEY)||'null');
       if(parsed){
         state.savedAddresses=Array.isArray(parsed.saved)?parsed.saved:[];
         state.recentAddresses=Array.isArray(parsed.recent)?parsed.recent:[];
@@ -17862,7 +17963,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }catch(_){}
     if(!state.savedAddresses.length){
       try{
-        const local=JSON.parse('[]');
+        const local=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');
         state.savedAddresses=Array.isArray(local)?local:[];
       }catch(_){}
     }
@@ -17878,7 +17979,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       const data=await customerApiFetch('/api/customer/addresses');
       state.savedAddresses=Array.isArray(data.addresses)?data.addresses:[];
       if(!state.savedAddresses.length){
-        try{const local=JSON.parse('[]');state.savedAddresses=Array.isArray(local)?local:[]}catch(_){}
+        try{const local=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');state.savedAddresses=Array.isArray(local)?local:[]}catch(_){}
       }
       renderAddressList('flowSavedAddresses',state.savedAddresses,'saved','尚未儲存常用地址',4);
       renderProfileAddressList();
@@ -17902,7 +18003,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
         saved=Array.isArray(ad.addresses)?ad.addresses:[];
         recent=Array.isArray(rd.addresses)?rd.addresses:[];
       }catch(error){console.warn('讀取常用地址失敗：',error)}
-      if(!saved.length){try{const local=JSON.parse('[]');saved=Array.isArray(local)?local:[]}catch(_){}}
+      if(!saved.length){try{const local=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');saved=Array.isArray(local)?local:[]}catch(_){}}
       state.savedAddresses=saved;state.recentAddresses=recent;
       renderAddressList('flowSavedAddresses',saved,'saved','尚未儲存常用地址',4);
       renderAddressList('flowRecentAddresses',recent,'recent','尚無最近使用地址',4);
@@ -17975,7 +18076,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if($('flowDetailPhoneLabel'))$('flowDetailPhoneLabel').innerHTML=optionalSecond?'聯絡電話（選填）':'聯絡電話 <span class="flow-required">＊</span>';
     $('flowDetailName').placeholder=optionalSecond?'第二點收件人，可留空':'取件聯絡人或收件人';
     $('flowDetailPhone').placeholder=optionalSecond?'可留空，未填則沿用送達點 1':'09xxxxxxxx';
-    $('flowSaveAddress').checked=false;if($('flowSaveContact'))$('flowSaveContact').checked=false;status('flowDetailStatus','');showPage('detail');
+    $('flowSaveAddress').checked=false;status('flowDetailStatus','');showPage('detail');
   }
 
   // Resolve manually edited addresses through existing backend endpoints only.
@@ -18035,10 +18136,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       if(state.service==='helper')state.singlePointTask=false;
     }
     syncSinglePointTask();
-    if(window.UBeeLinePendingSelections){
-      if($('flowSaveAddress').checked)window.UBeeLinePendingSelections.addresses.push(item);
-      if($('flowSaveContact')?.checked&&contactName&&phone)window.UBeeLinePendingSelections.contacts.push({name:contactName,phone});
-    }
+    if($('flowSaveAddress').checked)await persistAddress(item);
     updateHome();syncLegacy();
     try{UBeeEnhancements?.saveDraft?.()}catch(_){ }
     if(typeof refreshHomeServiceStatus === 'function') refreshHomeServiceStatus();
@@ -18050,7 +18148,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       await customerApiFetch('/api/customer/addresses',{method:'POST',body:JSON.stringify({address:item})});
       return;
     }catch(error){console.warn('跨裝置地址儲存失敗：',error)}
-    try{const list=JSON.parse('[]');const arr=Array.isArray(list)?list:[];arr.unshift({...item,id:`local_${Date.now()}`});localStorage.setItem('ubee_uu_local_addresses_v1',JSON.stringify(arr.slice(0,20)))}catch(_){ }
+    try{const list=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');const arr=Array.isArray(list)?list:[];arr.unshift({...item,id:`local_${Date.now()}`});localStorage.setItem('ubee_uu_local_addresses_v1',JSON.stringify(arr.slice(0,20)))}catch(_){ }
   }
 
   function collectTask(){
@@ -18581,8 +18679,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');
       const createdOrderId=await createOrder({propagateError:true,approvedPricing});
       if(createdOrderId && typeof currentOrderId!=='undefined'&&String(currentOrderId)===String(createdOrderId)){
-        // Favorites are strictly opt-in; failure NEVER re-submits a successful order.
-        void window.UBeeLineMy?.persistPending?.().catch(error=>console.warn('常用資料儲存未完成',error));
         document.body.classList.add('ubee-active-order');
         // A successful order is the source of truth. Do not navigate back to Home.
         try{showOnlyStep(5)}catch(error){console.warn('UBee 訂單追蹤頁顯示失敗：',error)}
@@ -18596,7 +18692,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function resetNewTask(clearLegacy=true){
-    if(window.UBeeLinePendingSelections)window.UBeeLinePendingSelections={addresses:[],contacts:[]};
     window.__ubeeUCoinRedeemWhole=0;
     Object.assign(state,{page:'home',service:'send',userSelectedService:false,serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
     if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','dropoff2','dropoff2AddressNote','dropoff2Contact','dropoff2Phone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=dropoff2Lat=dropoff2Lng=null;pickupPlaceId=dropoffPlaceId=dropoff2PlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;/* HF3: 初始化／切換服務不可刪除持久草稿；捨棄與成功建單才調用 UBeeEnhancements.clearDraft()。 */}catch(_){ }}
@@ -19379,7 +19474,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   // Guest Order: order list is the only secondary primary screen.
   window.openUBeeTaskPage=window.openUBeeTaskRoot;
   window.openUBeeUCoinPage=window.openUBeeTaskRoot; // old deep links stay harmless
-  window.openUBeeProfilePage=()=>window.UBeeLineMy?.open?.();
+  window.openUBeeProfilePage=window.openUBeeTaskRoot; // no account UI retained
   window.UBeeCustomerMyServiceData={
     showCachedAddresses(){hydrateCustomerAddressCache();renderProfileAddressList();return state.savedAddresses.slice();},
     refreshSavedAddresses(){return loadSavedAddressesForProfile();},
@@ -19507,7 +19602,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261110-customer-line-member-v1-rc1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261110-customer-guest-rc1-hf1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22276,8 +22371,8 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V5__) return;
   window.__UBEE_BOTTOM_NAV_CONTROLLER_V5__=true;
 
-  const targetToId={home:'flowNavHome',task:'flowNavTask',notify:'flowNavNotify',my:'flowNavMy'};
-  const supportedTargets=new Set(['home','task','notify','my']);
+  const targetToId={home:'flowNavHome',task:'flowNavTask'};
+  const supportedTargets=new Set(['home','task']);
   let navigation=null;
   let navigationToken=0;
   let activeTarget='home';
@@ -22293,8 +22388,8 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     activeTarget=normalizeTarget(target);
     if(document.body) document.body.dataset.ubeePrimaryNav=activeTarget;
     // Orders/U-Coin remain internal routes; their only primary visual parent is My.
-    if(['home','task','notify','my'].includes(activeTarget)) lastMainTarget=activeTarget;
-    const visualTarget=activeTarget;
+    if(['home','task'].includes(activeTarget)) lastMainTarget=activeTarget;
+    const visualTarget=activeTarget==='task'?'task':'home';
     const activeId=targetToId[visualTarget]||targetToId.home;
     navigation?.querySelectorAll(':scope > button').forEach(button=>{
       const active=button.id===activeId;
@@ -22311,7 +22406,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
   async function openTarget(target,options={}){
     // Primary tabs must never retain a My subpage overlay from the previous tab.
-    if(target!=='my'){window.closeUBeeMySubPages?.();window.UBeeLineMy?.close?.();}
+    if(target!=='my') window.closeUBeeMySubPages?.();
     if(target==='ucoin')target='task';
     if(target==='home'){
       return window.openUBeeHomePage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-navigation'});
@@ -22319,7 +22414,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     if(target==='task') return window.openUBeeTaskPage?.();
     if(target==='notify') return window.openUBeeNotificationPage?.({notificationId:options.notificationId||''});
     if(target==='store') return window.openUBeeStorePage?.();
-    if(target==='my') return window.UBeeLineMy?.open?.();
+    if(target==='my') return window.openUBeeTaskPage?.();
   }
 
   async function navigate(target,options={}){
@@ -24009,259 +24104,5 @@ body:not(.flow-active) .app select,
 @media(max-width:359px){#productionOrderFlow #flowPageHome .flow-home-scroll{padding-left:10px!important;padding-right:10px!important}#productionOrderFlow #flowPageHome .flow-service-tabs .flow-service-icon{width:57px!important;height:57px!important}#productionOrderFlow #flowPageHome .ubee-rc32-banner h2{font-size:25px!important}}
 @media(prefers-reduced-motion:reduce){#productionOrderFlow #flowPageHome *{scroll-behavior:auto!important;transition:none!important}}
 </style>
-<!-- =============================================================
-     UBee LINE Membership V1 RC1 | candidate only, not deployed.
-     New auth and My UI; legacy guest identity gate physically removed.
-     ============================================================= -->
-<style id="ubee-line-membership-v1-css">
-#ubeeLineAuth{position:fixed;inset:0;z-index:2147483500;display:flex;align-items:center;justify-content:center;padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));background:#f7f8fa;color:#141414;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}
-#ubeeLineAuth[hidden]{display:none!important}
-.ubee-line-auth-card{width:min(100%,420px);background:#fff;border:1px solid #ebecef;border-radius:28px;padding:30px 24px;box-shadow:0 22px 60px #0000000c;text-align:center}
-.ubee-line-symbol{display:grid;place-items:center;width:76px;height:76px;border-radius:23px;background:#facc15;margin:0 auto 20px;font-weight:1000;font-size:37px;letter-spacing:-3px;color:#141414}
-.ubee-line-auth-card h1{margin:0 0 8px;font-size:29px;line-height:1.3;font-weight:950}.ubee-line-auth-card p{margin:0 0 25px;font-size:14px;line-height:1.7;color:#6f747c}
-.ubee-line-primary{display:flex;align-items:center;justify-content:center;min-height:54px;width:100%;border:0;border-radius:16px;background:#06c755;color:white;font-size:17px!important;font-weight:900;text-decoration:none;cursor:pointer}
-.ubee-line-primary:disabled{opacity:.55;cursor:not-allowed}.ubee-line-primary[hidden]{display:none!important}
-#ubeeLineTerms{display:none;text-align:left}
-#ubeeLineTerms label{display:flex;gap:10px;align-items:flex-start;margin:12px 0;font-size:14px;line-height:1.5;color:#30343a}
-#ubeeLineTerms input{width:20px;height:20px;flex:0 0 20px;accent-color:#e5b800}
-#ubeeLineAuthStatus{min-height:22px;margin-top:15px;font-size:13px;color:#b42318;line-height:1.5}
-#ubeeLineMyScreen{position:fixed;top:0;bottom:calc(68px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:2147482900;width:min(100%,520px);background:#f5f6f8;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;color:#151515;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif}
-#ubeeLineMyScreen[hidden]{display:none!important}
-.ubee-line-my-content{padding:calc(18px + env(safe-area-inset-top)) 16px 24px}.ubee-line-my-heading{display:flex;align-items:center;gap:12px;min-height:47px;margin-bottom:17px}.ubee-line-my-heading h2{flex:1;margin:0;font-size:25px;font-weight:950}.ubee-line-my-back{border:0;background:transparent;font-size:17px;font-weight:850;color:#202326;padding:10px 8px 10px 0}
-.ubee-line-my-card{background:#fff;border:1px solid #e7e9ed;border-radius:18px;padding:16px;margin-bottom:14px}
-.ubee-line-my-person{display:flex;align-items:center;gap:14px}.ubee-line-my-avatar{width:56px;height:56px;flex:0 0 56px;border-radius:50%;background:#fff3b4;display:grid;place-items:center;font-size:27px;font-weight:950;overflow:hidden}.ubee-line-my-avatar img{width:100%;height:100%;object-fit:cover}.ubee-line-my-person strong{font-size:18px;line-height:1.4}.ubee-line-my-person small{display:block;margin-top:3px;color:#858b93;font-size:12px}
-.ubee-line-my-section-name{font-size:13px;font-weight:850;color:#7c828b;margin:21px 4px 10px}
-.ubee-line-my-menu{background:#fff;border:1px solid #e7e9ed;border-radius:16px;overflow:hidden}.ubee-line-my-row{display:flex;align-items:center;gap:12px;width:100%;min-height:61px;padding:13px 15px;background:#fff;border:0;border-bottom:1px solid #eef0f2;text-align:left;color:#181818;font-size:16px!important;font-weight:800}.ubee-line-my-row:last-child{border-bottom:0}.ubee-line-my-row i{display:grid;place-items:center;width:37px;height:37px;border-radius:12px;background:#f5f6f8;font-style:normal;font-size:18px}.ubee-line-my-row span{flex:1}.ubee-line-my-row small{font-size:12px;color:#a0a5ac}
-.ubee-line-my-sub[hidden]{display:none!important}.ubee-line-my-help{font-size:13px;color:#777e86;line-height:1.6;margin:8px 0 17px}
-.ubee-line-my-list{display:grid;gap:10px}.ubee-line-my-list-item{background:#fff;border:1px solid #e8eaed;border-radius:15px;padding:14px}.ubee-line-my-list-item strong{display:block;font-size:15px}.ubee-line-my-list-item small{display:block;font-size:13px;color:#7e848d;word-break:break-word;margin-top:6px}.ubee-line-my-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:11px}
-.ubee-line-btn{border:1px solid #dee1e5;border-radius:12px;background:#fff;padding:11px 15px;font-size:14px!important;font-weight:850;color:#181818;min-height:45px}.ubee-line-btn.danger{color:#c52b2b}.ubee-line-btn.primary{border-color:#facc15;background:#facc15;width:100%;font-weight:950}
-.ubee-line-my-form{display:grid;gap:11px}.ubee-line-my-form label{display:grid;gap:6px;color:#434850;font-size:13px;font-weight:850}.ubee-line-my-form input{width:100%;min-height:49px;padding:10px 12px;border:1px solid #dfe2e6;border-radius:12px;background:#fff;color:#111;font-size:16px!important}.ubee-line-my-form input[readonly]{background:#f2f3f5;color:#565b63}
-#ubeeLineMyStatus{position:sticky;bottom:0;z-index:1;padding:0 16px;font-size:13px;color:#b42318;background:#f5f6f8}
-#ubeeLineContactPicker{position:fixed;inset:0;display:grid;place-items:end center;background:#0007;z-index:2147483100;padding:16px 12px calc(16px + env(safe-area-inset-bottom))}
-#ubeeLineContactPicker[hidden]{display:none!important}.ubee-line-picker-card{width:min(100%,520px);max-height:75vh;overflow-y:auto;background:white;border-radius:22px;padding:20px}.ubee-line-picker-card h3{font-size:20px;margin:0 0 13px}
-#ubeeLineContactPickerList{display:grid;gap:8px;max-height:46vh;overflow-y:auto}
-#ubeeLineContactPickerList button{width:100%;text-align:left;border:1px solid #e8ebee;background:#fff;padding:13px;border-radius:12px;color:#111;font-size:15px!important}
-body > #ubeePersistentBottomNav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:1fr!important;align-items:center!important;max-width:520px!important;padding:6px 8px calc(7px + env(safe-area-inset-bottom))!important;min-height:calc(64px + env(safe-area-inset-bottom))!important}
-#ubeePersistentBottomNav>button{min-width:0!important;min-height:48px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:3px!important;font-size:11px!important;padding:4px 0!important}
-#ubeePersistentBottomNav .flow-nav-icon{font-size:21px!important;line-height:22px!important}
-#ubeePersistentBottomNav .ubee-line-nav-label{font-size:11px!important;font-weight:800!important;line-height:1.2!important}
-body.ubee-line-auth-required #ubeePersistentBottomNav{display:none!important}
-#flowDetailSavedContactButton{min-height:37px!important;font-size:13px!important}
-@media(max-width:360px){.ubee-line-auth-card{padding:27px 17px}.ubee-line-my-content{padding-left:12px;padding-right:12px}}
-</style>
-<div id="ubeeLineAuth" role="region" aria-label="UBee LINE 會員登入">
-  <div class="ubee-line-auth-card">
-    <div class="ubee-line-symbol" aria-hidden="true">U</div>
-    <h1>UBee 跑腿</h1>
-    <p id="ubeeLineAuthDesc">生活大小事，交給 UBee 幫你完成。<br>透過 LINE 即可登入或註冊。</p>
-    <div id="ubeeLineTerms">
-      <label><input id="ubeeLineAcceptTerms" type="checkbox">我已閱讀並同意 <a href="#" id="ubeeLineTermsLink" target="_blank" rel="noopener">服務條款</a></label>
-      <label><input id="ubeeLineAcceptPrivacy" type="checkbox">我已閱讀並了解 <a href="#" id="ubeeLinePrivacyLink" target="_blank" rel="noopener">隱私權政策</a></label>
-    </div>
-    <a class="ubee-line-primary" id="ubeeLineStart" href="/api/customer-line/start">使用 LINE 登入／註冊</a>
-    <button class="ubee-line-primary" id="ubeeLineFinish" type="button" hidden>同意並建立 UBee 會員</button>
-    <div id="ubeeLineAuthStatus" role="status" aria-live="polite"></div>
-  </div>
-</div>
-<section id="ubeeLineMyScreen" aria-label="我的會員中心" hidden>
-  <div class="ubee-line-my-content">
-    <div class="ubee-line-my-heading"><button class="ubee-line-my-back" id="ubeeLineMyBack" type="button" hidden>‹ 返回</button><h2 id="ubeeLineMyTitle">我的</h2></div>
-    <div id="ubeeLineMyRoot">
-      <div class="ubee-line-my-card ubee-line-my-person"><div class="ubee-line-my-avatar" id="ubeeLineMyAvatar">U</div><div><strong id="ubeeLineMyName">LINE 會員</strong><small>UBee 會員</small></div></div>
-      <div class="ubee-line-my-section-name">常用資料</div>
-      <div class="ubee-line-my-menu"><button class="ubee-line-my-row" type="button" data-ubee-my="addresses"><i>⌖</i><span>常用地址</span><small>›</small></button><button class="ubee-line-my-row" type="button" data-ubee-my="contacts"><i>♙</i><span>常用聯絡人</span><small>›</small></button></div>
-      <div class="ubee-line-my-section-name">服務與設定</div>
-      <div class="ubee-line-my-menu"><button class="ubee-line-my-row" type="button" data-ubee-my="support"><i>☏</i><span>客服中心</span><small>›</small></button><button class="ubee-line-my-row" type="button" data-ubee-my="settings"><i>⚙</i><span>帳號與設定</span><small>›</small></button></div>
-      <div style="margin-top:20px"><button class="ubee-line-btn" style="width:100%" data-ubee-my="logout" type="button">登出會員</button></div>
-    </div>
-    <div class="ubee-line-my-sub" id="ubeeLineMyAddresses" hidden><p class="ubee-line-my-help">只有您主動選擇儲存的地址會出現在這裡。</p><div id="ubeeLineMyAddressList" class="ubee-line-my-list"></div><button class="ubee-line-btn primary" data-ubee-my="addressForm" type="button" style="margin-top:14px">＋ 新增常用地址</button></div>
-    <div class="ubee-line-my-sub" id="ubeeLineMyContacts" hidden><p class="ubee-line-my-help">儲存常用聯絡人的姓名與電話，下次下單可直接帶入。</p><div id="ubeeLineMyContactList" class="ubee-line-my-list"></div><button class="ubee-line-btn primary" data-ubee-my="contactForm" type="button" style="margin-top:14px">＋ 新增常用聯絡人</button></div>
-    <div class="ubee-line-my-sub" id="ubeeLineMyContactForm" hidden><form id="ubeeLineContactForm" class="ubee-line-my-form"><label>姓名／稱呼 <input id="ubeeLineContactName" maxlength="60" required placeholder="例如：王先生"></label><label>聯絡電話 <input id="ubeeLineContactPhone" type="tel" maxlength="20" required placeholder="09xxxxxxxx"></label><button class="ubee-line-btn primary" type="submit">儲存聯絡人</button></form></div>
-    <div class="ubee-line-my-sub" id="ubeeLineMyAddressForm" hidden><form id="ubeeLineAddressForm" class="ubee-line-my-form"><label>地址名稱 <input id="ubeeLineAddressLabel" maxlength="40" required placeholder="例如：家裡、公司"></label><label>搜尋地址 <input id="ubeeLineAddressSearch" maxlength="120" placeholder="輸入地址後選擇正確地點" autocomplete="off"></label><div id="ubeeLineAddressResults" class="ubee-line-my-list"></div><label>完整地址 <input id="ubeeLineAddressValue" maxlength="240" readonly required placeholder="請從搜尋結果選擇"></label><label>樓層／補充說明 <input id="ubeeLineAddressDetail" maxlength="160" placeholder="選填"></label><button class="ubee-line-btn primary" type="submit">儲存常用地址</button></form></div>
-    <div class="ubee-line-my-sub" id="ubeeLineMySettings" hidden><div class="ubee-line-my-menu"><div class="ubee-line-my-row"><i>●</i><span>LINE 會員資料</span><small id="ubeeLineSettingsName">已登入</small></div><button class="ubee-line-my-row" type="button" data-ubee-my="notifications"><i>♧</i><span>通知中心</span><small>›</small></button><button class="ubee-line-my-row" type="button" data-ubee-my="terms"><i>◎</i><span>服務條款</span><small>›</small></button><button class="ubee-line-my-row" type="button" data-ubee-my="privacy"><i>◇</i><span>隱私權政策</span><small>›</small></button><button class="ubee-line-my-row" type="button" data-ubee-my="logout"><i>↪</i><span>登出會員</span><small>›</small></button><button class="ubee-line-my-row" type="button" data-ubee-my="delete"><i>×</i><span style="color:#c32626">申請刪除 UBee 帳號</span><small>›</small></button></div></div>
-    <div id="ubeeLineMyStatus" role="status" aria-live="polite"></div>
-  </div>
-</section>
-<div id="ubeeLineContactPicker" hidden role="dialog" aria-modal="true" aria-label="選擇常用聯絡人"><div class="ubee-line-picker-card"><h3>選擇常用聯絡人</h3><div id="ubeeLineContactPickerList"></div><button class="ubee-line-btn" style="width:100%;margin-top:12px" type="button" id="ubeeLinePickerClose">取消</button></div></div>
-<script id="ubee-line-membership-v1-js">
-(()=>{
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const gate=$('ubeeLineAuth'),terms=$('ubeeLineTerms'),status=$('ubeeLineAuthStatus');
-  const my=$('ubeeLineMyScreen'),root=$('ubeeLineMyRoot');
-  let account=null,activeSub='',editContact='',editAddress='',addressSelected=null,addressResults=[],addressTimer=null;
-  let contacts=[],addresses=[],pickerResolve=null;
-  const clean=s=>String(s??'').trim();
-  const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const json=async(url,opts={})=>{
-    const r=await fetch(url,{...opts,credentials:'include',cache:'no-store',headers:{Accept:'application/json',...(opts.body?{'Content-Type':'application/json'}:{}),...(opts.headers||{})}});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||d.success===false){const e=new Error(d.message||d.error||'系統暫時無法處理');e.status=r.status;throw e;}
-    return d;
-  };
-  function setAuth(ready){gate.hidden=Boolean(ready);document.body.classList.toggle('ubee-line-auth-required',!ready)}
-  function authError(msg){status.textContent=msg||''}
-  function useAccount(c){
-    account=c;window.__ubeeCurrentCustomer=c;
-    if(typeof currentCustomer!=='undefined')currentCustomer=c;
-    if(typeof userId!=='undefined')userId=String(c.customerId||'');
-    $('ubeeLineMyName').textContent=clean(c.name)||'LINE 會員';$('ubeeLineSettingsName').textContent=clean(c.name)||'已登入';
-    $('ubeeLineMyAvatar').replaceChildren();
-    if(/^https:\/\//.test(c.avatarUrl||'')){
-      const img=document.createElement('img');img.src=c.avatarUrl;img.referrerPolicy='no-referrer';img.alt='LINE 頭像';
-      img.onerror=()=>{$('ubeeLineMyAvatar').textContent='U'};$('ubeeLineMyAvatar').append(img);
-    }else $('ubeeLineMyAvatar').textContent='U';
-    setAuth(true);
-  }
-  async function init(){
-    setAuth(false);authError('');
-    const params=new URLSearchParams(location.search);
-    if(params.has('line_error'))authError(params.get('line_error'));
-    try{
-      const d=await json('/api/customer-line/me');useAccount(d.customer);return;
-    }catch(e){if(e.status!==401)authError('目前無法連線確認會員狀態，請檢查網路。');}
-    if(params.get('line')==='register'){
-      try{const pending=await json('/api/customer-line/pending');
-        const config=await json('/api/customer-line/config');
-        if(config.legalReady!==true||!config.termsUrl||!config.privacyUrl){
-          $('ubeeLineFinish').disabled=true;
-          authError('尚未提供正式服務條款與隱私權政策，暫時無法註冊；請聯絡 UBee。');
-        }else{
-          $('ubeeLineTermsLink').href=config.termsUrl;
-          $('ubeeLinePrivacyLink').href=config.privacyUrl;
-        }
-        $('ubeeLineAuthDesc').textContent=`歡迎 ${clean(pending.name)||'LINE 會員'}！首次使用請先確認服務條款與隱私權政策。`;
-        terms.style.display='block';$('ubeeLineStart').hidden=true;$('ubeeLineFinish').hidden=false;
-      }catch(_){authError('註冊授權已過期，請重新使用 LINE 登入。');}
-    }
-  }
-  $('ubeeLineFinish').addEventListener('click',async()=>{
-    if($('ubeeLineFinish').disabled)return;
-    if(!$('ubeeLineAcceptTerms').checked||!$('ubeeLineAcceptPrivacy').checked){authError('請先確認服務條款與隱私權政策。');return}
-    const btn=$('ubeeLineFinish');btn.disabled=true;authError('');
-    try{await json('/api/customer-line/finish',{method:'POST',body:JSON.stringify({acceptTerms:true,acceptPrivacy:true})});location.replace('/order.html?line=success');}
-    catch(e){authError(e.message);btn.disabled=false;}
-  });
-  // Existing, unexpired LINE cookies are the only source of customer identity.
-  window.ensureCustomerSessionForOrder=async()=>{
-    const d=await json('/api/customer-line/me');useAccount(d.customer);
-    if(!/^customer_[a-f0-9]{32}$/.test(String(d.customer?.customerId||'')))throw Error('LINE 會員識別無效');
-    return d.customer.customerId;
-  };
-  window.UBeeLineAuth=Object.freeze({refresh:init,require:()=>{setAuth(false);return false;},get:()=>account});
-  async function loadContacts(){const d=await json('/api/customer/contacts');contacts=d.contacts||[];return contacts;}
-  async function loadAddresses(){const d=await json('/api/customer/addresses');addresses=d.addresses||[];return addresses;}
-  function showMy(sub=''){
-    activeSub=sub;my.hidden=false;my.scrollTop=0;root.hidden=!!sub;
-    [['addresses','ubeeLineMyAddresses','常用地址'],['contacts','ubeeLineMyContacts','常用聯絡人'],['contactForm','ubeeLineMyContactForm',editContact?'修改聯絡人':'新增聯絡人'],['addressForm','ubeeLineMyAddressForm',editAddress?'修改地址':'新增地址'],['settings','ubeeLineMySettings','帳號與設定']].forEach(([k,id])=>{const el=$(id);el.hidden=sub!==k;if(sub===k)$('ubeeLineMyTitle').textContent=({'addresses':'常用地址','contacts':'常用聯絡人','contactForm':editContact?'修改聯絡人':'新增聯絡人','addressForm':editAddress?'修改地址':'新增地址','settings':'帳號與設定'}[k])});
-    if(!sub)$('ubeeLineMyTitle').textContent='我的';$('ubeeLineMyBack').hidden=!sub;$('ubeeLineMyStatus').textContent='';
-    if(sub==='addresses')void loadAddresses().then(renderAddresses).catch(e=>msg(e.message));
-    if(sub==='contacts')void loadContacts().then(renderContacts).catch(e=>msg(e.message));
-  }
-  function msg(s){$('ubeeLineMyStatus').textContent=clean(s)}
-  function close(){my.hidden=true;activeSub='';}
-  function renderAddresses(){
-    const el=$('ubeeLineMyAddressList');el.replaceChildren();
-    if(!addresses.length){el.innerHTML='<div class="ubee-line-my-list-item">尚未儲存常用地址</div>';return}
-    for(const a of addresses){
-      const div=document.createElement('div');div.className='ubee-line-my-list-item';
-      div.innerHTML=`<strong>${escape(a.label||'常用地址')}</strong><small>${escape(a.address||'')}${a.addressDetail?'・'+escape(a.addressDetail):''}</small><div class="ubee-line-my-actions"><button type="button" class="ubee-line-btn" data-edit-address="${escape(a.id)}">修改</button><button type="button" class="ubee-line-btn danger" data-delete-address="${escape(a.id)}">刪除</button></div>`;
-      el.append(div);
-    }
-  }
-  function renderContacts(){
-    const el=$('ubeeLineMyContactList');el.replaceChildren();
-    if(!contacts.length){el.innerHTML='<div class="ubee-line-my-list-item">尚未儲存常用聯絡人</div>';return}
-    for(const c of contacts){const div=document.createElement('div');div.className='ubee-line-my-list-item';div.innerHTML=`<strong>${escape(c.name)}</strong><small>${escape(c.phone)}</small><div class="ubee-line-my-actions"><button type="button" class="ubee-line-btn" data-edit-contact="${escape(c.id)}">修改</button><button type="button" class="ubee-line-btn danger" data-delete-contact="${escape(c.id)}">刪除</button></div>`;el.append(div)}
-  }
-  function startAddressForm(a=null){editAddress=a?.id||'';addressSelected=a?{...a}:null;addressResults=[]; $('ubeeLineAddressResults').replaceChildren();$('ubeeLineAddressLabel').value=a?.label||'';$('ubeeLineAddressSearch').value='';$('ubeeLineAddressValue').value=a?.address||'';$('ubeeLineAddressDetail').value=a?.addressDetail||'';showMy('addressForm')}
-  function startContactForm(c=null){editContact=c?.id||'';$('ubeeLineContactName').value=c?.name||'';$('ubeeLineContactPhone').value=c?.phone||'';showMy('contactForm')}
-  $('ubeeLineAddressSearch').addEventListener('input',e=>{
-    clearTimeout(addressTimer);const query=clean(e.target.value);if(query.length<2){$('ubeeLineAddressResults').replaceChildren();return}
-    addressTimer=setTimeout(async()=>{try{
-      const d=await json('/api/address/search',{method:'POST',body:JSON.stringify({input:query})});
-      if(clean($('ubeeLineAddressSearch').value)!==query)return;
-      addressResults=(d.predictions||[]).slice(0,8);const el=$('ubeeLineAddressResults');el.replaceChildren();
-      addressResults.forEach((p,i)=>{const b=document.createElement('button');b.className='ubee-line-btn';b.type='button';b.dataset.pickAddress=String(i);b.textContent=p.description||p.mainText||'地址';el.append(b)});
-    }catch(e){msg('搜尋地址失敗，請稍後再試。')}},350);
-  });
-  $('ubeeLineAddressResults').addEventListener('click',async e=>{
-    const b=e.target.closest('[data-pick-address]');if(!b)return;const p=addressResults[Number(b.dataset.pickAddress)];if(!p?.placeId)return;
-    b.disabled=true;try{const d=await json('/api/address/detail',{method:'POST',body:JSON.stringify({placeId:p.placeId})});addressSelected=d.address||null;
-      if(!addressSelected?.address&&!addressSelected?.formattedAddress)throw Error('地址資訊不完整');
-      $('ubeeLineAddressValue').value=addressSelected.address||addressSelected.formattedAddress;$('ubeeLineAddressResults').replaceChildren();
-    }catch(e){msg('無法取得完整地址，請重新選擇。');b.disabled=false}
-  });
-  $('ubeeLineAddressForm').addEventListener('submit',async e=>{
-    e.preventDefault();const label=clean($('ubeeLineAddressLabel').value),address=clean($('ubeeLineAddressValue').value);
-    if(!label||!address||!addressSelected){msg('請填寫名稱，並從搜尋結果選擇正確地址。');return}
-    const saved={...addressSelected,label,address,formattedAddress:address,addressDetail:clean($('ubeeLineAddressDetail').value),contactName:'',phone:''};
-    try{await json('/api/customer/addresses',{method:'POST',body:JSON.stringify({addressId:editAddress||undefined,address:saved})});editAddress='';showMy('addresses')}
-    catch(err){msg(err.message)}
-  });
-  $('ubeeLineContactForm').addEventListener('submit',async e=>{
-    e.preventDefault();const name=clean($('ubeeLineContactName').value),phone=clean($('ubeeLineContactPhone').value);
-    if(!/^09\d{8}$/.test(phone)){msg('請填寫正確的 09 開頭 10 碼手機號碼。');return}
-    try{await json('/api/customer/contacts',{method:'POST',body:JSON.stringify({id:editContact||undefined,name,phone})});editContact='';showMy('contacts')}
-    catch(err){msg(err.message)}
-  });
-  my.addEventListener('click',async e=>{
-    const editC=e.target.closest('[data-edit-contact]');if(editC){startContactForm(contacts.find(c=>c.id===editC.dataset.editContact));return}
-    const deleteC=e.target.closest('[data-delete-contact]');if(deleteC){if(confirm('確定刪除此聯絡人？'))try{await json('/api/customer/contacts/'+encodeURIComponent(deleteC.dataset.deleteContact),{method:'DELETE'});showMy('contacts')}catch(err){msg(err.message)}return}
-    const editA=e.target.closest('[data-edit-address]');if(editA){startAddressForm(addresses.find(a=>a.id===editA.dataset.editAddress));return}
-    const deleteA=e.target.closest('[data-delete-address]');if(deleteA){if(confirm('確定刪除此地址？'))try{await json('/api/customer/addresses/'+encodeURIComponent(deleteA.dataset.deleteAddress)+'/delete',{method:'POST',body:'{}'});showMy('addresses')}catch(err){msg(err.message)}return}
-    const action=e.target.closest('[data-ubee-my]')?.dataset.ubeeMy;
-    if(!action)return;
-    if(action==='addresses'||action==='contacts'||action==='settings'){showMy(action);return}
-    if(action==='addressForm'){startAddressForm();return}
-    if(action==='contactForm'){startContactForm();return}
-    if(action==='support'){window.openUBeeSupportCenter?.();return}
-    if(action==='notifications'){close();window.UBeePrimaryNavigation?.open('notify');return}
-    if(action==='terms'||action==='privacy'){try{const d=await json('/api/customer-line/config');if(d.legalReady)window.open(action==='terms'?d.termsUrl:d.privacyUrl,'_blank','noopener');else msg('正式條款或隱私權政策尚未設定。')}catch(err){msg(err.message)}return}
-    if(action==='logout'){
-      if(!confirm('確定登出 UBee 會員？'))return;
-      try{await window.UBeeCustomerPush?.disable?.().catch(()=>{});await json('/api/customer-auth/logout',{method:'POST',body:'{}'});
-        if(account?.customerId){
-          sessionStorage.removeItem('ubee_customer_address_session_cache_v1:'+account.customerId);
-          sessionStorage.removeItem('ubee_customer_order_list_cache_v1:'+account.customerId);
-        }
-        window.__ubeeCustomerOrdersCache=null;window.__ubeeCustomerOrdersFetchedAt=0;
-        localStorage.removeItem('ubee_current_order_id');
-        close();setAuth(false);location.replace('/order.html?line=logout');
-      }catch(err){msg(err.message)}return;
-    }
-    if(action==='delete'){
-      if(!confirm('確定提出 UBee 帳號刪除申請？將先確認進行中的訂單與依法保存的資料。'))return;
-      try{const d=await json('/api/customer-line/deletion-request',{method:'POST',body:'{}'});msg(d.message||'已提出刪除申請。')}catch(err){msg(err.message)}return;
-    }
-  });
-  $('ubeeLineMyBack').addEventListener('click',()=>{
-    if(activeSub==='contactForm')showMy('contacts');else if(activeSub==='addressForm')showMy('addresses');else showMy('');
-  });
-  async function openPicker(){
-    const picker=$('ubeeLineContactPicker');const list=$('ubeeLineContactPickerList');list.replaceChildren();
-    try{await loadContacts();}catch(e){msg('常用聯絡人無法載入');return}
-    if(!contacts.length){list.textContent='尚未儲存聯絡人，可在「我的」新增。';}
-    contacts.forEach(c=>{const btn=document.createElement('button');btn.type='button';btn.innerHTML=`<strong>${escape(c.name)}</strong><br><small>${escape(c.phone)}</small>`;btn.addEventListener('click',()=>{if($('flowDetailName'))$('flowDetailName').value=c.name;if($('flowDetailPhone'))$('flowDetailPhone').value=c.phone;picker.hidden=true});list.append(btn)});
-    picker.hidden=false;
-  }
-  $('ubeeLinePickerClose').addEventListener('click',()=>$('ubeeLineContactPicker').hidden=true);
-  document.getElementById('flowDetailSavedContactButton')?.addEventListener('click',openPicker);
-  // Only checked addresses/contacts from a successfully created order are saved.
-  window.UBeeLinePendingSelections={addresses:[],contacts:[]};
-  window.UBeeLineMy={open:()=>{if(!account){setAuth(false);return false}showMy('');return true},close,openPicker,async persistPending(){
-    const pending=window.UBeeLinePendingSelections;window.UBeeLinePendingSelections={addresses:[],contacts:[]};
-    const warnings=[];
-    for(const a of pending.addresses){try{const d=await loadAddresses();if(d.some(item=>item.address===a.address&&item.label===a.label))continue;
-      await json('/api/customer/addresses',{method:'POST',body:JSON.stringify({address:a})});}catch(e){warnings.push('常用地址儲存失敗')}}
-    for(const c of pending.contacts){try{const d=await loadContacts();if(d.some(item=>item.phone===c.phone&&item.name===c.name))continue;
-      await json('/api/customer/contacts',{method:'POST',body:JSON.stringify(c)});}catch(e){warnings.push('常用聯絡人儲存失敗')}}
-    if(warnings.length)console.warn('UBee 常用資料未全部儲存：',warnings.join('、'));
-    return warnings.length===0;
-  }};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else void init();
-})();
-</script>
-
 </body>
 </html>
