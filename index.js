@@ -1,3 +1,4 @@
+// UBee Customer TC V1.7 RC1 HF1 — existing member recovery UX/API hint; candidate, pending integration verification
 // UBee Customer TC V1.7 — Member Authentication RC1 (source candidate; pending production integration tests)
 // UBee Rider Review V4.0.2-HF1 supplement stability hotfix — shared backend
 // UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
@@ -5634,6 +5635,7 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
         success: false,
         authenticated: false,
         code: 'CUSTOMER_EXISTING_LOGIN_REQUIRED',
+        nextAction: 'ACCOUNT_RECOVERY',
         passwordSetupRequired,
         message: passwordSetupRequired
           ? '這支手機已建立 UBee 使用身分，但尚未設定登入密碼。'
@@ -5793,6 +5795,7 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
         success: false,
         authenticated: false,
         code: 'CUSTOMER_EXISTING_LOGIN_REQUIRED',
+        nextAction: 'ACCOUNT_RECOVERY',
         passwordSetupRequired: error.passwordSetupRequired === true,
         message: error.message || '這支手機已建立 UBee 使用身分，請改用登入。',
       });
