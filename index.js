@@ -1,3 +1,4 @@
+// UBee Customer V1.7.0 RC6 — LEGACY CUSTOMER RETIREMENT CANDIDATE, NOT DEPLOYED.
 // UBee Customer RC2 — customer membership growth & new customer referrals retired (候選，尚未正式部署)
 // UBee Rider Review V4.0.2-HF1 supplement stability hotfix — shared backend
 // UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
@@ -617,12 +618,17 @@ async function processUBeeGrowthCompletedOrder(order = {}) {
   const orderId = String(order.id || order.orderId || '').trim();
   if (!orderId) return;
   const customerId = String(order.userId || order.customerId || '').trim();
-  if (customerId && order.customerAccessMode!=='guest_order' && order.uCoinDisabled!==true) {
-    // Customer Growth 已退場：U幣完單／首單獎勵獨立運作，不新增會員等級資料。
-    await processUCoinCompletedOrder(order).catch(err => console.warn('U coin completed-order reward:', err.message));
-    // 僅結算既有推薦登記（部署後不再接受 customer 推薦碼）；不新增客戶推薦。
-    await qualifyGrowthReferral('customer', customerId, { type:'legacy_referral_first_valid_order', orderId }).catch(err => console.warn('Legacy referral reconcile:', err.message));
-    await settleLegacyUCoinCustomerReferralReward(customerId, orderId).catch(err => console.warn('Legacy U coin referral settlement:', err.message));
+  // RC6: Never grant new customer UCoin rewards. Settle pre-existing reserved discounts only.
+  if (customerId && order.uCoinReservationStatus === 'reserved') {
+    await finalizeUCoinReservation(order).catch(err => console.warn('Historic UCoin reservation finalize:', err.message));
+  }
+  // Rider-invited customer orders still count toward the existing Rider Growth program.
+  if (customerId) {
+    const priorReferral = await db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`customer_${customerId}`).get().catch(()=>null);
+    if (priorReferral?.exists && priorReferral.data()?.referrerType === 'rider') {
+      await qualifyGrowthReferral('customer', customerId, {type:'rider_invited_customer_first_valid_order',orderId})
+        .catch(err => console.warn('Rider referral reconcile:',err.message));
+    }
   }
   const riderOwnerId = await resolveGrowthRiderOwnerIdFromOrder(order).catch(()=>String(order.riderId || '').trim());
   if (riderOwnerId) {
@@ -5796,217 +5802,9 @@ function sendCustomerAuthError(res, error) {
 // - 同一手機若已存在帳號，絕不覆寫、絕不重建；回傳既有身分登入／密碼設定流程。
 // - 建立 account / phone index / member counter / session 於同一 Firestore transaction，避免半套帳號。
 // =====================================================
-async function createCustomerOnboarding(req, res, { withPassword = false } = {}) {
-  res.setHeader('Cache-Control', 'no-store');
-
-  try {
-    // 若瀏覽器本來就有有效 Session，直接沿用，不重複建立身分。
-    const existingAuth = await loadCustomerAuth(req).catch(() => null);
-    if (existingAuth && withPassword) {
-      throw customerAuthError('目前已登入 UBee，請至帳號與安全管理密碼，勿重複註冊。', 409, 'CUSTOMER_ALREADY_SIGNED_IN');
-    }
-    if (existingAuth) {
-      return res.json({
-        success: true,
-        authenticated: true,
-        reused: true,
-        customer: customerAccountResponse(existingAuth.account, existingAuth.customerId),
-      });
-    }
-
-    const phone = normalizeCustomerPhone(req.body?.phone);
-    const name = cleanText(req.body?.name || '', 40);
-    const serviceCity = cleanText(req.body?.serviceCity || '', 30);
-    const referralCode = cleanText(req.body?.referralCode || '', 24).toUpperCase();
-    const agreements = req.body?.agreements && typeof req.body.agreements === 'object'
-      ? req.body.agreements
-      : {};
-
-    if (!isValidCustomerPhone(phone)) {
-      throw customerAuthError('請輸入正確的 09 開頭 10 碼手機號碼。', 400, 'CUSTOMER_PHONE_INVALID');
-    }
-    if (name.length < 2) {
-      throw customerAuthError('請填寫下單人本人姓名。', 400, 'CUSTOMER_NAME_INVALID');
-    }
-    if (!agreements.terms || !agreements.privacy || !agreements.pricing || !agreements.prohibitedTasks) {
-      throw customerAuthError('請完整同意服務條款、隱私權、計價與禁運規範。', 400, 'CUSTOMER_AGREEMENTS_REQUIRED');
-    }
-
-    // 快速判斷既有手機，提供正確的原生登入／密碼設定導流。
-    const existingRecord = await findCustomerAccountByPhone(phone);
-    if (existingRecord) {
-      const passwordSetupRequired = !Boolean(existingRecord.account?.passwordHash?.hash);
-      return res.status(409).json({
-        success: false,
-        authenticated: false,
-        code: 'CUSTOMER_EXISTING_LOGIN_REQUIRED',
-        passwordSetupRequired,
-        message: passwordSetupRequired
-          ? '這支手機已建立 UBee 使用身分，但尚未設定登入密碼。'
-          : '這支手機已有 UBee 使用身分，請使用既有帳號登入。',
-      });
-    }
-
-    // 在通過手機格式、同意條款及既有帳號檢查後才執行 scrypt，避免無效註冊浪費 CPU。
-    const passwordHash = withPassword ? await hashCustomerPassword(req.body?.password, phone) : null;
-
-    // 停止客戶推薦碼；保留小U邀請新客流程的跨系統相容性。
-    // 舊客戶推薦連結或失效推薦碼不應阻止新客首次下單。
-    const resolvedReferral = referralCode ? await resolveGrowthReferralCode(referralCode) : null;
-    const incomingReferral = resolvedReferral?.ownerType === 'rider' ? resolvedReferral : null;
-
-    const customerId = `customer_${crypto.randomBytes(16).toString('hex')}`;
-    const sessionRawToken = customerAuthRandomToken(32);
-    const sessionHash = customerAuthHash(sessionRawToken);
-    const nowMs = Date.now();
-    const fingerprint = customerAuthClientFingerprint(req);
-
-    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
-    const phoneIndexRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex).doc(phone);
-    const counterRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.counters).doc('customerMembers');
-    const sessionRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(sessionHash);
-    const incomingReferralRef = incomingReferral
-      ? db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`customer_${customerId}`)
-      : null;
-
-    let memberNumber = '';
-
-    await db.runTransaction(async transaction => {
-      const [phoneIndexDoc, counterDoc] = await Promise.all([
-        transaction.get(phoneIndexRef),
-        transaction.get(counterRef),
-      ]);
-
-      // 競態保護：即使兩個請求同時送出，同一手機也只能建立一個 Customer。
-      if (phoneIndexDoc.exists) {
-        const conflict = customerAuthError('這支手機已建立 UBee 使用身分，請改用登入。', 409, 'CUSTOMER_EXISTING_LOGIN_REQUIRED');
-        conflict.passwordSetupRequired = true;
-        throw conflict;
-      }
-
-      const nextNumber = Math.max(1, Number(counterDoc.data()?.nextNumber || 1));
-      memberNumber = `UBC${String(nextNumber).padStart(8, '0')}`;
-
-      transaction.set(counterRef, {
-        nextNumber: nextNumber + 1,
-        updatedAtMs: nowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-
-      transaction.set(accountRef, {
-        customerId,
-        memberNumber,
-        phone,
-        phoneVerified: false,
-        phoneVerificationStatus: 'not_verified',
-        identityVerification: {
-          status: 'not_verified', level: 0, provider: '', method: '', verifiedName: '',
-          verificationId: '', verifiedAtMs: 0, lastAttemptAtMs: 0, failureCode: '', updatedAtMs: nowMs,
-        },
-        recoveryMethod: 'line_bot',
-        recoveryLineUserId: '',
-        recoveryLineTrustedAtMs: 0,
-        recoveryLineTrustLevel: 'none',
-        name,
-        email: '',
-        emailVerified: false,
-        serviceCity,
-        serviceDistrict: '',
-        referralCode: incomingReferral ? incomingReferral.code : '',
-        referredByType: incomingReferral ? String(incomingReferral.ownerType || '') : '',
-        referredById: incomingReferral ? String(incomingReferral.ownerId || '') : '',
-        passwordHash,
-        passwordVersion: 1,
-        passwordConfigured: withPassword,
-        authMode: withPassword ? 'password' : 'order_session',
-        status: 'active',
-        failedLoginCount: 0,
-        lockedUntilMs: 0,
-        preferences: {
-          orderStatusNotifications: true,
-          paymentAndSafetyNotifications: true,
-          importantAnnouncements: true,
-          marketingNotifications: false,
-          setupAddressLater: true,
-        },
-        agreements: {
-          terms: true,
-          privacy: true,
-          pricing: true,
-          prohibitedTasks: true,
-          agreedAtClient: cleanText(agreements.agreedAtClient || '', 50),
-          agreedAtMs: nowMs,
-        },
-        source: withPassword ? 'customer-registration' : 'customer-order-session',
-        schemaVersion: withPassword ? 'customer-account-v4-register' : 'customer-account-v3-order-session',
-        createdAtMs: nowMs,
-        updatedAtMs: nowMs,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      transaction.set(phoneIndexRef, {
-        customerId,
-        phone,
-        memberNumber,
-        phoneVerified: false,
-        createdAtMs: nowMs,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      if (incomingReferralRef) {
-        transaction.set(incomingReferralRef, {
-          referralId: `customer_${customerId}`,
-          referralCode: incomingReferral.code,
-          referrerType: String(incomingReferral.ownerType || ''),
-          referrerId: String(incomingReferral.ownerId || ''),
-          refereeType: 'customer',
-          refereeId: customerId,
-          status: 'registered',
-          city: serviceCity,
-          district: '',
-          createdAtMs: nowMs,
-          updatedAtMs: nowMs,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: false });
-      }
-
-      transaction.set(sessionRef, {
-        customerId,
-        passwordVersion: 1,
-        createdAtMs: nowMs,
-        lastSeenAtMs: nowMs,
-        expiresAtMs: nowMs + CUSTOMER_AUTH.sessionTtlMs,
-        revoked: false,
-        ...fingerprint,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    });
-
-    setCustomerSessionCookie(req, res, sessionRawToken);
-    const accountDoc = await accountRef.get();
-
-    return res.status(201).json({
-      success: true,
-      authenticated: true,
-      created: true,
-      customer: customerAccountResponse(accountDoc.data() || {}, customerId),
-    });
-  } catch (error) {
-    if (error?.code === 'CUSTOMER_EXISTING_LOGIN_REQUIRED') {
-      return res.status(409).json({
-        success: false,
-        authenticated: false,
-        code: 'CUSTOMER_EXISTING_LOGIN_REQUIRED',
-        passwordSetupRequired: error.passwordSetupRequired === true,
-        message: error.message || '這支手機已建立 UBee 使用身分，請改用登入。',
-      });
-    }
-    if (Number(error?.statusCode || 500) >= 500) console.error('❌ UBee 會員身分建立失敗：', error);
-    return sendCustomerAuthError(res, error);
-  }
-}
+// RC6: Removed legacy customer member onboarding implementation.
+// Existing orders continue to be protected by HttpOnly customer order ownership sessions.
+// No new account/member registration via legacy endpoints.
 
 // Customer Guest Order V1: this is an ORDER OWNERSHIP SESSION, not a membership registration.
 // A phone number is contact data only. Possessing a phone number grants NO access to old orders.
@@ -6058,9 +5856,14 @@ app.get('/api/customer-guest/me',customerAuthOptional,(req,res)=>{
   return res.json({success:true,customer:{customerId:a.customerId,name:a.account.name||'',phone:a.account.guestContactPhone||'',authMode:'guest_order'}});
 });
 
-// Legacy routes temporarily retained for previously deployed clients. Do not re-enable member UI.
-app.post('/api/customer-auth/order-session', (req, res) => createCustomerOnboarding(req, res));
-app.post('/api/customer-auth/register', (req, res) => createCustomerOnboarding(req, res, { withPassword:true }));
+// RC6: Legacy member onboarding is closed. Never silently convert it to a guest account.
+// Older deployed clients get an explicit response rather than creating a new registered identity.
+for (const legacyMemberCreationPath of ['/api/customer-auth/order-session','/api/customer-auth/register']) {
+  app.post(legacyMemberCreationPath, (req, res) => {
+    res.setHeader('Cache-Control','no-store');
+    return res.status(410).json({success:false,code:'CUSTOMER_MEMBER_ONBOARDING_RETIRED',message:'會員註冊服務已停止，請更新用戶端後使用免登入下單。'});
+  });
+}
 
 // 密碼新增與變更由後端認證 Session，密碼更新後輪替 Session，其他裝置失效。
 app.post('/api/customer-auth/password/update', requireCustomerAuth, async (req, res) => {
@@ -6478,152 +6281,16 @@ app.get('/api/rider/growth/referrals', riderAuthMiddleware, async (req, res) => 
   }
 });
 
-function uCoinTaipeiDateKey(nowMs = Date.now()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit',
-  }).formatToParts(new Date(nowMs));
-  const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  return `${map.year}-${map.month}-${map.day}`;
-}
-
-function uCoinPreviousDateKey(dateKey) {
-  const [year, month, day] = String(dateKey || '').split('-').map(Number);
-  if (!year || !month || !day) return '';
-  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
-}
-
-function uCoinRulesPayload() {
-  return {
-    version:UBEE_UCOIN.version,
-    unitsPerCoin:UBEE_UCOIN.unitsPerCoin,
-    redemptionRateTwd:UBEE_UCOIN.redemptionRateTwd,
-    expiryDays:UBEE_UCOIN.expiryDays,
-    redemptionServicePercent:UBEE_UCOIN.redemptionServicePercent,
-    orderRedemptionCapTwd:UBEE_UCOIN.orderRedemptionCapTwd,
-    redemptionText:'1 U幣折抵 NT$1；每筆最多折抵 NT$20，且同時不得超過跑腿服務費 20% 與 UBee 平台收入。代墊費、停車費、過路費與小費不適用。',
-    earn:[
-      { key:'checkin', title:'每日簽到', amountText:'0.1～0.2 U幣' },
-      { key:'order', title:'完成一趟跑腿', amountText:'0.5 U幣' },
-      { key:'first_order', title:'完成首次跑腿', amountText:'加贈 1 U幣' },
-      { key:'rating', title:'完成訂單評價', amountText:'0.5 U幣' },
-    ],
-    checkinSchedule:[1,1,1,1,2,2,2],
+// RC6: Customer UCoin public endpoints retired. No check-in, wallet display or redemption preview.
+// Historic ledger and reservation settlement are retained separately pending financial reconciliation.
+for (const legacyWalletPath of ['/api/customer/u-coins','/api/customer/u-coins/check-in','/api/customer/u-coins/redemption-preview']) {
+  const handler = (req, res) => {
+    res.setHeader('Cache-Control','no-store');
+    return res.status(410).json({success:false,code:'CUSTOMER_UCOIN_RETIRED',message:'客戶 U幣功能已停止。'});
   };
+  if (legacyWalletPath.endsWith('/u-coins')) app.get(legacyWalletPath, handler);
+  else app.post(legacyWalletPath, handler);
 }
-
-app.get('/api/customer/u-coins', requireCustomerAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const customerId = req.customerAuth.customerId;
-    await reconcileExpiredUCoin(customerId);
-    const historyQuery = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).where('customerId', '==', customerId);
-    const historyRequest = historyQuery.orderBy('createdAtMs','desc').limit(100).get()
-      .catch(async error => {
-        // Continue serving the page while the required composite index is being provisioned.
-        console.warn('UBee U幣最新明細查詢需檢查 Firestore 索引：', error?.code || error?.message || error);
-        return historyQuery.limit(100).get();
-      });
-    const [walletDoc, historySnap] = await Promise.all([
-      db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId).get(),
-      historyRequest,
-    ]);
-    const walletData = walletDoc.exists ? walletDoc.data() || {} : {};
-    const today = uCoinTaipeiDateKey();
-    const history = historySnap.docs.map(doc => ({ id:doc.id, ...(doc.data() || {}) }))
-      .sort((a, b) => Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0))
-      .filter(item => String(item.type || '') !== 'reservation')
-      .slice(0, 50)
-      .map(item => ({
-        id:item.id, type:String(item.type || ''), title:String(item.title || 'U幣異動'),
-        deltaUnits:Number(item.deltaUnits || 0), orderId:String(item.orderId || ''),
-        createdAtMs:Number(item.createdAtMs || 0), expiresAtMs:Number(item.expiresAtMs || 0),
-      }));
-    return res.json({
-      success:true,
-      wallet:serializeUCoinWallet(walletData),
-      checkin:{
-        checkedInToday:String(walletData.lastCheckinDate || '') === today,
-        lastCheckinDate:String(walletData.lastCheckinDate || ''),
-        streak:uCoinSafeUnits(walletData.checkinStreak),
-        cycleDay:uCoinSafeUnits(walletData.checkinCycleDay),
-      },
-      history,
-      rules:uCoinRulesPayload(),
-    });
-  } catch (error) {
-    console.error('❌ 讀取 U幣失敗：', error);
-    return res.status(500).json({ success:false, error:'U幣資料暫時無法讀取，請稍後再試。' });
-  }
-});
-
-app.post('/api/customer/u-coins/check-in', requireCustomerAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const customerId = req.customerAuth.customerId;
-    await reconcileExpiredUCoin(customerId);
-    const dateKey = uCoinTaipeiDateKey();
-    const walletRef = db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId);
-    const checkinRef = db.collection(UBEE_UCOIN_COLLECTIONS.checkins).doc(`${customerId}_${dateKey}`);
-    const eventRef = db.collection(UBEE_UCOIN_COLLECTIONS.transactions).doc(uCoinEventId(customerId, `checkin:${dateKey}`));
-    let result = null;
-    await db.runTransaction(async tx => {
-      const [walletDoc, checkinDoc, eventDoc] = await Promise.all([tx.get(walletRef), tx.get(checkinRef), tx.get(eventRef)]);
-      const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
-      if (checkinDoc.exists || eventDoc.exists || String(wallet.lastCheckinDate || '') === dateKey) {
-        result = { duplicate:true, wallet:serializeUCoinWallet(wallet), cycleDay:uCoinSafeUnits(wallet.checkinCycleDay) };
-        return;
-      }
-      const consecutive = String(wallet.lastCheckinDate || '') === uCoinPreviousDateKey(dateKey);
-      const previousCycleDay = uCoinSafeUnits(wallet.checkinCycleDay);
-      const cycleDay = consecutive ? (previousCycleDay >= 7 ? 1 : Math.max(1, previousCycleDay + 1)) : 1;
-      const streak = consecutive ? uCoinSafeUnits(wallet.checkinStreak) + 1 : 1;
-      const units = cycleDay <= 4 ? 1 : 2;
-      const availableUnits = uCoinSafeUnits(wallet.availableUnits) + units;
-      const nowMs = Date.now();
-      tx.set(checkinRef, { customerId, dateKey, cycleDay, units, createdAtMs:nowMs, createdAt:admin.firestore.FieldValue.serverTimestamp() });
-      tx.set(eventRef, {
-        customerId, type:'checkin', eventKey:`checkin:${dateKey}`, title:`每日簽到・第 ${cycleDay} 天`,
-        deltaUnits:units, balanceUnitsAfter:availableUnits,
-        remainingUnits:units,
-        expiresAtMs:nowMs + UBEE_UCOIN.expiryDays * 86400000,
-        createdAtMs:nowMs, createdAt:admin.firestore.FieldValue.serverTimestamp(),
-      });
-      const nextWallet = {
-        customerId, availableUnits, reservedUnits:uCoinSafeUnits(wallet.reservedUnits),
-        lifetimeEarnedUnits:uCoinSafeUnits(wallet.lifetimeEarnedUnits) + units,
-        lifetimeUsedUnits:uCoinSafeUnits(wallet.lifetimeUsedUnits),
-        lastCheckinDate:dateKey, checkinCycleDay:cycleDay, checkinStreak:streak,
-        updatedAtMs:nowMs, updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      };
-      tx.set(walletRef, nextWallet, { merge:true });
-      result = { duplicate:false, units, cycleDay, streak, wallet:serializeUCoinWallet(nextWallet) };
-    });
-    return res.json({ success:true, message:result?.duplicate ? '今天已完成簽到。' : `簽到成功，獲得 ${(result.units / 10).toFixed(1)} U幣。`, ...result });
-  } catch (error) {
-    console.error('❌ U幣簽到失敗：', error);
-    return res.status(500).json({ success:false, error:'簽到失敗，請稍後再試。' });
-  }
-});
-
-app.post('/api/customer/u-coins/redemption-preview', requireCustomerAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const customerId = req.customerAuth.customerId;
-    await reconcileExpiredUCoin(customerId);
-    const walletDoc = await db.collection(UBEE_UCOIN_COLLECTIONS.wallets).doc(customerId).get();
-    const wallet = walletDoc.exists ? walletDoc.data() || {} : {};
-    const serviceSubtotal = Math.max(0, Math.round(Number(req.body?.serviceSubtotal || 0)));
-    const platformIncome = Math.max(0, Math.floor(Number(req.body?.platformIncome || 0)));
-    const balanceWhole = Math.floor(uCoinSafeUnits(wallet.availableUnits) / UBEE_UCOIN.unitsPerCoin);
-    const percentCap = Math.floor(serviceSubtotal * UBEE_UCOIN.redemptionServicePercent);
-    const orderCapTwd = Math.max(0, Math.floor(Number(UBEE_UCOIN.orderRedemptionCapTwd || 0)));
-    const maxWhole = Math.max(0, Math.min(balanceWhole, percentCap, platformIncome, orderCapTwd));
-    return res.json({ success:true, wallet:serializeUCoinWallet(wallet), serviceSubtotal, platformIncome, percentCap, orderCapTwd, maxWhole, discountTwd:maxWhole });
-  } catch (error) {
-    console.error('❌ U幣折抵預覽失敗：', error);
-    return res.status(500).json({ success:false, error:'目前無法計算 U幣折抵。' });
-  }
-});
 
 app.post('/api/customer-identity/start', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -40030,14 +39697,18 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     req.body.customerMemberNumber = String(req.customerAuth.account.memberNumber || '');
     req.body.customerName = String(req.customerAuth.account.name || '');
     req.body.customerPhone = String(req.customerAuth.account.authMode === 'guest_order' ? (req.customerAuth.account.guestContactPhone || '') : (req.customerAuth.account.phone || ''));
-    if(req.customerAuth.account.authMode==='guest_order')req.body.uCoinRedeemWhole=0;
+    // RC6: never create new wallet redemptions. Reject rather than silently changing a customer's agreed total.
+    if (Number(req.body.uCoinRedeemWhole || 0) > 0) {
+      return res.status(410).json({success:false,code:'CUSTOMER_UCOIN_RETIRED',error:'U幣折抵已停止，請重新取得未折抵的正式報價。'});
+    }
+    req.body.uCoinRedeemWhole = 0;
     const trustedSelfOrderIdentityKeys = buildCustomerSelfOrderIdentityKeys(
       {...req.customerAuth.account, phone:req.customerAuth.account.authMode==='guest_order' ? req.customerAuth.account.guestContactPhone : req.customerAuth.account.phone},
       req.customerAuth.customerId
     );
     const data = createOrderFromApi(req.body);
     data.customerAccessMode=req.customerAuth.account.authMode==='guest_order'?'guest_order':'legacy_customer';
-    data.uCoinDisabled=data.customerAccessMode==='guest_order';
+    data.uCoinDisabled=true; // RC6: all newly created customer orders, including old member sessions.
 
     // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
     data.customerIdentityVerified = isCustomerIdentityVerified(
@@ -40720,8 +40391,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   // U幣只接受整數 U；實際可折抵額仍由 saveCustomerOrderWithQuoteLock
   // 依錢包餘額、服務費 20% 與平台收入三者重新取最小值。
-  uCoinRequestedWhole:
-    Math.max(0, Math.floor(Number(req.body.uCoinRedeemWhole || 0))),
+  uCoinRequestedWhole: 0, // RC6: legacy schema compatibility; never reserves new wallet credit.
 
   serviceSubtotal,
 
@@ -40873,7 +40543,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     Object.assign(order, buildDispatchOrderMetadata(order, Date.now()));
 
     // 建單前先結清已到期的可用 U幣，避免以過期餘額建立折抵保留。
-    if(req.customerAuth.account.authMode!=='guest_order')await reconcileExpiredUCoin(req.customerAuth.customerId);
+    // RC6: do not mutate legacy UCoin wallets during new customer checkout.
 
     // Final amount is an optional strict contract for the new customer client.
     if (req.body.checkoutExpectedPayableTotal !== undefined) {
@@ -51253,22 +50923,12 @@ app.post('/api/customer/orders/:orderId/rider-rating', requireCustomerAuth, asyn
       }, { merge:true });
     });
 
-    const uCoinReward = req.customerAuth?.account?.authMode==='guest_order'
-      ? {granted:false,disabled:true}
-      : await grantUCoin(
-      customerId,
-      UBEE_UCOIN.ratingUnits,
-      'rating',
-      `rating:${orderId}`,
-      '完成訂單評價',
-      { orderId }
-    ).catch(error => ({ granted:false, error:String(error?.message || error) }));
+    // RC6: rating still updates Rider service-quality statistics, but no longer awards UCoin.
 
     return res.json({
       success:true,
       message:'評價已送出，謝謝你的回饋。',
       rating:savedRating,
-      uCoinReward,
       riderRatingSummary:{
         count:Number(riderAggregate?.count || 0),
         average:Number(riderAggregate?.average || 0),
