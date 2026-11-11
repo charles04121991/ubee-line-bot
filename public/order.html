@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261111-customer-v1-7-0-rc2" rel="manifest"/>
+<link href="/manifest-order.json?v=20261111-customer-v1-7-0-rc3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17369,39 +17369,99 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </section>
 
 
-<!-- UBee Customer V1.7.0 RC2 | Navigation-only information architecture. No additional checkout engine. -->
+<!-- UBee Customer V1.7.0 RC3 | Navigation-only information architecture. No additional checkout engine. -->
 
 <section class="flow-page ubee-v17-page" data-page="v17GuestNotify" id="flowPageGuestNotifyV17" aria-label="通知">
   <header class="ubee-v17-top"><strong>通知</strong></header>
   <div class="flow-scroll ubee-v17-scroll"><section class="ubee-v17-about"><div aria-hidden="true">🔔</div><h2>目前尚無通知</h2><p>完成首次下單並建立安全訂單憑證後，可在這裡查看與此裝置相關的訂單通知。</p><button class="ubee-v17-hero-button" type="button" data-v17-action="home">返回首頁</button></section></div>
 </section>
-<section class="flow-page ubee-v17-page" data-page="v17My" id="flowPageMyV17" aria-label="我的">
-  <header class="ubee-v17-top"><strong>我的</strong><span class="ubee-v17-top-label">V1.7.0 RC2</span></header>
-  <div class="flow-scroll ubee-v17-scroll">
-    <section class="ubee-v17-guest"><div class="ubee-v17-guest-icon" aria-hidden="true">🐝</div><div><strong>歡迎使用 UBee</strong><span>訪客使用模式</span></div></section>
-    <p class="ubee-v17-guest-note">免登入即可開始下單。首次送出時仍需提供必要聯絡資料，並建立安全訂單憑證，以保護訂單查詢權限。</p>
-    <h2 class="ubee-v17-list-head">服務與協助</h2>
-    <div class="ubee-v17-list">
-      <button type="button" data-v17-action="faq"><span class="ubee-v17-list-icon">?</span><span>常見問題<small>下單、費用與訂單查詢</small></span><b aria-hidden="true">›</b></button>
-      <button type="button" data-v17-action="support"><span class="ubee-v17-list-icon">☏</span><span>聯絡客服<small>使用協助與問題回報</small></span><b aria-hidden="true">›</b></button>
-      <button type="button" data-v17-action="city"><span class="ubee-v17-list-icon">⌖</span><span>選擇服務城市<small>服務範圍以實際地址與估價為準</small></span><b aria-hidden="true">›</b></button>
+<!-- UBee Customer V1.7.0 RC3 | My Native redesign. Guest order, finance and dispatch contracts unchanged. -->
+<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17My" id="flowPageMyV17" aria-label="我的">
+  <header class="ubee-v17-native-title"><strong>我的</strong></header>
+  <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll">
+    <h2 class="ubee-v17-native-group-title">服務與協助</h2>
+    <div class="ubee-v17-native-group">
+      <button class="ubee-v17-native-item" type="button" data-v17-action="faq"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17h.01"/></svg></span><span class="ubee-v17-native-item-content"><strong>常見問題</strong><small>下單、費用與訂單問題</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+      <button class="ubee-v17-native-item" type="button" data-v17-action="support"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 16 0v3"/><rect x="2" y="12" width="4" height="7" rx="2"/><rect x="18" y="12" width="4" height="7" rx="2"/><path d="M20 19c0 2-2 3-6 3h-2"/></svg></span><span class="ubee-v17-native-item-content"><strong>聯絡客服</strong><small>服務協助與問題回報</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+      <button class="ubee-v17-native-item" type="button" data-v17-action="city"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5.25-8 11-8 11S4 15.25 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="ubee-v17-native-item-content"><strong>服務範圍</strong><small>查看服務城市及地址規則</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
     </div>
-    <h2 class="ubee-v17-list-head">其他</h2>
-    <div class="ubee-v17-list">
-      <button type="button" data-v17-action="settings"><span class="ubee-v17-list-icon">⚙</span><span>使用設定<small>畫面與操作偏好</small></span><b aria-hidden="true">›</b></button>
-      <button type="button" data-v17-action="about"><span class="ubee-v17-list-icon">ⓘ</span><span>關於 UBee<small>服務說明及版本資訊</small></span><b aria-hidden="true">›</b></button>
+    <h2 class="ubee-v17-native-group-title">設定與資訊</h2>
+    <div class="ubee-v17-native-group">
+      <button class="ubee-v17-native-item" type="button" data-v17-action="settings"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="white"/><circle cx="16" cy="17" r="2.2" fill="white"/></svg></span><span class="ubee-v17-native-item-content"><strong>使用設定</strong><small>調整畫面操作偏好</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+      <button class="ubee-v17-native-item" type="button" data-v17-action="about"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg></span><span class="ubee-v17-native-item-content"><strong>關於 UBee</strong><small>版本及服務資訊</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
     </div>
   </div>
 </section>
-<section class="flow-page ubee-v17-page" data-page="v17Faq" id="flowPageFaqV17" aria-label="常見問題"><header class="ubee-v17-subheader"><button type="button" data-v17-action="back-my" aria-label="返回我的">‹</button><strong>常見問題</strong><span></span></header><div class="flow-scroll ubee-v17-scroll"><div class="ubee-v17-faq">
-<details open><summary>沒有會員也能下單嗎？</summary><p>可以。UBee 目前以免登入下單為主。首次送單仍須提供必要聯絡資訊、同意條款並取得本裝置的安全訂單憑證，並不代表已完成手機門號本人驗證。</p></details>
-<details><summary>要如何開始下單？</summary><p>請點底部「下單」，選擇服務類型，填寫地點及任務內容，確認系統估價後送出。</p></details>
-<details><summary>要在哪裡查看訂單？</summary><p>請點底部「訂單」，查看本裝置或目前有效訂單憑證可存取的訂單及執行進度。</p></details>
-<details><summary>服務費如何計算？</summary><p>由正式後端依服務、地址及其他條件計算。送出前以確認頁顯示的系統估價為準，實際代墊及調整費用依訂單規則處理。</p></details>
-<details><summary>更換手機可以看到原本訂單嗎？</summary><p>訪客訂單存取受安全憑證限制，不保證更換裝置即可直接取得。請妥善保存訂單資料，必要時聯絡客服。</p></details>
-</div></div></section>
-<section class="flow-page ubee-v17-page" data-page="v17Settings" id="flowPageSettingsV17" aria-label="使用設定"><header class="ubee-v17-subheader"><button type="button" data-v17-action="back-my" aria-label="返回我的">‹</button><strong>使用設定</strong><span></span></header><div class="flow-scroll ubee-v17-scroll"><div class="ubee-v17-list"><label class="ubee-v17-setting"><span>減少介面動畫<small>降低畫面轉場動態效果</small></span><input id="ubeeV17ReduceMotion" type="checkbox" aria-label="減少介面動畫"></label></div><p class="ubee-v17-guest-note">通知權限與訂單資料依裝置及瀏覽器原有設定管理。</p></div></section>
-<section class="flow-page ubee-v17-page" data-page="v17About" id="flowPageAboutV17" aria-label="關於 UBee"><header class="ubee-v17-subheader"><button type="button" data-v17-action="back-my" aria-label="返回我的">‹</button><strong>關於 UBee</strong><span></span></header><div class="flow-scroll ubee-v17-scroll"><section class="ubee-v17-about"><div aria-hidden="true">🐝</div><h2>UBee 跑腿</h2><p>同城生活跑腿服務</p><strong>UBee Customer V1.7.0 RC2</strong><small>以 Guest Order RC1 HF1 為原始基準。此版屬未部署測試候選，必須完成跨系統驗證。</small></section></div></section>
+<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Faq" id="flowPageFaqV17" aria-label="常見問題">
+  <header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>常見問題</strong><span aria-hidden="true"></span></header>
+  <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll">
+    <h2 class="ubee-v17-native-group-title">下單與使用</h2>
+    <div class="ubee-v17-native-faq">
+      <details><summary>沒有會員也能下單嗎？<span><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></summary><p>可以。直接從「首頁」選擇服務並填寫訂單，不需要先註冊或登入。首次送單仍須提供必要聯絡資料與同意條款，系統會建立安全的訪客訂單憑證；這不等於手機門號已完成本人驗證。</p></details>
+      <details><summary>要如何建立跑腿訂單？<span><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></summary><p>打開「首頁」，選擇需要的小U服務，填寫服務地點、任務內容及時間，依畫面步驟確認正式估價後送出。</p></details>
+      <details><summary>如何查看訂單的最新進度？<span><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></summary><p>請使用底部「訂單」分頁，點選想查看的訂單。僅能查閱目前裝置或有效訂單憑證有權限存取的訂單。</p></details>
+      <details><summary>系統服務費如何計算？<span><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></summary><p>費用由正式後端依服務類型、路線及其他適用條件計算，請以送單前的確認頁估價為準。代墊與額外費用須依實際訂單規則處理。</p></details>
+    </div>
+    <h2 class="ubee-v17-native-group-title">帳務與安全</h2>
+    <div class="ubee-v17-native-faq">
+      <details><summary>換手機後能看到舊訂單嗎？<span><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></summary><p>訪客訂單會受到裝置及安全憑證保護；更換裝置後不能只憑手機號碼取回其他訂單。如需協助，請透過客服管道詢問。</p></details>
+      <details><summary>送出訂單後還能修改或取消嗎？<span><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></summary><p>請進入「訂單」查看目前狀態及畫面提供的操作。是否允許修改、取消及相關費用，依訂單當下狀態與後端規則決定。</p></details>
+    </div>
+  </div>
+</section>
+<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Support" id="flowPageSupportV17" aria-label="聯絡客服">
+  <header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>聯絡客服</strong><span aria-hidden="true"></span></header>
+  <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll">
+    <h2 class="ubee-v17-native-group-title">需要協助？</h2>
+    <div class="ubee-v17-native-group ubee-v17-native-simple">
+      <div class="ubee-v17-native-info-row"><strong>訂單相關問題</strong><p>建議先至「訂單」確認編號及目前狀態，以利客服了解狀況。</p></div>
+      <button type="button" class="ubee-v17-native-item" data-v17-action="go-orders"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="M3 7v10l9 5 9-5V7M12 12v10"/></svg></span><span class="ubee-v17-native-item-content"><strong>前往訂單</strong><small>查看訂單內容與狀態</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+    </div>
+    <h2 class="ubee-v17-native-group-title">官方聯絡入口</h2>
+    <div class="ubee-v17-native-group ubee-v17-native-simple">
+      <button type="button" class="ubee-v17-native-item" data-v17-action="open-support-site"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 16 0v3"/><rect x="2" y="12" width="4" height="7" rx="2"/><rect x="18" y="12" width="4" height="7" rx="2"/><path d="M20 19c0 2-2 3-6 3h-2"/></svg></span><span class="ubee-v17-native-item-content"><strong>開啟既有官方聯絡入口</strong><small>將離開 UBee 用戶端</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+    </div>
+    <p class="ubee-v17-native-footnote">此按鈕沿用現有程式設定的官方連結；若該管道暫停服務，請依 UBee 最新官方公告為準。</p>
+  </div>
+</section>
+<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Service" id="flowPageServiceV17" aria-label="服務範圍">
+  <header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>服務範圍</strong><span aria-hidden="true"></span></header>
+  <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll">
+    <h2 class="ubee-v17-native-group-title">服務城市</h2>
+    <div class="ubee-v17-native-group ubee-v17-native-simple">
+      <div class="ubee-v17-native-info-row"><strong>選擇需要服務的城市</strong><p>取件地點、送達地點及服務可用性由正式系統判定，不保證所有行政區或時段皆有小U可承接。</p></div>
+      <button type="button" class="ubee-v17-native-item" data-v17-action="select-city"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5.25-8 11-8 11S4 15.25 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="ubee-v17-native-item-content"><strong>前往選擇服務城市</strong><small>使用既有的城市選擇功能</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
+    </div>
+    <p class="ubee-v17-native-footnote">實際是否可下單、服務時間與最終費用，以首頁填寫地址後的正式系統回覆為準。</p>
+  </div>
+</section>
+<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Settings" id="flowPageSettingsV17" aria-label="使用設定">
+  <header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>使用設定</strong><span aria-hidden="true"></span></header>
+  <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll">
+    <h2 class="ubee-v17-native-group-title">顯示與操作</h2>
+    <div class="ubee-v17-native-group ubee-v17-native-simple">
+      <label class="ubee-v17-native-switch-row" for="ubeeV17ReduceMotion"><span class="ubee-v17-native-item-content"><strong>減少動態效果</strong><small>降低畫面切換時的動畫</small></span><input id="ubeeV17ReduceMotion" type="checkbox" role="switch" aria-label="減少動態效果"></label>
+    </div>
+    <h2 class="ubee-v17-native-group-title">裝置與通知</h2>
+    <div class="ubee-v17-native-group ubee-v17-native-simple">
+      <div class="ubee-v17-native-info-row"><strong>通知權限</strong><p id="ubeeV17PermissionStatus">讀取中…</p></div>
+      <div class="ubee-v17-native-info-row"><strong>訂單資料保護</strong><p>本機的安全訂單憑證用來確認訂單存取權限。不要清除網站資料後假設訂單仍會自動恢復。</p></div>
+    </div>
+  </div>
+</section>
+<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17About" id="flowPageAboutV17" aria-label="關於 UBee">
+  <header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>關於 UBee</strong><span aria-hidden="true"></span></header>
+  <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll">
+    <div class="ubee-v17-native-brand"><div class="ubee-v17-native-mark">U</div><div><strong>UBee 跑腿</strong><small>生活跑腿服務</small></div></div>
+    <h2 class="ubee-v17-native-group-title">應用程式資訊</h2>
+    <div class="ubee-v17-native-group ubee-v17-native-simple">
+      <div class="ubee-v17-native-key-value"><span>用戶端版本</span><strong>V1.7.0 RC3</strong></div>
+      <div class="ubee-v17-native-key-value"><span>使用方式</span><strong>免登入直接下單</strong></div>
+      <div class="ubee-v17-native-key-value"><span>目前狀態</span><strong>獨立測試候選</strong></div>
+    </div>
+    <p class="ubee-v17-native-footnote">此候選版以 UBee Customer TC V1.6 — Guest Order RC1 HF1 為底進行介面調整，尚未完成正式後端整合驗證。</p>
+  </div>
+</section>
 </div>
 </div>
 <nav aria-label="主要導覽" class="ubee-primary-bottom-nav" id="ubeePersistentBottomNav">
@@ -19567,7 +19627,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261111-customer-v1-7-0-rc2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261111-customer-v1-7-0-rc3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22197,7 +22257,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
   const STATE_KEY='ubeeCustomerNavigationV3';
   const PRIMARY=new Set(['home','orders','notify','my']);
-  const MY_SECTIONS=new Set(['faq','settings','about']);
+  const MY_SECTIONS=new Set(['faq','support','service','settings','about']);
   let applying=false;
 
   const normalizePrimary=value=>{const v=String(value||'').toLowerCase();return v==='task'||v==='ucoin'?'orders':v==='order'||v==='new'?'home':PRIMARY.has(v)?v:'home'};
@@ -22366,11 +22426,11 @@ async function open(target,options={}){
   else if(target==='orders')window.openUBeeTaskPage?.();
   else if(target==='notify')await showNotifications(options);
   else if(target==='my')showLocal('v17My');
- }catch(error){console.error('UBee V1.7.0 RC2 導覽失敗',error);window.showUBeeCustomerNativeAlert?.('頁面暫時無法開啟，請再試一次。');}
+ }catch(error){console.error('UBee V1.7.0 RC3 導覽失敗',error);window.showUBeeCustomerNativeAlert?.('頁面暫時無法開啟，請再試一次。');}
  if(epoch===currentToken)setActive(target);return true;
 }
 function openMySection(section,{fromHistory=false}={}){
- const names={faq:'v17Faq',settings:'v17Settings',about:'v17About'};if(!names[section])return false;
+ const names={faq:'v17Faq',support:'v17Support',service:'v17Service',settings:'v17Settings',about:'v17About'};if(!names[section])return false;
  if(!fromHistory)window.UBeeCustomerNavigation?.pushMySection?.(section);
  showLocal(names[section]);setActive('my');return true;
 }
@@ -22390,9 +22450,11 @@ function jumpToCity(){open('home',{source:'my-city'}).then(()=>document.getEleme
 function onShortcut(event){const b=event.target.closest('[data-v17-action]');if(!b)return;
  const a=b.dataset.v17Action;if(a==='back-my'){window.UBeeCustomerNavigation?.backOrFallback?.(()=>open('my',{source:'back'}));return;}
  if(a==='home'||a==='orders'||a==='notify'){open(a,{source:'shortcut'});return;}
- if(['faq','settings','about'].includes(a)){openMySection(a);return;}
- if(a==='city'){jumpToCity();return;}
- if(a==='support'){const fn=window.openUBeeSupportCenter||window.openUBeeOfficialAccount;
+ if(['faq','support','settings','about'].includes(a)){openMySection(a);return;}
+ if(a==='city'){openMySection('service');return;}
+  if(a==='select-city'){jumpToCity();return;}
+  if(a==='go-orders'){open('orders',{source:'my-support'});return;}
+ if(a==='open-support-site'){const fn=window.openUBeeSupportCenter||window.openUBeeOfficialAccount;
   if(typeof fn==='function')fn();else window.showUBeeCustomerNativeAlert?.('客服入口暫時無法開啟，請稍後再試。');}
 }
 function init(){
@@ -22405,7 +22467,22 @@ function init(){
  document.getElementById('ubeeV17NotificationBack')?.addEventListener('click',()=>open('orders',{source:'back'}));
  document.getElementById('ubeeV17OrderFilters')?.addEventListener('click',e=>{const b=e.target.closest('[data-v17-filter]');if(b)applyFilter(b.dataset.v17Filter)});
  const list=document.getElementById('flowProfileTasksList');if(list)new MutationObserver(()=>applyFilter(filter)).observe(list,{childList:true,subtree:false});
- const reduce=document.getElementById('ubeeV17ReduceMotion');if(reduce)reduce.addEventListener('change',()=>document.body.classList.toggle('ubee-v17-reduce-motion',reduce.checked));
+ const reduce=document.getElementById('ubeeV17ReduceMotion');
+  if(reduce){
+    try{reduce.checked=localStorage.getItem('ubee-customer-reduce-motion')==='1';}catch(_){}
+    document.body.classList.toggle('ubee-v17-reduce-motion',reduce.checked);
+    reduce.addEventListener('change',()=>{
+      document.body.classList.toggle('ubee-v17-reduce-motion',reduce.checked);
+      try{localStorage.setItem('ubee-customer-reduce-motion',reduce.checked?'1':'0');}catch(_){}
+    });
+  }
+  const permission=document.getElementById('ubeeV17PermissionStatus');
+  const updatePermission=()=>{
+    if(!permission)return;
+    permission.textContent=!('Notification' in window)?'此瀏覽器未提供通知權限設定':Notification.permission==='granted'?'已允許通知':Notification.permission==='denied'?'已封鎖通知，請由裝置或瀏覽器設定調整':'尚未允許通知，可依原有訂單通知流程啟用';
+  };
+  updatePermission();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)updatePermission();});
  applyFilter('all');setActive(document.body.dataset.ubeePrimaryNav||'home');
  const initial=window.__UBEE_PENDING_INITIAL_NAV__;if(initial&&!userNavigated){window.__UBEE_PENDING_INITIAL_NAV__='';open(initial,{source:'initial-url'});}
 }
@@ -24130,6 +24207,62 @@ body > #ubeePersistentBottomNav > button.active{color:#b18700!important;}
 #productionOrderFlow #flowPageHome .flow-service-tabs{margin-bottom:4px!important;}
 #productionOrderFlow #flowPageHome .ubee-rc32-section-head h3{font-size:19px!important;}
 #productionOrderFlow #flowPageHome .ubee-rc32-form-title{font-size:18px!important;}
+</style>
+<style id="ubee-v17-rc3-native-my-style">
+/* UBee Customer V1.7.0 RC3: My native UI; scoped to new pages only. */
+#productionOrderFlow .ubee-v17-native-page {background:#f4f5f7!important;color:#111!important;color-scheme:light!important;}
+#productionOrderFlow .ubee-v17-native-page * {box-sizing:border-box;}
+#productionOrderFlow .ubee-v17-native-title {display:flex;align-items:center;justify-content:center;flex:0 0 60px;min-height:60px;border-bottom:1px solid #e8e9ec;background:#fff;color:#111;padding:9px 16px;}
+#productionOrderFlow .ubee-v17-native-title strong{font-size:20px!important;line-height:1.3;font-weight:850;color:#111!important;}
+#productionOrderFlow .ubee-v17-native-subhead{display:grid;grid-template-columns:minmax(74px,1fr) auto minmax(74px,1fr);align-items:center;flex:0 0 60px;min-height:60px;border-bottom:1px solid #e8e9ec;background:#fff;color:#111;padding:6px 12px;}
+#productionOrderFlow .ubee-v17-native-subhead>strong{font-size:19px!important;font-weight:850;color:#111!important;white-space:nowrap;}
+#productionOrderFlow .ubee-v17-native-back{display:flex;align-items:center;justify-content:flex-start;gap:2px;min-height:44px;min-width:72px;border:0;background:transparent;cursor:pointer;color:#111!important;padding:0 5px!important;font-size:15px!important;font-weight:750!important;}
+#productionOrderFlow .ubee-v17-native-back .ubee-v17-native-svg{width:22px;height:22px;color:#111!important;}
+#productionOrderFlow .ubee-v17-native-scroll{background:#f4f5f7!important;padding:14px 15px calc(28px + env(safe-area-inset-bottom))!important;}
+#productionOrderFlow .ubee-v17-native-group-title{margin:10px 5px 9px!important;padding:0!important;font-size:13px!important;font-weight:750!important;color:#5f656c!important;letter-spacing:.3px;}
+#productionOrderFlow .ubee-v17-native-group{background:#fff!important;border:1px solid #e4e6e9!important;border-radius:16px!important;box-shadow:0 1px 1px rgba(17,24,39,.02)!important;overflow:hidden;margin:0 0 22px!important;}
+#productionOrderFlow .ubee-v17-native-item {width:100%;min-height:65px;display:flex;align-items:center;gap:11px;text-align:left;border:0!important;border-bottom:1px solid #eff0f2!important;padding:11px 14px!important;background:#fff!important;color:#111!important;font-size:16px!important;cursor:pointer;appearance:none;-webkit-appearance:none;}
+#productionOrderFlow .ubee-v17-native-item:last-child{border-bottom:0!important;}
+#productionOrderFlow .ubee-v17-native-icon{display:flex;align-items:center;justify-content:center;flex:0 0 36px;width:36px;height:36px;border-radius:11px;background:#f2f3f5;color:#222!important;}
+#productionOrderFlow .ubee-v17-native-svg{width:21px;height:21px;display:block;flex-shrink:0;color:inherit;}
+#productionOrderFlow .ubee-v17-native-item-content{flex:1;min-width:0;display:block!important;color:#111!important;}
+#productionOrderFlow .ubee-v17-native-item-content>strong{display:block!important;font-size:16px!important;line-height:1.35!important;font-weight:760!important;color:#111!important;-webkit-text-fill-color:#111!important;}
+#productionOrderFlow .ubee-v17-native-item-content>small{display:block!important;margin-top:3px!important;line-height:1.45!important;font-size:12px!important;font-weight:500!important;color:#626970!important;-webkit-text-fill-color:#626970!important;}
+#productionOrderFlow .ubee-v17-native-chevron{color:#a5aab0!important;display:flex;align-items:center;}
+#productionOrderFlow .ubee-v17-native-chevron .ubee-v17-native-svg{width:17px;height:17px;}
+#productionOrderFlow .ubee-v17-native-page .ubee-v17-native-item:hover{background:#fafbfc!important;}
+#productionOrderFlow .ubee-v17-native-page .ubee-v17-native-item:active{background:#f4f5f7!important;}
+#productionOrderFlow .ubee-v17-native-faq{border:1px solid #e4e6e9;border-radius:16px;background:#fff;overflow:hidden;margin-bottom:21px;}
+#productionOrderFlow .ubee-v17-native-faq details{margin:0;padding:0!important;border:0!important;border-bottom:1px solid #eceef0!important;background:#fff!important;color:#111!important;}
+#productionOrderFlow .ubee-v17-native-faq details:last-child{border-bottom:0!important;}
+#productionOrderFlow .ubee-v17-native-faq summary{list-style:none;display:flex;align-items:center;gap:9px;justify-content:space-between;min-height:56px;padding:14px 15px;color:#111!important;font-size:15px!important;font-weight:740!important;cursor:pointer;}
+#productionOrderFlow .ubee-v17-native-faq summary::-webkit-details-marker{display:none;}
+#productionOrderFlow .ubee-v17-native-faq summary span{color:#989da4;display:flex;transition:transform .18s;}
+#productionOrderFlow .ubee-v17-native-faq details[open] summary span{transform:rotate(90deg);}
+#productionOrderFlow .ubee-v17-native-faq summary .ubee-v17-native-svg{width:17px;height:17px;}
+#productionOrderFlow .ubee-v17-native-faq details p{margin:0!important;padding:0 15px 16px!important;color:#30343b!important;font-size:14px!important;font-weight:450!important;line-height:1.85!important;}
+#productionOrderFlow .ubee-v17-native-info-row{padding:16px 15px;border-bottom:1px solid #eff0f2;color:#111;}
+#productionOrderFlow .ubee-v17-native-info-row:last-child{border-bottom:0;}
+#productionOrderFlow .ubee-v17-native-info-row>strong{font-size:15px;font-weight:760;color:#111;display:block;}
+#productionOrderFlow .ubee-v17-native-info-row p{font-size:13px!important;line-height:1.75!important;color:#3d4248!important;margin:7px 0 0!important;}
+#productionOrderFlow .ubee-v17-native-footnote{margin:1px 5px 18px;padding:0!important;color:#5b626b!important;font-size:12px!important;line-height:1.8!important;font-weight:450!important;}
+#productionOrderFlow .ubee-v17-native-switch-row{display:flex;min-height:74px;align-items:center;justify-content:space-between;gap:16px;padding:14px 15px;background:#fff!important;color:#111!important;cursor:pointer;}
+#productionOrderFlow .ubee-v17-native-switch-row input{appearance:none;-webkit-appearance:none;width:47px!important;height:28px!important;flex:0 0 47px;min-width:47px;position:relative;margin:0!important;border-radius:999px;background:#d9dce0;border:0;cursor:pointer;transition:background .15s;}
+#productionOrderFlow .ubee-v17-native-switch-row input::after{content:"";width:22px;height:22px;position:absolute;top:3px;left:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .15s;}
+#productionOrderFlow .ubee-v17-native-switch-row input:checked{background:#f3bf16;}
+#productionOrderFlow .ubee-v17-native-switch-row input:checked::after{transform:translateX(19px);}
+#productionOrderFlow .ubee-v17-native-key-value{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:57px;padding:14px 15px;border-bottom:1px solid #eef0f1;font-size:14px;color:#50565e!important;}
+#productionOrderFlow .ubee-v17-native-key-value:last-child{border-bottom:0;}
+#productionOrderFlow .ubee-v17-native-key-value strong{color:#111!important;font-weight:730!important;text-align:right;font-size:13px!important;}
+#productionOrderFlow .ubee-v17-native-brand{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e4e6e9;border-radius:17px;padding:19px 17px;margin:3px 0 22px;}
+#productionOrderFlow .ubee-v17-native-mark{width:49px;height:49px;display:grid;place-items:center;flex:0 0 49px;border-radius:13px;background:#facc15;font-size:27px;font-weight:1000;color:#111;}
+#productionOrderFlow .ubee-v17-native-brand strong{display:block;font-size:19px!important;font-weight:850!important;color:#111!important;}
+#productionOrderFlow .ubee-v17-native-brand small{display:block;font-size:12px!important;margin-top:3px;color:#626970!important;}
+#productionOrderFlow .ubee-v17-native-page button,#productionOrderFlow .ubee-v17-native-page button:link,#productionOrderFlow .ubee-v17-native-page button:visited{color:#111!important;-webkit-text-fill-color:#111!important;text-decoration:none!important;}
+#productionOrderFlow .ubee-v17-native-page a{color:#111!important;text-decoration:underline;}
+#productionOrderFlow .ubee-v17-native-page button:focus-visible,#productionOrderFlow .ubee-v17-native-page summary:focus-visible,#productionOrderFlow .ubee-v17-native-switch-row input:focus-visible{outline:3px solid #272727!important;outline-offset:-3px!important;}
+@media(max-width:360px){#productionOrderFlow .ubee-v17-native-scroll{padding-inline:11px!important;}#productionOrderFlow .ubee-v17-native-item{padding-inline:11px!important;}#productionOrderFlow .ubee-v17-native-subhead{padding-inline:8px;}}
+@media(prefers-reduced-motion:reduce){#productionOrderFlow .ubee-v17-native-page *{transition:none!important;}}
 </style>
 </body>
 </html>
