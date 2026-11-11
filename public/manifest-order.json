@@ -4,7 +4,7 @@
   "short_name": "UBee 跑腿",
   "description": "UBee 跑腿｜正式會員登入與註冊｜六大跑腿服務、下單及訂單追蹤",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20261111-customer-member-v1-7-rc1",
+  "start_url": "/order.html?source=pwa&v=20261111-customer-member-v1-7-rc1-hf1",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone"],
@@ -18,7 +18,7 @@
     {"src":"/ubee-customer-icon-512.png?v=20261016-brand-icons-v3-1","sizes":"512x512","type":"image/png","purpose":"any"}
   ],
   "shortcuts": [
-    {"name":"立即下單","short_name":"下單","description":"登入 UBee 會員後建立跑腿任務","url":"/order.html?action=new&source=shortcut&v=20261111-customer-member-v1-7-rc1","icons":[{"src":"/ubee-customer-icon-192.png","sizes":"192x192","type":"image/png"}]},
-    {"name":"我的訂單","short_name":"訂單","description":"查看正式會員的歷史訂單及任務進度","url":"/order.html?action=tasks&source=shortcut&v=20261111-customer-member-v1-7-rc1","icons":[{"src":"/ubee-customer-icon-192.png","sizes":"192x192","type":"image/png"}]}
+    {"name":"立即下單","short_name":"下單","description":"登入 UBee 會員後建立跑腿任務","url":"/order.html?action=new&source=shortcut&v=20261111-customer-member-v1-7-rc1-hf1","icons":[{"src":"/ubee-customer-icon-192.png","sizes":"192x192","type":"image/png"}]},
+    {"name":"我的訂單","short_name":"訂單","description":"查看正式會員的歷史訂單及任務進度","url":"/order.html?action=tasks&source=shortcut&v=20261111-customer-member-v1-7-rc1-hf1","icons":[{"src":"/ubee-customer-icon-192.png","sizes":"192x192","type":"image/png"}]}
   ]
 }
