@@ -1,4 +1,4 @@
-// UBee Customer RC2 — customer membership growth & new customer referrals retired (候選，尚未正式部署)
+// UBee Customer TC V1.7 — Member Authentication RC1 (source candidate; pending production integration tests)
 // UBee Rider Review V4.0.2-HF1 supplement stability hotfix — shared backend
 // UBee Driver V5.23.5.2｜Comprehensive Terms Review｜2026-10-29
 // ============================================================
@@ -4916,6 +4916,19 @@ async function loadCustomerPasswordResetRecord(rawToken) {
   }
 
   const account = accountDoc.data() || {};
+  // V1.7：舊版知識問答產生的連結不可沿用；必須由已在登入裝置綁定的 LINE 發出。
+  const trustedLineId = customerPasswordResetLineUserId(account.recoveryLineUserId);
+  const lineIndex = trustedLineId
+    ? await db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLineIndex)
+        .doc(customerAuthHash(trustedLineId)).get()
+    : null;
+  if (String(reset.verificationMethod || '') !== 'trusted_line_recovery' ||
+      account.recoveryLineTrustLevel !== 'trusted' ||
+      !trustedLineId ||
+      String(reset.lineUserIdHash || '') !== customerAuthHash(trustedLineId).slice(0,32) ||
+      !lineIndex?.exists || String(lineIndex.data()?.customerId || '') !== customerId) {
+    throw customerAuthError('密碼重設連結不符合新版安全驗證要求，請從已綁定 LINE 重新申請。', 410, 'CUSTOMER_RESET_TRUST_REQUIRED');
+  }
   if (String(account.status || 'active') !== 'active') {
     throw customerAuthError(
       '此帳號目前無法重設密碼，請聯繫 UBee 客服。',
@@ -5122,6 +5135,10 @@ async function issueCustomerPasswordResetByLine(record, lineUserId, verification
     }
 
     const account = accountDoc.data() || {};
+    if (account.recoveryLineTrustLevel !== 'trusted' ||
+        customerPasswordResetLineUserId(account.recoveryLineUserId) !== safeLineUserId) {
+      throw customerAuthError('此 LINE 尚未完成帳號復原綁定。', 403, 'CUSTOMER_RECOVERY_NOT_LINKED');
+    }
     if (String(account.status || 'active') !== 'active') {
       throw customerAuthError(
         '此帳號目前無法重設密碼。',
@@ -5306,75 +5323,24 @@ async function customerPasswordResetProcessPhone(event, lineUserId, phone, sessi
   }
 
   const account = record.account || {};
-  const trustedRecoveryLine =
+  const trustedRecoveryLine = account.recoveryLineTrustLevel === 'trusted' &&
     customerPasswordResetLineUserId(account.recoveryLineUserId) === lineUserId;
-
-  if (trustedRecoveryLine) {
-    return customerPasswordResetReplySuccess(
-      event,
-      record,
-      lineUserId,
-      'trusted_line_recovery',
-      true
-    );
+  const indexDoc = trustedRecoveryLine
+    ? await db.collection(CUSTOMER_AUTH_COLLECTIONS.recoveryLineIndex)
+        .doc(customerAuthHash(lineUserId)).get()
+    : null;
+  if (!trustedRecoveryLine || !indexDoc?.exists ||
+      String(indexDoc.data()?.customerId || '') !== record.customerId) {
+    await sessionRef.delete().catch(() => {});
+    return replyText(event.replyToken,
+      '目前無法確認這個 LINE 帳號已安全綁定該 UBee 會員。請使用原本已登入的裝置，到「我的會員 → 帳號安全」完成 LINE 復原綁定；若已無登入裝置，請聯繫官方客服進行人工核查。');
   }
-
-  const legacyLineMatched = await customerPasswordResetLegacyLineMatches(
-    record,
-    lineUserId
-  );
-
-  if (legacyLineMatched) {
-    return customerPasswordResetReplySuccess(
-      event,
-      record,
-      lineUserId,
-      'legacy_line_order_match',
-      true
-    );
-  }
-
-  const recentOrders = await customerPasswordResetRecentOrders(record.customerId);
-  const hasEmail = Boolean(normalizeCustomerEmail(account.email));
-  const hasOrders = recentOrders.length > 0;
-
-  if (!hasEmail && !hasOrders) {
-    if (sessionRef) {
-      await sessionRef.delete().catch(() => {});
-    }
-    return replyText(
-      event.replyToken,
-      '這個舊會員帳號目前沒有足夠的自動核對資料（沒有註冊 Email，也沒有可核對的歷史任務）。\n\n為避免只知道手機號碼的人直接接管帳號，系統不會放寬驗證。'
-    );
-  }
-
-  await sessionRef.set(
-    {
-      lineUserId,
-      customerId: record.customerId,
-      phone: normalizedPhone,
-      stage: 'awaiting_name',
-      hasEmail,
-      hasOrders,
-      failedAttempts: 0,
-      createdAtMs: Date.now(),
-      updatedAtMs: Date.now(),
-      expiresAtMs: Date.now() + CUSTOMER_PASSWORD_RESET.botSessionTtlMs,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  return replyText(
-    event.replyToken,
-    '🔐 已找到可進行自動核對的 UBee 會員。\n\n第一步：請輸入你註冊會員時填寫的「姓名」。\n\n不需要提供舊密碼。'
-  );
+  return customerPasswordResetReplySuccess(event,record,lineUserId,'trusted_line_recovery',false);
 }
 
 async function handleCustomerPasswordResetBotText(event, lineUserId, rawText) {
   const safeLineUserId = customerPasswordResetLineUserId(lineUserId);
-  if (!safeLineUserId) return null;
+  if (!safeLineUserId || event.source?.type !== 'user') return null;
 
   const text = String(rawText || '').trim();
   const startMatch = text.match(/^(?:忘記密碼|重設密碼|密碼重設)(?:\s+(\d{10}))?$/);
@@ -5441,180 +5407,8 @@ async function handleCustomerPasswordResetBotText(event, lineUserId, rawText) {
     );
   }
 
-  const customerId = String(session.customerId || '').trim();
-  const accountRef = db
-    .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-    .doc(customerId);
-  const accountDoc = await accountRef.get();
-
-  if (!accountDoc.exists) {
-    await sessionRef.delete().catch(() => {});
-    return replyText(
-      event.replyToken,
-      '會員資料已變更，本次重設已結束。請重新輸入「忘記密碼」。'
-    );
-  }
-
-  const account = accountDoc.data() || {};
-  const record = {
-    customerId,
-    ref: accountRef,
-    account,
-    phone: normalizeCustomerPhone(account.phone || session.phone || ''),
-  };
-
-  if (session.stage === 'awaiting_name') {
-    const expected = customerPasswordResetNormalizeName(account.name);
-    const supplied = customerPasswordResetNormalizeName(text);
-
-    if (!expected || supplied !== expected) {
-      return customerPasswordResetBotFail(
-        event,
-        sessionRef,
-        session,
-        '姓名核對不一致，請重新輸入註冊時填寫的完整姓名。'
-      );
-    }
-
-    if (session.hasEmail) {
-      await sessionRef.set(
-        {
-          stage: 'awaiting_email',
-          nameVerified: true,
-          failedAttempts: 0,
-          updatedAtMs: nowMs,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-      return replyText(
-        event.replyToken,
-        '✅ 姓名核對完成。\n\n第二步：請輸入註冊 UBee 會員時填寫的完整 Email。'
-      );
-    }
-
-    await sessionRef.set(
-      {
-        stage: 'awaiting_order',
-        nameVerified: true,
-        failedAttempts: 0,
-        updatedAtMs: nowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-    return replyText(
-      event.replyToken,
-      '✅ 姓名核對完成。\n\n第二步：請輸入你過去任一筆 UBee 任務編號（UB 開頭）。'
-    );
-  }
-
-  if (session.stage === 'awaiting_email') {
-    const expected = normalizeCustomerEmail(account.email);
-    const supplied = normalizeCustomerEmail(text);
-
-    if (!expected || supplied !== expected) {
-      return customerPasswordResetBotFail(
-        event,
-        sessionRef,
-        session,
-        'Email 核對不一致，請重新輸入註冊會員時填寫的完整 Email。'
-      );
-    }
-
-    if (session.hasOrders) {
-      await sessionRef.set(
-        {
-          stage: 'awaiting_order',
-          emailVerified: true,
-          failedAttempts: 0,
-          updatedAtMs: nowMs,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-      return replyText(
-        event.replyToken,
-        '✅ Email 核對完成。\n\n最後一步：請輸入你過去任一筆 UBee 任務編號（UB 開頭）。'
-      );
-    }
-
-    await sessionRef.set(
-      {
-        stage: 'awaiting_area',
-        emailVerified: true,
-        failedAttempts: 0,
-        updatedAtMs: nowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-    return replyText(
-      event.replyToken,
-      '✅ Email 核對完成。\n\n最後一步：請輸入註冊時選擇的常用服務地區，例如「台中市豐原區」。'
-    );
-  }
-
-  if (session.stage === 'awaiting_order') {
-    const orderId = String(text || '').trim().toUpperCase().replace(/\s+/g, '');
-    const recentOrders = await customerPasswordResetRecentOrders(customerId);
-    const matched = recentOrders.some(
-      order => String(order.id || order.orderId || order.orderNo || '')
-        .trim()
-        .toUpperCase() === orderId
-    );
-
-    if (!matched) {
-      return customerPasswordResetBotFail(
-        event,
-        sessionRef,
-        session,
-        '任務編號核對不一致。請輸入屬於你這個 UBee 會員帳號的歷史任務編號。'
-      );
-    }
-
-    return customerPasswordResetReplySuccess(
-      event,
-      record,
-      safeLineUserId,
-      session.emailVerified
-        ? 'line_bot_name_email_order'
-        : 'line_bot_name_order',
-      true
-    );
-  }
-
-  if (session.stage === 'awaiting_area') {
-    const expectedArea = customerPasswordResetNormalizeArea(
-      `${account.serviceCity || ''}${account.serviceDistrict || ''}`
-    );
-    const suppliedArea = customerPasswordResetNormalizeArea(text);
-
-    if (!expectedArea || suppliedArea !== expectedArea) {
-      return customerPasswordResetBotFail(
-        event,
-        sessionRef,
-        session,
-        '常用服務地區核對不一致，請輸入完整縣市＋行政區。'
-      );
-    }
-
-    // 只有姓名＋Email＋服務地區的舊帳號可以完成本次重設，
-    // 但不把這個 LINE 永久標記為 trusted；下次仍會重新核對。
-    return customerPasswordResetReplySuccess(
-      event,
-      record,
-      safeLineUserId,
-      'line_bot_name_email_area',
-      false
-    );
-  }
-
   await sessionRef.delete().catch(() => {});
-  return replyText(
-    event.replyToken,
-    '密碼重設狀態已失效。請重新輸入「忘記密碼」。'
-  );
+  return replyText(event.replyToken,'為保護會員帳號，舊的資料問答式密碼重設已停止。請重新輸入「忘記密碼」。');
 }
 
 
@@ -5705,13 +5499,13 @@ async function customerAuthOptional(req, res, next) {
 async function requireCustomerAuth(req, res, next) {
   try {
     const auth = await loadCustomerAuth(req);
-    if (!auth) {
+    if (!auth || !auth.account?.passwordHash?.hash || auth.account.authMode === 'guest_order') {
       clearCustomerSessionCookie(req, res);
       return res.status(401).json({
         success: false,
         authenticated: false,
         code: 'CUSTOMER_LOGIN_REQUIRED',
-        message: '目前沒有可用的本裝置訂單憑證，請重新確認下單聯絡資料。',
+        message: '請先登入 UBee 正式會員帳號。',
       });
     }
     req.customerAuth = auth;
@@ -5802,10 +5596,10 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
   try {
     // 若瀏覽器本來就有有效 Session，直接沿用，不重複建立身分。
     const existingAuth = await loadCustomerAuth(req).catch(() => null);
-    if (existingAuth && withPassword) {
+    if (existingAuth && withPassword && existingAuth.account?.passwordHash?.hash && existingAuth.account.authMode !== 'guest_order') {
       throw customerAuthError('目前已登入 UBee，請至帳號與安全管理密碼，勿重複註冊。', 409, 'CUSTOMER_ALREADY_SIGNED_IN');
     }
-    if (existingAuth) {
+    if (existingAuth && !withPassword) {
       return res.json({
         success: true,
         authenticated: true,
@@ -6008,58 +5802,16 @@ async function createCustomerOnboarding(req, res, { withPassword = false } = {})
   }
 }
 
-// Customer Guest Order V1: this is an ORDER OWNERSHIP SESSION, not a membership registration.
-// A phone number is contact data only. Possessing a phone number grants NO access to old orders.
-app.post('/api/customer-guest/session', async (req, res) => {
-  res.setHeader('Cache-Control','no-store');
-  try {
-    const name=cleanText(req.body?.name||'',40);
-    const contactPhone=normalizeCustomerPhone(req.body?.phone);
-    if (name.length<2) return res.status(400).json({success:false,code:'GUEST_NAME_INVALID',message:'請填寫至少兩字的下單人姓名。'});
-    if (!isValidCustomerPhone(contactPhone)) return res.status(400).json({success:false,code:'GUEST_PHONE_INVALID',message:'請填寫 09 開頭十碼聯絡電話。'});
-    // Do not turn a legacy member cookie into a guest account or link by phone.
-    const prior=await loadCustomerAuth(req).catch(()=>null);
-    if (prior?.account?.authMode==='guest_order') {
-      await db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(prior.customerId).set({
-        name,guestContactPhone:contactPhone,updatedAtMs:Date.now(),
-        updatedAt:admin.firestore.FieldValue.serverTimestamp()
-      },{merge:true});
-      return res.json({success:true,customer:{customerId:prior.customerId,name,phone:contactPhone,authMode:'guest_order'}});
-    }
-    const customerId=`customer_${crypto.randomBytes(16).toString('hex')}`;
-    const rawToken=customerAuthRandomToken(32);
-    const nowMs=Date.now();
-    const accountRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
-    const sessionRef=db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(customerAuthHash(rawToken));
-    const batch=db.batch();
-    batch.create(accountRef,{
-      customerId,name,phone:'',guestContactPhone:contactPhone,authMode:'guest_order',
-      status:'active',passwordHash:null,passwordConfigured:false,passwordVersion:1,
-      phoneVerified:false,memberNumber:'',identityVerification:{status:'not_verified'},
-      source:'customer-guest-order',schemaVersion:'guest-order-v1',
-      createdAtMs:nowMs,updatedAtMs:nowMs,
-      createdAt:admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt:admin.firestore.FieldValue.serverTimestamp()
-    });
-    batch.create(sessionRef,{
-      customerId,passwordVersion:1,createdAtMs:nowMs,lastSeenAtMs:nowMs,
-      expiresAtMs:nowMs+CUSTOMER_AUTH.sessionTtlMs,revoked:false,
-      ...customerAuthClientFingerprint(req),createdAt:admin.firestore.FieldValue.serverTimestamp()
-    });
-    await batch.commit();
-    setCustomerSessionCookie(req,res,rawToken);
-    return res.status(201).json({success:true,created:true,customer:{customerId,name,phone:contactPhone,authMode:'guest_order'}});
-  }catch(error){console.error('客戶訪客訂單憑證建立失敗',error);return res.status(503).json({success:false,code:'GUEST_SESSION_UNAVAILABLE',message:'目前無法取得安全下單憑證，請稍後再試。'});}
-});
-app.get('/api/customer-guest/me',customerAuthOptional,(req,res)=>{
-  res.setHeader('Cache-Control','no-store');
-  const a=req.customerAuth;
-  if(!a||a.account?.authMode!=='guest_order')return res.status(401).json({success:false,code:'GUEST_SESSION_REQUIRED',message:'本裝置尚未建立訪客訂單憑證。'});
-  return res.json({success:true,customer:{customerId:a.customerId,name:a.account.name||'',phone:a.account.guestContactPhone||'',authMode:'guest_order'}});
-});
+// V1.7：正式會員制；舊訪客建立與查詢入口停止提供，保留資料庫歷史紀錄以便人工核對。
+for (const path of ['/api/customer-guest/session','/api/customer-guest/me']) {
+  app.all(path, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(410).json({success:false,code:'CUSTOMER_MEMBER_ONLY',message:'UBee 已改採正式會員制，請註冊或登入會員。'});
+  });
+}
 
 // Legacy routes temporarily retained for previously deployed clients. Do not re-enable member UI.
-app.post('/api/customer-auth/order-session', (req, res) => createCustomerOnboarding(req, res));
+app.all('/api/customer-auth/order-session', (_req,res) => res.status(410).json({success:false,code:'CUSTOMER_MEMBER_ONLY',message:'請使用會員註冊或登入。'}));
 app.post('/api/customer-auth/register', (req, res) => createCustomerOnboarding(req, res, { withPassword:true }));
 
 // 密碼新增與變更由後端認證 Session，密碼更新後輪替 Session，其他裝置失效。
@@ -6193,6 +5945,11 @@ app.post('/api/customer-auth/login', async (req, res) => {
 app.post('/api/customer-auth/recovery-line/start', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
+    // V1.7: LINE account-recovery enrollment is security-sensitive; require password again.
+    const currentPassword = String(req.body?.currentPassword || '');
+    if (!currentPassword || !await verifyCustomerPassword(currentPassword, req.customerAuth.account.passwordHash)) {
+      throw customerAuthError('請先輸入正確的目前登入密碼，才能綁定 LINE 安全復原。', 401, 'CUSTOMER_PASSWORD_CONFIRM_REQUIRED');
+    }
     const customerId = req.customerAuth.customerId;
     const raw = customerAuthRandomToken(24);
     const challengeHash = customerAuthHash(raw);
@@ -6362,7 +6119,7 @@ app.post('/api/customer-auth/password-reset/complete', async (req, res) => {
 
 app.get('/api/customer-auth/me', customerAuthOptional, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  if (!req.customerAuth) {
+  if (!req.customerAuth || !req.customerAuth.account?.passwordHash?.hash || req.customerAuth.account.authMode === 'guest_order') {
     return res.status(401).json({
       success: false,
       authenticated: false,
@@ -40026,14 +39783,14 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     req.body.customerMemberNumber = String(req.customerAuth.account.memberNumber || '');
     req.body.customerName = String(req.customerAuth.account.name || '');
     req.body.customerPhone = String(req.customerAuth.account.authMode === 'guest_order' ? (req.customerAuth.account.guestContactPhone || '') : (req.customerAuth.account.phone || ''));
-    if(req.customerAuth.account.authMode==='guest_order')req.body.uCoinRedeemWhole=0;
+    req.body.uCoinRedeemWhole = 0; // V1.7 no customer-facing UCoin spending.
     const trustedSelfOrderIdentityKeys = buildCustomerSelfOrderIdentityKeys(
       {...req.customerAuth.account, phone:req.customerAuth.account.authMode==='guest_order' ? req.customerAuth.account.guestContactPhone : req.customerAuth.account.phone},
       req.customerAuth.customerId
     );
     const data = createOrderFromApi(req.body);
-    data.customerAccessMode=req.customerAuth.account.authMode==='guest_order'?'guest_order':'legacy_customer';
-    data.uCoinDisabled=data.customerAccessMode==='guest_order';
+    data.customerAccessMode='member_password_v1_7';
+    data.uCoinDisabled=true; // No new award or redemption; keep historical finance ledger unchanged.
 
     // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
     data.customerIdentityVerified = isCustomerIdentityVerified(
@@ -45728,7 +45485,7 @@ async function handleTextMessage(event) {
   console.log('請把這個 userId 複製到 Firebase riders 的 lineUserId 欄位:', userId);
   console.log('groupId:', event.source.groupId || '-');
   console.log('roomId:', event.source.roomId || '-');
-  console.log('text:', /^綁定會員\s/.test(String(text||'')) ? '[UBee 安全綁定指令已遮蔽]' : text);
+  console.log('text:', /^(?:綁定會員|忘記密碼|重設密碼|密碼重設)/.test(String(text||'')) ? '[UBee 會員安全指令已遮蔽]' : text);
 
   if (/^強制取消\s+UB\d+/i.test(text)) {
     const orderId = text.replace(/^強制取消\s+/i, '').trim().toUpperCase();
