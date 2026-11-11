@@ -1,7 +1,7 @@
 /* ============================================================
  * UBee 跑腿｜客戶端 Service Worker｜Guest Order RC1 candidate 2026-11-11
  * Release: Customer Guest Order Session V4 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261111-customer-v1-7-0-rc5
+ * Version: 20261111-customer-v1-7-0-rc6
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；訂單／通知仍維持內部深層連結）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261111-customer-v1-7-0-rc5';
+const UBEE_CUSTOMER_SW_VERSION = '20261111-customer-v1-7-0-rc6';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
