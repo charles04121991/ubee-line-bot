@@ -1,10 +1,10 @@
 /* ============================================================
- * UBee 跑腿｜客戶端 Service Worker｜Member Authentication RC1 candidate 2026-11-11
- * Release: Member Authentication V1.7 (mandatory registration + password + trusted LINE reset; no guest order, no UCoin UI) + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261111-customer-member-v1-7-rc1-hf1
+ * UBee 跑腿｜客戶端 Service Worker｜Guest Order RC1 candidate 2026-11-10
+ * Release: Member Security V1 (optional register + password + LINE recovery) + Customer No-Register Order Session V4 + UCoin Hard Cap V2 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
+ * Version: 20261110-customer-guest-rc1-hf1
  *
  * Canonical responsibilities:
- * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；會員訂單／通知維持內部深層連結）
+ * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；訂單／通知／U幣仍維持內部深層連結）
  * - API / Auth / Orders / Quote 一律 Network Only
  * - order.html Navigation 採 Network First
  * - 靜態資源 Stale While Revalidate
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261111-customer-member-v1-7-rc1-hf1';
+const UBEE_CUSTOMER_SW_VERSION = '20261110-customer-guest-rc1-hf1';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
@@ -103,7 +103,7 @@ async function networkFirstPage(request) {
       ignoreSearch: true
     });
 
-    // V1.7: never use stale cached HTML for login and order forms.
+    // Guest Order: never fall back to an older member-enabled HTML page.
     return new Response('UBee 目前無法連線，請恢復網路後重新開啟。', {
       status:503,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}
     });
