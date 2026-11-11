@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261111-customer-v1-7-0-rc5" rel="manifest"/>
+<link href="/manifest-order.json?v=20261111-customer-v1-7-0-rc6" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -10918,7 +10918,7 @@ function getInitialOpenAction(){
 
   if(['orders','my-orders','tasks','task'].includes(directOpen)) return 'orders';
   if(['notifications','notification','notify'].includes(directOpen)) return 'notify';
-  if(['ucoin','u-coins','wallet'].includes(directOpen)) return 'task';
+  if(directOpen==='wallet') return 'task';
   if(['profile','my','account'].includes(directOpen)) return 'my';
   if(['stores','store','merchant'].includes(directOpen)) return 'store';
   if(['new','create','order'].includes(directOpen)) return 'new';
@@ -12102,7 +12102,7 @@ function captureApprovedCustomerCheckoutPricing(){
   const roundMoney = value => Math.max(0, Math.round(Number(value) || 0));
   const base = roundMoney(typeof lastEstimatedTotal !== 'undefined' ? lastEstimatedTotal : 0);
   const advance = roundMoney(quote.advancePayment ?? price.advancePayment ?? (typeof getAdvancePaymentAmount === 'function' ? getAdvancePaymentAmount() : 0));
-  const discount = 0; // No-member candidate: UCoin redemption disabled.
+  const discount = 0; // RC6: no wallet discount is part of this guest-order checkout.
   return {
     base, advance, discount, payable:Math.max(0,base-discount),
     serviceSubtotal:roundMoney(price.serviceSubtotal ?? price.serviceTotal ?? base-advance),
@@ -12159,18 +12159,9 @@ async function createOrder(options = {}){
     }
 
     const refreshed = captureApprovedCustomerCheckoutPricing();
-    let maxRedeemNow = approved.discount;
-    if (approved.discount > 0) {
-      // Wallet and platform share may have changed since checkout preview.
-      const preview = await customerApiFetch('/api/customer/u-coins/redemption-preview', {
-        method:'POST',
-        body:JSON.stringify({serviceSubtotal:refreshed.serviceSubtotal, platformIncome:refreshed.platformIncome})
-      });
-      maxRedeemNow = Math.max(0, Math.floor(Number(preview.maxWhole || 0)));
-    }
+    // RC6: Compare the customer's approved quote with the refreshed quote, without calling any wallet API.
     const resumedApprovedBase = window.UBeeCheckoutAuthResume?.expectedTotal?.();
     const changed = approved.base !== refreshed.base || approved.advance !== refreshed.advance ||
-      approved.discount !== refreshed.discount || maxRedeemNow < approved.discount ||
       (Number.isFinite(resumedApprovedBase) && resumedApprovedBase !== refreshed.base);
     if (changed) {
       // Update visible quote/discount; customer must explicitly accept the new amount.
@@ -12198,7 +12189,7 @@ async function createOrder(options = {}){
     }
     btn.innerText = '建立訂單中...';
     const payload = getPayload();
-    payload.uCoinRedeemWhole = 0; // No-member candidate.
+    // RC6: legacy wallet input removed; backend also rejects new redemption attempts.
     payload.checkoutExpectedPayableTotal = approved.payable;
 
     if(!payload.quoteId){
@@ -17376,8 +17367,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   <div class="flow-scroll ubee-v17-scroll"><section class="ubee-v17-about"><div aria-hidden="true">🔔</div><h2>目前尚無通知</h2><p>完成首次下單並建立安全訂單憑證後，可在這裡查看與此裝置相關的訂單通知。</p><button class="ubee-v17-hero-button" type="button" data-v17-action="home">返回首頁</button></section></div>
 </section>
 <!-- UBee Customer V1.7.0 RC3 | My Native redesign. Guest order, finance and dispatch contracts unchanged. -->
-<!-- UBee Customer V1.7.0 RC5 | 14-item Native My Center; guest-order checkout untouched. -->
-<!-- UBee Customer V1.7.0 RC5 | Eight-entry compact My Center with native collapsible sections. -->
+<!-- UBee Customer V1.7.0 RC6 | 14-item Native My Center; guest-order checkout untouched. -->
+<!-- UBee Customer V1.7.0 RC6 | Eight-entry compact My Center with native collapsible sections. -->
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17My" id="flowPageMyV17" aria-label="我的">
 <header class="ubee-v17-native-title"><strong>我的</strong></header>
 <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll ubee-v17-rc5-root">
@@ -17391,7 +17382,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       <div id="ubeeV17PrefsGroup" class="ubee-v17-native-group ubee-v17-rc5-group" hidden>
         <button class="ubee-v17-native-item" type="button" data-v17-action="notifysettings"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span class="ubee-v17-native-item-content"><strong>通知設定</strong><small>權限狀態與訊息中心</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><button class="ubee-v17-native-item" type="button" data-v17-action="addresses"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span><span class="ubee-v17-native-item-content"><strong>常用地址</strong><small>本裝置地址及下單聯絡資訊</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><button class="ubee-v17-native-item" type="button" data-v17-action="settings"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="white"/><circle cx="16" cy="17" r="2.2" fill="white"/></svg></span><span class="ubee-v17-native-item-content"><strong>顯示與操作</strong><small>文字大小、動畫與選單說明</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><button class="ubee-v17-native-item" type="button" data-v17-action="infohub"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg></span><span class="ubee-v17-native-item-content"><strong>關於與隱私</strong><small>條款、資料保護、安裝與版本</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>
       </div>
-    </div><p class="ubee-v17-native-footnote ubee-v17-rc5-version">UBee Customer V1.7.0 RC5 · 獨立測試候選</p>
+    </div><p class="ubee-v17-native-footnote ubee-v17-rc5-version">UBee Customer V1.7.0 RC6 · 獨立測試候選</p>
 </div>
 </section>
 <section class="flow-page ubee-v17-page ubee-v17-native-page ubee-v17-rc5-drill" data-page="v17HelpGuide" id="flowPageV17HelpGuideV17" aria-label="服務指南">
@@ -17468,7 +17459,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Feedback" id="flowPageV17FeedbackV17" aria-label="意見回饋"><header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>意見回饋</strong><span aria-hidden="true"></span></header><div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll"><h2 class="ubee-v17-native-group-title">提供建議</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-feedback"><label for="ubeeV17FeedbackText">分享你希望 UBee 改進的地方</label><textarea id="ubeeV17FeedbackText" rows="5" maxlength="1000" placeholder="例如：操作問題、服務建議、畫面使用體驗……"></textarea><p class="ubee-v17-native-footnote">此候選版尚無新的意見回饋後端；文字不會自動傳送或儲存。</p><button type="button" class="ubee-v17-native-primary" data-v17-action="copy-feedback">複製回饋內容</button><p id="ubeeV17FeedbackStatus" class="ubee-v17-native-feedback-status" role="status" aria-live="polite"></p></div></div><h2 class="ubee-v17-native-group-title">聯絡方式</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><button class="ubee-v17-native-item" type="button" data-v17-action="support"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 16 0v3"/><rect x="2" y="12" width="4" height="7" rx="2"/><rect x="18" y="12" width="4" height="7" rx="2"/><path d="M20 19c0 2-2 3-6 3h-2"/></svg></span><span class="ubee-v17-native-item-content"><strong>前往客服中心</strong><small>透過現有官方管道確認如何提交</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button></div></div></section>
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Notifysettings" id="flowPageV17NotifysettingsV17" aria-label="通知設定"><header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>通知設定</strong><span aria-hidden="true"></span></header><div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll"><h2 class="ubee-v17-native-group-title">裝置通知</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>目前權限狀態</strong><p>請查看下方裝置權限；開啟系統推播與否仍取決於瀏覽器支援、裝置設定及既有訂單通知機制。</p></div><div class="ubee-v17-native-info-row"><strong>目前通知權限</strong><p id="ubeeV17NotificationPermissionRC4">讀取中…</p></div><button class="ubee-v17-native-item" type="button" data-v17-action="notify"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span class="ubee-v17-native-item-content"><strong>查看通知中心</strong><small>訂單更新及平台消息</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button></div><p class="ubee-v17-native-footnote">若通知已被封鎖，請在裝置或瀏覽器設定中重新允許。本頁不假裝開關已成功註冊推播。</p></div></section>
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Addresses" id="flowPageV17AddressesV17" aria-label="常用地址與聯絡資訊"><header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>常用地址與聯絡資訊</strong><span aria-hidden="true"></span></header><div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll"><h2 class="ubee-v17-native-group-title">本裝置可用地址</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div id="ubeeV17AddressSnapshot" class="ubee-v17-native-info-row"><strong>正在檢查已儲存地址</strong><p>請稍候…</p></div><button class="ubee-v17-native-item" type="button" data-v17-action="home"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span><span class="ubee-v17-native-item-content"><strong>前往首頁管理取送地址</strong><small>使用原本下單地址選擇及儲存流程</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button></div><h2 class="ubee-v17-native-group-title">聯絡資訊</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>訂單聯絡資料</strong><p>免登入下單時仍需提供必要聯絡資料。聯絡人及電話應在新訂單的原有表單中確認或修正，不會在此新增會員資料庫。</p></div></div><p class="ubee-v17-native-footnote">本頁僅顯示目前裝置既有的常用地址資料，不會透過手機號碼讀取其他人的訂單。</p></div></section>
-<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Install" id="flowPageV17InstallV17" aria-label="App 安裝與更新"><header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>App 安裝與更新</strong><span aria-hidden="true"></span></header><div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll"><h2 class="ubee-v17-native-group-title">在手機上使用</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>iPhone Web Clip</strong><p>UBee 已有 Web Clip 安裝方式；安裝描述檔的版本與用戶端程式版本分開管理。請使用 UBee 正式提供的安裝來源，不隨意安裝不明描述檔。</p></div><div class="ubee-v17-native-info-row"><strong>一般瀏覽器與 PWA</strong><p>透過既有 UBee 用戶端網址使用時，支援的瀏覽器可依其介面將網頁加入主畫面。</p></div></div><h2 class="ubee-v17-native-group-title">版本資訊</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>目前候選版本</strong><p>UBee Customer V1.7.0 RC5。此為獨立候選，不能作為正式已部署版本的證明。</p></div><button class="ubee-v17-native-item" type="button" data-v17-action="check-update"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><span class="ubee-v17-native-item-content"><strong>檢查本裝置的更新</strong><small>請求現有 Service Worker 檢查更新</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button></div><p class="ubee-v17-native-footnote" id="ubeeV17UpdateStatus" role="status" aria-live="polite">尚未檢查更新。</p></div></section>
+<section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Install" id="flowPageV17InstallV17" aria-label="App 安裝與更新"><header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>App 安裝與更新</strong><span aria-hidden="true"></span></header><div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll"><h2 class="ubee-v17-native-group-title">在手機上使用</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>iPhone Web Clip</strong><p>UBee 已有 Web Clip 安裝方式；安裝描述檔的版本與用戶端程式版本分開管理。請使用 UBee 正式提供的安裝來源，不隨意安裝不明描述檔。</p></div><div class="ubee-v17-native-info-row"><strong>一般瀏覽器與 PWA</strong><p>透過既有 UBee 用戶端網址使用時，支援的瀏覽器可依其介面將網頁加入主畫面。</p></div></div><h2 class="ubee-v17-native-group-title">版本資訊</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>目前候選版本</strong><p>UBee Customer V1.7.0 RC6。此為獨立候選，不能作為正式已部署版本的證明。</p></div><button class="ubee-v17-native-item" type="button" data-v17-action="check-update"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><span class="ubee-v17-native-item-content"><strong>檢查本裝置的更新</strong><small>請求現有 Service Worker 檢查更新</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button></div><p class="ubee-v17-native-footnote" id="ubeeV17UpdateStatus" role="status" aria-live="polite">尚未檢查更新。</p></div></section>
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Privacydata" id="flowPageV17PrivacydataV17" aria-label="隱私與資料管理"><header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>隱私與資料管理</strong><span aria-hidden="true"></span></header><div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll"><h2 class="ubee-v17-native-group-title">訂單資料與安全</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>訪客訂單憑證</strong><p>下單使用安全 Session 確認訂單存取權限。這不是會員註冊，也不代表手機號碼已本人驗證。</p></div><div class="ubee-v17-native-info-row"><strong>更換裝置或清除網站資料</strong><p>請勿把清除瀏覽器 Cookie 或網站資料當作一般清理操作；這可能使你無法從裝置直接開啟原有訂單。</p></div><div class="ubee-v17-native-info-row"><strong>個人資料請求</strong><p>如需查詢、更正或申請處理平台持有的個人資料，請透過客服與平台確認正式程序。</p></div></div><h2 class="ubee-v17-native-group-title">本機偏好</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>可清除的項目</strong><p>只重設動態效果、文字大小和選單說明三項本機偏好，不刪除訂單、地址、Cookie 或訪客憑證。</p></div><button class="ubee-v17-native-item" type="button" data-v17-action="reset-display"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="white"/><circle cx="16" cy="17" r="2.2" fill="white"/></svg></span><span class="ubee-v17-native-item-content"><strong>重設顯示偏好</strong><small>不影響訂單及訪客安全憑證</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button></div><p class="ubee-v17-native-footnote" id="ubeeV17ResetDisplayStatus" role="status" aria-live="polite"></p></div></section>
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Legal" id="flowPageV17LegalV17" aria-label="服務條款與隱私權"><header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>服務條款與隱私權</strong><span aria-hidden="true"></span></header><div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll"><h2 class="ubee-v17-native-group-title">文件閱讀</h2><div class="ubee-v17-native-group ubee-v17-native-simple"><div class="ubee-v17-native-info-row"><strong>服務條款</strong><p>下單前應閱讀正式系統在訂單確認流程提供的服務規則與付款同意資訊。本頁未擅自將簡化摘要冒充完整正式條款。</p></div><div class="ubee-v17-native-info-row"><strong>隱私權資訊</strong><p>平台蒐集及處理聯絡資料、訂單內容與必要裝置憑證，以提供下單、派單、通知及客服等功能；完整適用文件須由平台正式發布並確認版本。</p></div><button class="ubee-v17-native-item" type="button" data-v17-action="home"><span class="ubee-v17-native-icon"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l4 4v16H6V2ZM15 2v5h4M9 12h7M9 16h7"/></svg></span><span class="ubee-v17-native-item-content"><strong>返回首頁查看下單確認資訊</strong><small>實際同意條款依現有正式下單流程</small></span><span class="ubee-v17-native-chevron"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button></div><p class="ubee-v17-native-footnote">正式政策全文與生效日期尚須由營運方提供。本候選版不虛構法律文件，也不宣稱已有最新完整政策頁。</p></div></section>
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17About" id="flowPageAboutV17" aria-label="關於 UBee">
@@ -17477,7 +17468,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     <div class="ubee-v17-native-brand"><div class="ubee-v17-native-mark">U</div><div><strong>UBee 跑腿</strong><small>生活跑腿服務</small></div></div>
     <h2 class="ubee-v17-native-group-title">應用程式資訊</h2>
     <div class="ubee-v17-native-group ubee-v17-native-simple">
-      <div class="ubee-v17-native-key-value"><span>用戶端版本</span><strong>V1.7.0 RC5</strong></div>
+      <div class="ubee-v17-native-key-value"><span>用戶端版本</span><strong>V1.7.0 RC6</strong></div>
       <div class="ubee-v17-native-key-value"><span>使用方式</span><strong>免登入直接下單</strong></div>
       <div class="ubee-v17-native-key-value"><span>目前狀態</span><strong>獨立測試候選</strong></div>
     </div>
@@ -18739,7 +18730,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function resetNewTask(clearLegacy=true){
-    window.__ubeeUCoinRedeemWhole=0;
+    // RC6 removed legacy wallet global.
     Object.assign(state,{page:'home',service:'send',userSelectedService:false,serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
     if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','dropoff2','dropoff2AddressNote','dropoff2Contact','dropoff2Phone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=dropoff2Lat=dropoff2Lng=null;pickupPlaceId=dropoffPlaceId=dropoff2PlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;/* HF3: 初始化／切換服務不可刪除持久草稿；捨棄與成功建單才調用 UBeeEnhancements.clearDraft()。 */}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
@@ -19520,7 +19511,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   };
   // Guest Order: order list is the only secondary primary screen.
   window.openUBeeTaskPage=window.openUBeeTaskRoot;
-  window.openUBeeUCoinPage=window.openUBeeTaskRoot; // old deep links stay harmless
+  // RC6 removed legacy wallet page global.
   window.openUBeeProfilePage=window.openUBeeTaskRoot; // no account UI retained
   window.UBeeCustomerMyServiceData={
     showCachedAddresses(){hydrateCustomerAddressCache();renderProfileAddressList();return state.savedAddresses.slice();},
@@ -19649,7 +19640,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261111-customer-v1-7-0-rc5';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261111-customer-v1-7-0-rc6';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -20698,335 +20689,6 @@ html,body{
   }
 }
 </style>
-<style id="ubee-customer-growth-v1-style">
-/* UBee Growth Engine V1.3｜Customer Native Growth UI
-   刪除舊深色漸層成長卡與網頁式大按鈕，統一使用 App 內頁、Grouped List、原生狀態列。 */
-#productionOrderFlow .ubee-native-growth-summary{margin:0 0 18px;padding:17px 16px 15px;border:1px solid var(--ubee-my-line);border-radius:16px;background:#fff;color:#111}
-#productionOrderFlow .ubee-native-growth-summary-top{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center}
-#productionOrderFlow .ubee-native-growth-mark{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:#facc15;color:#111}#productionOrderFlow .ubee-native-growth-mark svg{width:22px;height:22px}
-#productionOrderFlow .ubee-native-growth-copy{min-width:0}
-#productionOrderFlow .ubee-native-growth-label{display:block;color:#7b8188;font-size:13px;font-weight:800;line-height:1.35}
-#productionOrderFlow .ubee-native-growth-tier{display:block;margin-top:2px;color:#111;font-size:22px;font-weight:1000;line-height:1.2;letter-spacing:-.25px}
-#productionOrderFlow .ubee-native-growth-count{align-self:center;color:#111;font-size:14px;font-weight:900;white-space:nowrap}
-#productionOrderFlow .ubee-native-growth-progress{height:6px;margin-top:15px;border-radius:999px;background:#eceef1;overflow:hidden}
-#productionOrderFlow .ubee-native-growth-progress>span{display:block;height:100%;border-radius:inherit;background:#facc15}
-#productionOrderFlow .ubee-native-growth-next{display:flex;justify-content:space-between;gap:12px;margin-top:8px;color:#747a81;font-size:13px;font-weight:750;line-height:1.45}
-#productionOrderFlow .ubee-native-growth-next strong{color:#111;font-size:13px;font-weight:900;text-align:right}
-#productionOrderFlow .ubee-native-growth-metrics{display:grid;grid-template-columns:1fr 1fr;margin:0 0 18px;border:1px solid var(--ubee-my-line);border-radius:16px;background:#fff;overflow:hidden}
-#productionOrderFlow .ubee-native-growth-metric{min-width:0;padding:14px 15px}
-#productionOrderFlow .ubee-native-growth-metric+ .ubee-native-growth-metric{border-left:1px solid var(--ubee-my-line)}
-#productionOrderFlow .ubee-native-growth-metric small{display:block;color:#7b8188;font-size:13px;font-weight:750}
-#productionOrderFlow .ubee-native-growth-metric strong{display:block;margin-top:4px;color:#111;font-size:20px;font-weight:1000;line-height:1.2}
-#productionOrderFlow .ubee-native-growth-section-title{margin:20px 6px 8px;color:#747a81;font-size:14px;font-weight:850;letter-spacing:.1px}
-#productionOrderFlow .ubee-native-growth-list{margin:0 0 16px;border:1px solid var(--ubee-my-line);border-radius:16px;background:#fff;overflow:hidden}
-#productionOrderFlow .ubee-native-growth-row{min-height:56px;padding:10px 13px;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:11px;align-items:center;border-bottom:1px solid #eceef0;background:#fff}
-#productionOrderFlow .ubee-native-growth-row:last-child{border-bottom:0}
-#productionOrderFlow .ubee-native-growth-state{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#f0f1f3;color:#8b9198;font-size:13px;font-weight:1000}
-#productionOrderFlow .ubee-native-growth-row.is-done .ubee-native-growth-state{background:#eaf7ee;color:#16803c}
-#productionOrderFlow .ubee-native-growth-row.is-current .ubee-native-growth-state{background:#facc15;color:#111}
-#productionOrderFlow .ubee-native-growth-row-main{min-width:0}
-#productionOrderFlow .ubee-native-growth-row-main strong{display:block;color:#111;font-size:15px;font-weight:900;line-height:1.35}
-#productionOrderFlow .ubee-native-growth-row-main small{display:block;margin-top:2px;color:#7b8188;font-size:13px;font-weight:700;line-height:1.4}
-#productionOrderFlow .ubee-native-growth-row-side{color:#7b8188;font-size:13px;font-weight:800;text-align:right;white-space:nowrap}
-#productionOrderFlow .ubee-native-growth-row.is-current .ubee-native-growth-row-side{color:#111}
-#productionOrderFlow .ubee-native-growth-history-dot{width:9px;height:9px;margin-left:9px;border-radius:50%;background:#c9cdd2}
-#productionOrderFlow .ubee-native-growth-history-row:first-child .ubee-native-growth-history-dot{background:#facc15}
-#productionOrderFlow .ubee-native-invite-code{margin:0 0 16px;padding:18px 16px;border:1px solid var(--ubee-my-line);border-radius:16px;background:#fff;text-align:center}
-#productionOrderFlow .ubee-native-invite-code small{display:block;color:#7b8188;font-size:13px;font-weight:800}
-#productionOrderFlow .ubee-native-invite-code strong{display:block;margin-top:7px;color:#111;font-size:28px;font-weight:1000;letter-spacing:1.5px;line-height:1.2;word-break:break-all}
-#productionOrderFlow .ubee-native-invite-code p{margin:9px auto 0;max-width:320px;color:#747a81;font-size:13px;font-weight:700;line-height:1.55}
-#productionOrderFlow .ubee-native-growth-primary{width:100%;min-height:50px;margin:0 0 12px;border:0;border-radius:14px;background:#facc15;color:#111;font-size:16px;font-weight:950}
-#productionOrderFlow .ubee-native-growth-primary:active{opacity:.72}
-#productionOrderFlow .ubee-native-growth-action-list{margin:0 0 16px;border:1px solid var(--ubee-my-line);border-radius:16px;background:#fff;overflow:hidden}
-#productionOrderFlow .ubee-native-growth-action{width:100%;min-height:54px;padding:0 14px;border:0;border-bottom:1px solid #eceef0;background:#fff;color:#111;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;font-size:15px;font-weight:850}
-#productionOrderFlow .ubee-native-growth-action:last-child{border-bottom:0}
-#productionOrderFlow .ubee-native-growth-action:active{background:#f2f3f4}
-#productionOrderFlow .ubee-native-growth-action span:last-child{color:#a1a6ac;font-size:20px;font-weight:400}
-#productionOrderFlow .ubee-native-growth-note{margin:0;padding:12px 13px;border-radius:13px;background:#eceef1;color:#666d74;font-size:13px;font-weight:700;line-height:1.6}
-#productionOrderFlow .ubee-native-growth-status{min-height:20px;margin:8px 2px 0;color:#747a81;font-size:13px;font-weight:750;text-align:center}
-#productionOrderFlow .ubee-native-growth-hub{margin:0 0 16px;border:1px solid var(--ubee-my-line);border-radius:16px;background:#fff;overflow:hidden}
-#productionOrderFlow .ubee-native-growth-hub-row{width:100%;min-height:60px;padding:10px 13px;border:0;border-bottom:1px solid #eceef0;background:#fff;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:11px;align-items:center;text-align:left;color:#111}
-#productionOrderFlow .ubee-native-growth-hub-row:last-child{border-bottom:0}#productionOrderFlow .ubee-native-growth-hub-row:active{background:#f3f4f5}
-#productionOrderFlow .ubee-native-growth-hub-icon{width:32px;height:32px;border-radius:10px;background:#f1f2f4;display:grid;place-items:center;color:#555d65}#productionOrderFlow .ubee-native-growth-hub-icon svg{width:18px;height:18px}
-#productionOrderFlow .ubee-native-growth-hub-main strong{display:block;color:#111;font-size:15px;font-weight:900}.ubee-native-growth-hub-main small{display:block;margin-top:2px;color:#7b8188;font-size:13px;font-weight:700;line-height:1.4}
-#productionOrderFlow .ubee-native-growth-hub-side{color:#a1a6ac;font-size:20px;font-weight:400}
-#productionOrderFlow .ubee-native-growth-detail-head{display:flex;align-items:center;gap:10px;margin:0 0 14px}
-#productionOrderFlow .ubee-native-growth-back{min-height:38px;padding:0 12px;border:0;border-radius:11px;background:#eceef1;color:#111;font-size:14px;font-weight:850}
-#productionOrderFlow .ubee-native-growth-detail-head strong{font-size:19px;font-weight:1000;color:#111}
-#productionOrderFlow .ubee-native-task-row{padding:13px 14px;border-bottom:1px solid #eceef0}.ubee-native-task-row:last-child{border-bottom:0}
-#productionOrderFlow .ubee-native-task-top{display:flex;justify-content:space-between;gap:12px;align-items:center}.ubee-native-task-top strong{font-size:15px;font-weight:900;color:#111}.ubee-native-task-top span{font-size:13px;font-weight:850;color:#747a81;white-space:nowrap}
-#productionOrderFlow .ubee-native-task-bar{height:5px;margin-top:9px;border-radius:999px;background:#eceef1;overflow:hidden}.ubee-native-task-bar span{display:block;height:100%;border-radius:inherit;background:#facc15}
-#productionOrderFlow .ubee-native-task-row small{display:block;margin-top:6px;color:#7b8188;font-size:13px;font-weight:700}
-#productionOrderFlow .ubee-native-achievement-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px}.ubee-native-achievement{padding:14px 12px;border:1px solid var(--ubee-my-line);border-radius:14px;background:#fff;min-height:108px}.ubee-native-achievement.locked{opacity:.46}.ubee-native-achievement-mark{width:30px;height:30px;border-radius:10px;background:#facc15;display:grid;place-items:center;font-size:14px;font-weight:1000;color:#111}.ubee-native-achievement.locked .ubee-native-achievement-mark{background:#eceef1;color:#7b8188}.ubee-native-achievement strong{display:block;margin-top:9px;font-size:14px;font-weight:900;color:#111}.ubee-native-achievement small{display:block;margin-top:3px;font-size:13px;line-height:1.4;font-weight:650;color:#7b8188}
-#productionOrderFlow .ubee-native-growth-history-date{margin-top:5px!important;color:#a1a6ac!important}
-@media(max-width:380px){#productionOrderFlow .ubee-native-growth-summary{padding:15px 13px}#productionOrderFlow .ubee-native-growth-tier{font-size:20px}#productionOrderFlow .ubee-native-invite-code strong{font-size:24px}}
-
-/* UBee Growth Engine V1.7｜Native usability refine */
-#productionOrderFlow .ubee-my-member-card{min-height:132px;padding:17px 16px 15px}
-#productionOrderFlow .ubee-my-member-card:active{transform:scale(.992);opacity:.86}
-#productionOrderFlow .ubee-my-member-meta{gap:12px}
-#productionOrderFlow .ubee-my-member-meta>span{min-width:0;white-space:normal;line-height:1.35}
-#productionOrderFlow .ubee-my-growth-detail-panel{padding-top:max(8px,env(safe-area-inset-top))}
-#productionOrderFlow .ubee-my-growth-detail-panel .ubee-native-growth-detail-head{position:sticky;top:0;z-index:4;margin:0;padding:8px 16px 12px;background:color-mix(in srgb,var(--ubee-surface) 92%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-#productionOrderFlow .ubee-my-growth-detail-panel .ubee-native-growth-back{min-height:44px;padding:0 4px;font-size:16px}
-#productionOrderFlow .ubee-my-menu-item{min-height:60px}
-#productionOrderFlow .ubee-my-menu-item:active{background:var(--ubee-surface-2)}
-
-/* Customer Notification Settings V3｜獨立元件，禁止繼承舊 settings row 版型 */
-#productionOrderFlow #ubeeMyPreferencesPanel{
-  width:100% !important;
-  min-width:0 !important;
-}
-#productionOrderFlow .ubee-notify-section-title{
-  margin:22px 4px 9px !important;
-  color:#8b9096 !important;
-  font-size:14px !important;
-  font-weight:850 !important;
-  line-height:1.25 !important;
-  letter-spacing:.01em !important;
-}
-#productionOrderFlow #ubeeMyPreferencesPanel .ubee-notify-section-title:first-of-type{
-  margin-top:4px !important;
-}
-#productionOrderFlow .ubee-notify-group{
-  width:100% !important;
-  min-width:0 !important;
-  margin:0 !important;
-  overflow:hidden !important;
-  border:1px solid #e6e7e9 !important;
-  border-radius:15px !important;
-  background:#fff !important;
-}
-#productionOrderFlow .ubee-notify-row{
-  width:100% !important;
-  min-width:0 !important;
-  min-height:72px !important;
-  display:flex !important;
-  flex-direction:row !important;
-  align-items:center !important;
-  justify-content:space-between !important;
-  gap:16px !important;
-  padding:14px 16px !important;
-  border:0 !important;
-  border-bottom:1px solid #eceef0 !important;
-  background:#fff !important;
-}
-#productionOrderFlow .ubee-notify-row:last-child{
-  border-bottom:0 !important;
-}
-#productionOrderFlow .ubee-notify-copy{
-  display:block !important;
-  flex:1 1 auto !important;
-  width:auto !important;
-  min-width:0 !important;
-  max-width:none !important;
-  padding:0 !important;
-  margin:0 !important;
-  text-align:left !important;
-  writing-mode:horizontal-tb !important;
-  word-break:normal !important;
-  overflow-wrap:normal !important;
-  white-space:normal !important;
-}
-#productionOrderFlow .ubee-notify-copy strong{
-  display:block !important;
-  width:auto !important;
-  margin:0 !important;
-  color:#111317 !important;
-  font-size:17px !important;
-  font-weight:900 !important;
-  line-height:1.35 !important;
-  letter-spacing:-.01em !important;
-  white-space:normal !important;
-  word-break:keep-all !important;
-}
-#productionOrderFlow .ubee-notify-copy small{
-  display:block !important;
-  width:auto !important;
-  margin:4px 0 0 !important;
-  color:#8d9298 !important;
-  font-size:14px !important;
-  font-weight:650 !important;
-  line-height:1.45 !important;
-  white-space:normal !important;
-  word-break:normal !important;
-  overflow-wrap:anywhere !important;
-}
-#productionOrderFlow .ubee-notify-badge{
-  flex:0 0 auto !important;
-  width:auto !important;
-  min-width:54px !important;
-  max-width:86px !important;
-  margin:0 !important;
-  padding:6px 10px !important;
-  border-radius:999px !important;
-  background:#f1f2f4 !important;
-  color:#747980 !important;
-  font-size:14px !important;
-  font-weight:850 !important;
-  line-height:1.2 !important;
-  text-align:center !important;
-  white-space:nowrap !important;
-}
-#productionOrderFlow .ubee-notify-badge-required{
-  background:#fff4bc !important;
-  color:#6e5700 !important;
-}
-#productionOrderFlow .ubee-notify-footnote{
-  margin:8px 5px 0 !important;
-  color:#9a9fa5 !important;
-  font-size:13px !important;
-  font-weight:650 !important;
-  line-height:1.5 !important;
-}
-#productionOrderFlow .ubee-notify-switch{
-  position:relative !important;
-  display:block !important;
-  flex:0 0 51px !important;
-  width:51px !important;
-  min-width:51px !important;
-  max-width:51px !important;
-  height:31px !important;
-  min-height:31px !important;
-  margin:0 !important;
-  padding:0 !important;
-  border:0 !important;
-  border-radius:999px !important;
-  background:#d7d9dc !important;
-  box-shadow:inset 0 0 0 1px rgba(17,17,17,.04) !important;
-  appearance:none !important;
-  -webkit-appearance:none !important;
-  cursor:pointer !important;
-  overflow:visible !important;
-  transition:background-color .2s ease !important;
-}
-#productionOrderFlow .ubee-notify-switch::after{
-  content:"" !important;
-  position:absolute !important;
-  top:3px !important;
-  left:3px !important;
-  width:25px !important;
-  height:25px !important;
-  border-radius:50% !important;
-  background:#fff !important;
-  box-shadow:0 2px 6px rgba(0,0,0,.22) !important;
-  transform:translateX(0) !important;
-  transition:transform .2s cubic-bezier(.22,.61,.36,1) !important;
-}
-#productionOrderFlow .ubee-notify-switch[aria-checked="true"]{
-  background:#f4bd00 !important;
-}
-#productionOrderFlow .ubee-notify-switch[aria-checked="true"]::after{
-  transform:translateX(20px) !important;
-}
-#productionOrderFlow .ubee-notify-switch:disabled,
-#productionOrderFlow .ubee-notify-switch[aria-disabled="true"]{
-  opacity:1 !important;
-  cursor:default !important;
-}
-#productionOrderFlow .ubee-notify-switch.is-locked[aria-checked="true"]{
-  background:#f4bd00 !important;
-}
-#productionOrderFlow .ubee-notify-permission-switch[data-state="unsupported"]{
-  opacity:.55 !important;
-}
-#productionOrderFlow .ubee-notify-permission-side{
-  display:flex !important;
-  flex:0 0 auto !important;
-  flex-direction:column !important;
-  align-items:flex-end !important;
-  justify-content:center !important;
-  gap:7px !important;
-  min-width:70px !important;
-}
-#productionOrderFlow .ubee-notify-badge[data-state="granted"]{
-  background:#e6f6eb !important;
-  color:#18733d !important;
-}
-#productionOrderFlow .ubee-notify-badge[data-state="default"]{
-  background:#fff4bc !important;
-  color:#6e5700 !important;
-}
-#productionOrderFlow .ubee-notify-badge[data-state="denied"],
-#productionOrderFlow .ubee-notify-badge[data-state="unsupported"]{
-  background:#f1f2f4 !important;
-  color:#747980 !important;
-}
-#productionOrderFlow .ubee-notify-permission-action{
-  width:auto !important;
-  min-width:0 !important;
-  min-height:34px !important;
-  margin:0 !important;
-  padding:7px 10px !important;
-  border:0 !important;
-  border-radius:9px !important;
-  background:#facc15 !important;
-  color:#111 !important;
-  font:inherit !important;
-  font-size:14px !important;
-  font-weight:850 !important;
-  line-height:1.2 !important;
-  white-space:nowrap !important;
-}
-#productionOrderFlow .ubee-notify-permission-action:disabled{
-  background:#f1f2f4 !important;
-  color:#8f949a !important;
-}
-#productionOrderFlow .ubee-notify-autosave-status{
-  min-height:22px !important;
-  margin:9px 4px 0 !important;
-  color:#7a8087 !important;
-  font-size:14px !important;
-  font-weight:650 !important;
-  line-height:1.4 !important;
-}
-#productionOrderFlow .ubee-notify-autosave-status.is-saved{
-  color:#27864c !important;
-}
-@media(max-width:380px){
-  #productionOrderFlow .ubee-notify-row{
-    padding:13px 14px !important;
-    gap:12px !important;
-  }
-  #productionOrderFlow .ubee-notify-copy strong{
-    font-size:16px !important;
-  }
-  #productionOrderFlow .ubee-notify-copy small{
-    font-size:13px !important;
-  }
-  #productionOrderFlow .ubee-notify-badge{
-    min-width:50px !important;
-    padding:6px 8px !important;
-    font-size:13px !important;
-  }
-}
-
-#productionOrderFlow .ubee-account-security-note{
-  margin:4px 2px 18px;
-  color:#8a9097;
-  font-size:14px;
-  font-weight:650;
-  line-height:1.55;
-}
-#productionOrderFlow .ubee-account-secondary-action{
-  width:100%;
-  min-height:48px;
-  margin:0 0 14px;
-  border:1px solid #e4e6e8;
-  border-radius:12px;
-  background:#fff;
-  color:#25282c;
-  font:inherit;
-  font-size:15px;
-  font-weight:800;
-}
-#productionOrderFlow .ubee-account-secondary-action:active{background:#f5f6f7;}
-@media(max-width:380px){#productionOrderFlow .ubee-my-member-card{padding-left:14px;padding-right:14px}#productionOrderFlow .ubee-my-menu-copy small{font-size:13px}}
-</style>
-
-
-
-
 <style id="ubee-customer-notification-center-v4-style">
 /* =========================================================
    Customer Native Notification Center V1
@@ -22282,7 +21944,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   const MY_SECTIONS=new Set(['faq','support','service','guide','pricing','cancellation','feedback','notifysettings','addresses','settings','install','privacydata','legal','about','helpguide','orderrules','infohub']);
   let applying=false;
 
-  const normalizePrimary=value=>{const v=String(value||'').toLowerCase();return v==='task'||v==='ucoin'?'orders':v==='order'||v==='new'?'home':PRIMARY.has(v)?v:'home'};
+  const normalizePrimary=value=>{const v=String(value||'').toLowerCase();return v==='task'?'orders':v==='order'||v==='new'?'home':PRIMARY.has(v)?v:'home'};
   const currentPrimary=()=>normalizePrimary(window.UBeePrimaryNavigation?.getCurrent?.()||document.body?.dataset.ubeePrimaryNav||'home');
   const getState=()=>history.state?.[STATE_KEY]||null;
   const wrap=route=>({...(history.state||{}),[STATE_KEY]:{primary:normalizePrimary(route.primary),sub:route.sub||'',detail:route.detail||'',ts:Date.now()}});
@@ -22307,11 +21969,6 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
         await window.UBeePrimaryNavigation.open(primary,{source:'history',skipHistory:true});
       }
       if(primary!=='my') return true;
-      // 舊版瀏覽歷史中的「我的 → U幣」仍必須能返回既有 U幣內部頁。
-      if(route.sub==='ucoin'){
-        await window.UBeePrimaryNavigation?.open?.('ucoin',{source:'history',skipHistory:true});
-        return true;
-      }
       if(route.sub&&MY_SECTIONS.has(route.sub)){
         window.openUBeeMySection?.(route.sub,{fromHistory:true});
         return true;
@@ -22420,7 +22077,7 @@ window.__UBEE_BOTTOM_NAV_CONTROLLER_V17_RC2__=true;
 const NAV={home:'flowNavHome',orders:'flowNavTask',notify:'flowNavNotify',my:'flowNavMy'};
 let nav=null,active='home',epoch=0,userNavigated=false,filter='all',noticeOrigin='notify';
 const root=document.getElementById('productionOrderFlow');
-const resolve=t=>{const s=String(t||'').toLowerCase();return s==='task'||s==='ucoin'?'orders':s==='order'||s==='new'?'home':NAV[s]?s:'home';};
+const resolve=t=>{const s=String(t||'').toLowerCase();return s==='task'?'orders':s==='order'||s==='new'?'home':NAV[s]?s:'home';};
 function setActive(target){const t=resolve(target);active=t;document.body.dataset.ubeePrimaryNav=t;
  nav?.querySelectorAll(':scope > button').forEach(btn=>{const yes=btn.id===NAV[t];btn.classList.toggle('active',yes);yes?btn.setAttribute('aria-current','page'):btn.removeAttribute('aria-current');});
 }
@@ -22448,7 +22105,7 @@ async function open(target,options={}){
   else if(target==='orders')window.openUBeeTaskPage?.();
   else if(target==='notify')await showNotifications(options);
   else if(target==='my')showLocal('v17My');
- }catch(error){console.error('UBee V1.7.0 RC5 導覽失敗',error);window.showUBeeCustomerNativeAlert?.('頁面暫時無法開啟，請再試一次。');}
+ }catch(error){console.error('UBee V1.7.0 RC6 導覽失敗',error);window.showUBeeCustomerNativeAlert?.('頁面暫時無法開啟，請再試一次。');}
  if(epoch===currentToken)setActive(target);return true;
 }
 function openMySection(section,{fromHistory=false}={}){
@@ -24077,8 +23734,7 @@ body:not(.flow-active) .app select,
   width:40px!important;height:40px!important;margin:0!important;border:0!important;
   border-radius:12px!important;background:#fff0b7!important;color:#624b0c!important;
 }
-#productionOrderFlow #flowPageProfile #ubeeMyServicesGroup [data-my-action="orders"] .ubee-my-menu-icon,
-#productionOrderFlow #flowPageProfile #ubeeMyServicesGroup [data-my-action="ucoin"] .ubee-my-menu-icon {background:#fff0b7!important;color:#624b0c!important;}
+#productionOrderFlow #flowPageProfile #ubeeMyServicesGroup [data-my-action="orders"] .ubee-my-menu-icon {background:#fff0b7!important;color:#624b0c!important;}
 #productionOrderFlow #flowPageProfile #ubeeMyServicesGroup [data-my-action="addresses"] .ubee-my-menu-icon {background:#e7f5ec!important;color:#2e8b59!important;}
 #productionOrderFlow #flowPageProfile #ubeeMyServicesGroup [data-my-action="notifications"] .ubee-my-menu-icon,
 #productionOrderFlow #flowPageProfile #ubeeMyServicesGroup [data-my-action="favorites"] .ubee-my-menu-icon {background:#eaf1ff!important;color:#3060aa!important;}
