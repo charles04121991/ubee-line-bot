@@ -1,7 +1,7 @@
 /* ============================================================
  * UBee 跑腿｜客戶端 Service Worker｜Member Authentication RC1 candidate 2026-11-11
  * Release: Member Authentication V1.7 (mandatory registration + password + trusted LINE reset; no guest order, no UCoin UI) + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261111-customer-member-v1-7-rc1
+ * Version: 20261111-customer-member-v1-7-rc1-hf1
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；會員訂單／通知維持內部深層連結）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261111-customer-member-v1-7-rc1';
+const UBEE_CUSTOMER_SW_VERSION = '20261111-customer-member-v1-7-rc1-hf1';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
