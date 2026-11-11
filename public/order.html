@@ -1,4 +1,4 @@
-<!-- UBee Customer TC V1.7 — Member Authentication RC1｜候選版・上線前需整合測試｜強制會員登入、無訪客下單／無 U幣 -->
+<!-- UBee Customer TC V1.7 — Member Authentication RC1 HF1｜既有帳號協助流程修正，候選版・上線前需整合測試 -->
 <!DOCTYPE html>
 <html lang="zh-TW" class="ubee-app-starting ubee-member-check" style="background:#ffffff;">
 <head>
@@ -11,7 +11,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261111-customer-member-v1-7-rc1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261111-customer-member-v1-7-rc1-hf1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6786,6 +6786,15 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
         <button type="submit" class="v17-btn primary">建立會員帳號</button><button type="button" class="v17-btn" data-v17-view="login">返回登入</button>
       </form>
     </section>
+    <section id="v17ViewExisting" class="v17-view" hidden>
+      <h2>這支手機已有 UBee 帳號</h2>
+      <p>為保護你原本的訂單與會員資料，相同手機號碼不能重複註冊。請先使用既有帳號登入，或依下方方式找回。</p>
+      <div class="v17-note" id="v17ExistingExplanation">如果忘記密碼，已安全綁定 LINE 官方帳號的會員可自行重設；尚未綁定者請聯絡客服核對帳號歸屬。</div>
+      <button type="button" class="v17-btn primary" id="v17ExistingLogin">使用既有帳號登入</button>
+      <button type="button" class="v17-btn" id="v17ExistingForgot">忘記密碼／LINE 安全重設</button>
+      <button type="button" class="v17-btn" id="v17ExistingSupport">無法登入且未綁定 LINE？聯絡客服</button>
+      <button type="button" class="v17-btn" data-v17-view="register">返回註冊</button>
+    </section>
     <section id="v17ViewForgot" class="v17-view" hidden>
       <h2>忘記密碼</h2><p>不需簡訊、Email 驗證或 LINE 登入。請使用事先綁定的 UBee LINE 官方帳號對話。</p>
       <div class="v17-note">到 UBee LINE 官方帳號的一對一對話，發送「忘記密碼 09xxxxxxxx」。系統確認 LINE 身分已安全綁定會員後，才會傳送 15 分鐘內有效的一次性重設連結。未事先綁定時，需透過客服人工核查，無法直接自動取回。</div>
@@ -6824,7 +6833,7 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
 (()=>{'use strict';
   const gate=document.getElementById('ubeeV17MemberGate');
   const $=id=>document.getElementById(id);
-  const views=['login','register','forgot','reset','account','change'];
+  const views=['login','register','existing','forgot','reset','account','change'];
   const official='https://lin.ee/8HLQtl4';
   let callback=null,starting=false,busy=false,member=null,resetToken='',bindingCommand='';
   const phone=value=>String(value||'').replace(/\D/g,'').slice(0,10);
@@ -6836,7 +6845,7 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
   async function api(path,data,method='POST'){
     const response=await fetch(path,{method,credentials:'include',cache:'no-store',headers:{Accept:'application/json',...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify(data||{})}:{})});
     const json=await response.json().catch(()=>({}));
-    if(!response.ok||json.success===false){const e=new Error(json.message||'系統暫時無法處理，請稍後重試。');e.status=response.status;e.code=json.code;throw e;}
+    if(!response.ok||json.success===false){const e=new Error(json.message||'系統暫時無法處理，請稍後重試。');e.status=response.status;e.code=json.code;e.passwordSetupRequired=json.passwordSetupRequired===true;e.nextAction=json.nextAction||'';throw e;}
     return json;
   }
   function isMember(data){return /^customer_[a-f0-9]{32}$/.test(String(data?.customerId||''))&&data?.passwordConfigured===true&&data?.authMode!=='guest_order'}
@@ -6844,8 +6853,17 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
   async function authenticated(){member=await me();window.__ubeeCurrentCustomer=member;hide();if(typeof currentCustomer!=='undefined')currentCustomer=member;if(typeof userId!=='undefined')userId=member.customerId;const cb=callback;if(cb){const ok=await cb();if(ok===false){show('login');status('會員已登入，但目前無法啟動服務。請檢查網路或稍後重新開啟。');return false;}callback=null;}return true;}
   async function task(fn){if(busy)return;setBusy(true);status('');try{await fn()}catch(error){status(error.message||'操作失敗，請稍後再試。')}finally{setBusy(false)}}
   function validatePassword(pass,confirm){if(pass!==confirm)throw Error('兩次密碼輸入不一致。');if(pass.length<8||pass.length>72||!/[A-Za-z]/.test(pass)||!/[0-9]/.test(pass))throw Error('密碼需為 8 至 72 字元，包含英文字母及數字。');}
-  const loginForm=$('v17LoginForm');loginForm.addEventListener('submit',e=>{e.preventDefault();task(async()=>{const p=phone($('v17LoginPhone').value);if(!validPhone(p))throw Error('請輸入正確的手機號碼。');await api('/api/customer-auth/login',{phone:p,password:$('v17LoginPassword').value});await authenticated();})});
-  $('v17RegisterForm').addEventListener('submit',e=>{e.preventDefault();task(async()=>{const p=phone($('v17RegisterPhone').value),name=$('v17RegisterName').value.trim(),pass=$('v17RegisterPassword').value;if(!validPhone(p)||name.length<2)throw Error('請填寫正確姓名及 09 開頭十碼手機。');validatePassword(pass,$('v17RegisterConfirm').value);if(!$('v17RegisterAgree').checked)throw Error('請先同意服務條款及隱私權政策。');await api('/api/customer-auth/register',{name,phone:p,password:pass,agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}});if(!(await authenticated()))return;show('account');await refreshAccount();status('註冊成功！建議先綁定 LINE 官方帳號，未來才能安全找回密碼。',true);})});
+  const loginForm=$('v17LoginForm');loginForm.addEventListener('submit',e=>{e.preventDefault();task(async()=>{const p=phone($('v17LoginPhone').value);if(!validPhone(p))throw Error('請輸入正確的手機號碼。');try{await api('/api/customer-auth/login',{phone:p,password:$('v17LoginPassword').value});await authenticated()}catch(error){if(error.code==='CUSTOMER_LOGIN_INVALID'){status('手機號碼或密碼未通過驗證。忘記密碼可點選上方「忘記密碼？」使用已綁定 LINE 的安全重設；未綁定請聯絡客服。');return}throw error}})});
+  $('v17RegisterForm').addEventListener('submit',e=>{e.preventDefault();task(async()=>{const p=phone($('v17RegisterPhone').value),name=$('v17RegisterName').value.trim(),pass=$('v17RegisterPassword').value;if(!validPhone(p)||name.length<2)throw Error('請填寫正確姓名及 09 開頭十碼手機。');validatePassword(pass,$('v17RegisterConfirm').value);if(!$('v17RegisterAgree').checked)throw Error('請先同意服務條款及隱私權政策。');try{await api('/api/customer-auth/register',{name,phone:p,password:pass,agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()}})}catch(error){if(error.code==='CUSTOMER_EXISTING_LOGIN_REQUIRED'){// 不改寫或重建帳號；透過原帳號登入／安全復原。
+        $('v17LoginPhone').value=p;$('v17LoginPassword').value='';$('v17RegisterPassword').value='';$('v17RegisterConfirm').value='';
+        $('v17ExistingExplanation').textContent=error.passwordSetupRequired
+          ? '系統已有這支手機的使用紀錄，但尚未設定登入密碼。若你仍有已登入的舊裝置，請從帳號與安全處理；否則請聯絡客服完成安全人工核查，不可直接重新註冊。'
+          : '此手機已有帳號。請嘗試原本的登入密碼；忘記密碼可使用事先安全綁定的 LINE 官方帳號申請重設連結。未綁定時，需由客服人工核查。';
+        show('existing');return}throw error}
+      if(!(await authenticated()))return;show('account');await refreshAccount();status('註冊成功！建議先綁定 LINE 官方帳號，未來才能安全找回密碼。',true);})});
+  $('v17ExistingLogin').addEventListener('click',()=>{show('login');$('v17LoginPhone').focus()});
+  $('v17ExistingForgot').addEventListener('click',()=>show('forgot'));
+  $('v17ExistingSupport').addEventListener('click',()=>window.open(official,'_blank','noopener'));
   $('v17ResetForm').addEventListener('submit',e=>{e.preventDefault();task(async()=>{const pass=$('v17ResetPassword').value;validatePassword(pass,$('v17ResetConfirm').value);if(!resetToken)throw Error('密碼重設連結無效，請返回 LINE 官方帳號重新申請。');await api('/api/customer-auth/password-reset/complete',{token:resetToken,password:pass});resetToken='';history.replaceState(history.state,'',location.pathname);show('login');status('密碼已重設完成，請使用新密碼登入。',true);})});
   $('v17ChangeForm').addEventListener('submit',e=>{e.preventDefault();task(async()=>{const pass=$('v17NewPassword').value;validatePassword(pass,$('v17NewConfirm').value);await api('/api/customer-auth/password/update',{currentPassword:$('v17CurrentPassword').value,password:pass});await authenticated();show('account');await refreshAccount();status('密碼修改成功。',true);})});
   document.querySelectorAll('[data-v17-view]').forEach(b=>b.addEventListener('click',()=>{show(b.dataset.v17View);if(b.dataset.v17View==='account')refreshAccount().catch(err=>status(err.message))}));
@@ -19621,7 +19639,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261111-customer-member-v1-7-rc1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261111-customer-member-v1-7-rc1-hf1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
