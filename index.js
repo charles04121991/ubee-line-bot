@@ -4657,16 +4657,29 @@ function customerAuthClientFingerprint(req) {
   };
 }
 
-function customerAuthScrypt(password, salt) {
+function customerAuthScrypt(password, salt, storedParams = null) {
+  // HF2: verify each password using the parameters saved when it was created.
+  // Changing global scrypt defaults must not silently lock out existing members.
+  const rawN = Number(storedParams?.N ?? CUSTOMER_AUTH.passwordN);
+  const rawR = Number(storedParams?.r ?? CUSTOMER_AUTH.passwordR);
+  const rawP = Number(storedParams?.p ?? CUSTOMER_AUTH.passwordP);
+  const rawLength = Number(storedParams?.keyLength ?? CUSTOMER_AUTH.passwordKeyLength);
+  const safeN = Number.isSafeInteger(rawN) && rawN >= 1024 && rawN <= 32768 && (rawN & (rawN - 1)) === 0;
+  if (!safeN || !Number.isSafeInteger(rawR) || rawR < 1 || rawR > 8 ||
+      !Number.isSafeInteger(rawP) || rawP < 1 || rawP > 4 ||
+      !Number.isSafeInteger(rawLength) || rawLength < 16 || rawLength > 64 ||
+      128 * rawN * rawR > 48 * 1024 * 1024) {
+    return Promise.reject(new Error('Invalid stored password hashing parameters'));
+  }
   return new Promise((resolve, reject) => {
     crypto.scrypt(
       password,
       salt,
-      CUSTOMER_AUTH.passwordKeyLength,
+      rawLength,
       {
-        N: CUSTOMER_AUTH.passwordN,
-        r: CUSTOMER_AUTH.passwordR,
-        p: CUSTOMER_AUTH.passwordP,
+        N: rawN,
+        r: rawR,
+        p: rawP,
         maxmem: 64 * 1024 * 1024,
       },
       (error, derivedKey) => {
@@ -4697,7 +4710,7 @@ async function verifyCustomerPassword(password, stored) {
     return false;
   }
   try {
-    const derivedKey = await customerAuthScrypt(String(password || ''), stored.salt);
+    const derivedKey = await customerAuthScrypt(String(password || ''), stored.salt, stored);
     const expected = Buffer.from(String(stored.hash), 'base64url');
     return expected.length === derivedKey.length &&
       crypto.timingSafeEqual(expected, derivedKey);
@@ -5896,6 +5909,15 @@ app.post('/api/customer-auth/login', async (req, res) => {
       );
     }
 
+    // HF2: distinguish legacy accounts that never had a usable password.
+    // Do not grant access or set a password without a trusted recovery proof.
+    if (!account.passwordHash?.hash || account.passwordHash?.algorithm !== 'scrypt') {
+      throw customerAuthError(
+        '此帳號的舊密碼資料無法使用，請透過已綁定 LINE 官方帳號重設，或聯絡客服安全核查。',
+        409,
+        'CUSTOMER_PASSWORD_RECOVERY_REQUIRED'
+      );
+    }
     const passwordOk = await verifyCustomerPassword(password, account.passwordHash);
     if (!passwordOk) {
       const failedCount = Number(account.failedLoginCount || 0) + 1;
