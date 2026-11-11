@@ -6760,6 +6760,35 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
 #ubeeV17MemberGate .v17-muted{font-size:13px;color:#777}
 #ubeeV17MemberGate .v17-code{white-space:pre-wrap;word-break:break-all;background:#f2f4f5;border-radius:10px;padding:12px;font-size:14px;font-weight:900;user-select:all}
 @media(max-height:740px){#ubeeV17MemberGate{align-items:flex-start}#ubeeV17MemberGate .v17-card{max-height:none}}
+
+/* Member HF3: compact native-style My / Security hierarchy; auth & backend untouched */
+#ubeeV17MemberGate:has(.v17-my-home:not([hidden])) .v17-card,#ubeeV17MemberGate:has(.v17-my-security:not([hidden])) .v17-card{padding:24px 18px 20px;border-radius:26px;box-shadow:0 8px 26px rgba(0,0,0,.045)}
+#ubeeV17MemberGate:has(.v17-my-home:not([hidden])) .v17-brand,#ubeeV17MemberGate:has(.v17-my-home:not([hidden])) .v17-card>.v17-center,#ubeeV17MemberGate:has(.v17-my-security:not([hidden])) .v17-brand,#ubeeV17MemberGate:has(.v17-my-security:not([hidden])) .v17-card>.v17-center{display:none}
+#ubeeV17MemberGate .v17-my-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 0 22px}
+#ubeeV17MemberGate .v17-my-header h2{margin:0 0 4px;font-size:25px;line-height:1.25}
+#ubeeV17MemberGate .v17-my-header p{margin:0;color:#7a7e85;font-size:13px}
+#ubeeV17MemberGate .v17-close-btn{flex:none;border:0;border-radius:50%;background:#f3f4f6;color:#444;width:36px;height:36px;font-size:18px;cursor:pointer}
+#ubeeV17MemberGate .v17-profile{display:flex;align-items:center;gap:13px;background:#fafafa;border:1px solid #ededed;border-radius:17px;padding:17px 14px;margin-bottom:22px}
+#ubeeV17MemberGate .v17-avatar{width:47px;height:47px;border-radius:15px;background:#facc15;display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:1000;color:#111;flex:none}
+#ubeeV17MemberGate .v17-profile-info{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1}
+#ubeeV17MemberGate .v17-profile-info strong{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ubeeV17MemberGate .v17-profile-info span{font-size:12px;color:#777;overflow-wrap:anywhere}
+#ubeeV17MemberGate .v17-member-tag{font-size:11px;font-weight:800;background:#fff3bc;color:#755700;border-radius:20px;padding:5px 9px;white-space:nowrap}
+#ubeeV17MemberGate .v17-menu-label{font-size:12px;color:#8a8d92;font-weight:800;margin:17px 3px 9px}
+#ubeeV17MemberGate .v17-menu-group{border:1px solid #ebedef;border-radius:16px;overflow:hidden;background:#fff}
+#ubeeV17MemberGate .v17-menu-row{display:flex;align-items:center;gap:12px;width:100%;padding:16px 14px;min-height:57px;border:0;border-bottom:1px solid #f0f1f2;background:#fff;color:#202124;text-align:left;font-size:15px;font-weight:750;cursor:pointer}
+#ubeeV17MemberGate .v17-menu-row:last-child{border-bottom:0}
+#ubeeV17MemberGate .v17-menu-row:active{background:#fafafa}
+#ubeeV17MemberGate .v17-menu-icon{display:flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;border-radius:10px;background:#f5f5f5;color:#555;font-size:18px;font-weight:800}
+#ubeeV17MemberGate .v17-chevron{margin-left:auto;color:#aaa;font-size:26px;font-weight:400;line-height:1}
+#ubeeV17MemberGate .v17-my-footer{text-align:center;font-size:11px;color:#a0a0a0;margin:25px 0 0}
+#ubeeV17MemberGate .v17-info-row{display:flex;justify-content:space-between;gap:10px;padding:17px 14px;border-bottom:1px solid #f0f1f2;font-size:14px}
+#ubeeV17MemberGate .v17-info-row:last-child{border-bottom:0}
+#ubeeV17MemberGate .v17-info-row strong{font-size:13px;overflow-wrap:anywhere;text-align:right}
+#ubeeV17MemberGate .v17-signout{display:block;width:100%;border:1px solid #f0d3d3;border-radius:13px;background:#fff;color:#ad3232;font-weight:800;font-size:15px;min-height:49px;margin-top:24px;cursor:pointer}
+#ubeeV17MemberGate .v17-back{display:block;width:100%;background:none;border:0;padding:16px;color:#666;font-size:14px;font-weight:750;cursor:pointer}
+#ubeeV17MemberGate .v17-code{overflow-wrap:anywhere;user-select:all}
+@media(max-width:380px){#ubeeV17MemberGate .v17-profile{gap:9px;padding:13px 10px}#ubeeV17MemberGate .v17-member-tag{display:none}}
 </style>
 <div id="ubeeV17MemberGate" role="dialog" aria-modal="true" aria-label="UBee 會員登入註冊">
   <div class="v17-card">
@@ -6809,15 +6838,42 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
         <button type="submit" class="v17-btn primary">確認重設密碼</button><button type="button" class="v17-btn" data-v17-view="login">返回登入</button>
       </form>
     </section>
-    <section id="v17ViewAccount" class="v17-view" hidden>
-      <div class="v17-row"><h2>我的會員</h2><button type="button" class="v17-text-link" id="v17CloseAccount">關閉</button></div>
-      <p id="v17AccountSummary">帳號資訊載入中</p>
-      <div class="v17-item"><span>登入手機</span><strong id="v17AccountPhone">—</strong></div>
-      <div class="v17-item"><span>LINE 復原綁定</span><strong id="v17AccountLinked">—</strong></div>
-      <label class="v17-label" for="v17BindPassword">目前登入密碼（安全確認）</label><input type="password" id="v17BindPassword" autocomplete="current-password" placeholder="綁定前請再次輸入目前密碼">
+    <section id="v17ViewAccount" class="v17-view v17-my-home" hidden>
+      <div class="v17-my-header"><div><h2>我的</h2><p>管理您的 UBee 會員服務</p></div><button type="button" class="v17-close-btn" id="v17CloseAccount" aria-label="關閉會員中心">✕</button></div>
+      <div class="v17-profile"><div class="v17-avatar" aria-hidden="true">U</div><div class="v17-profile-info"><strong id="v17AccountName">UBee 會員</strong><span id="v17AccountSummary">會員資料載入中</span></div><span class="v17-member-tag">會員</span></div>
+      <div class="v17-menu-label">我的服務</div>
+      <div class="v17-menu-group">
+        <button type="button" class="v17-menu-row" id="v17AccountOrders"><span class="v17-menu-icon" aria-hidden="true">▤</span><span>我的訂單</span><span class="v17-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="v17-menu-row" id="v17AccountNotifications"><span class="v17-menu-icon" aria-hidden="true">♧</span><span>通知中心</span><span class="v17-chevron" aria-hidden="true">›</span></button>
+      </div>
+      <div class="v17-menu-label">帳號與協助</div>
+      <div class="v17-menu-group">
+        <button type="button" class="v17-menu-row" data-v17-view="security"><span class="v17-menu-icon" aria-hidden="true">⚙</span><span>帳號與安全</span><span class="v17-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="v17-menu-row" id="v17AccountSupport"><span class="v17-menu-icon" aria-hidden="true">☏</span><span>聯絡客服</span><span class="v17-chevron" aria-hidden="true">›</span></button>
+      </div>
+      <p class="v17-my-footer">UBee 跑腿 · 會員服務 V1.7</p>
+    </section>
+    <section id="v17ViewSecurity" class="v17-view v17-my-security" hidden>
+      <div class="v17-my-header"><div><h2>帳號與安全</h2><p>管理登入與帳號復原方式</p></div><button type="button" class="v17-close-btn" data-v17-view="account" aria-label="返回我的">✕</button></div>
+      <div class="v17-menu-group v17-security-info">
+        <div class="v17-info-row"><span>登入手機</span><strong id="v17AccountPhone">—</strong></div>
+        <div class="v17-info-row"><span>LINE 復原綁定</span><strong id="v17AccountLinked">—</strong></div>
+      </div>
+      <div class="v17-menu-label">安全設定</div>
+      <div class="v17-menu-group">
+        <button type="button" class="v17-menu-row" data-v17-view="change"><span class="v17-menu-icon" aria-hidden="true">♙</span><span>修改登入密碼</span><span class="v17-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="v17-menu-row" data-v17-view="linebind"><span class="v17-menu-icon" aria-hidden="true">↗</span><span>LINE 帳號復原設定</span><span class="v17-chevron" aria-hidden="true">›</span></button>
+      </div>
+      <button type="button" class="v17-signout" id="v17Logout">登出會員</button>
+      <button type="button" class="v17-back" data-v17-view="account">返回我的</button>
+    </section>
+    <section id="v17ViewLinebind" class="v17-view v17-my-security" hidden>
+      <div class="v17-my-header"><div><h2>LINE 復原綁定</h2><p>僅用於忘記密碼時安全找回帳號</p></div><button type="button" class="v17-close-btn" data-v17-view="security" aria-label="返回帳號與安全">✕</button></div>
+      <div class="v17-note">此功能不需要 LINE 登入。請先輸入目前密碼，再將限時綁定指令傳送到 UBee LINE 官方帳號的一對一對話。</div>
+      <label class="v17-label" for="v17BindPassword">目前登入密碼（安全確認）</label><input type="password" id="v17BindPassword" autocomplete="current-password" placeholder="請輸入目前密碼">
       <button type="button" class="v17-btn primary" id="v17BindLine">取得 LINE 安全綁定指令</button>
-      <div id="v17BindInstructions" hidden><p class="v17-note">將以下指令複製到 UBee LINE 官方帳號一對一對話。指令有效 10 分鐘，貼上後即完成安全綁定。</p><div class="v17-code" id="v17BindCode"></div><button type="button" class="v17-btn" id="v17CopyBind">複製綁定指令</button><button type="button" class="v17-btn" id="v17OpenLineBind">開啟 LINE 官方帳號</button></div>
-      <button type="button" class="v17-btn" id="v17AccountOrders">我的訂單</button><button type="button" class="v17-btn" id="v17AccountNotifications">通知中心</button><button type="button" class="v17-btn" data-v17-view="change">修改登入密碼</button><button type="button" class="v17-btn" id="v17AccountSupport">聯絡客服</button><button type="button" class="v17-btn" id="v17Logout">登出會員</button>
+      <div id="v17BindInstructions" hidden><p class="v17-note">指令有效 10 分鐘。請勿分享給其他人，綁定後指令即失效。</p><div class="v17-code" id="v17BindCode"></div><button type="button" class="v17-btn" id="v17CopyBind">複製綁定指令</button><button type="button" class="v17-btn" id="v17OpenLineBind">開啟 LINE 官方帳號</button></div>
+      <button type="button" class="v17-back" data-v17-view="security">返回帳號與安全</button>
     </section>
     <section id="v17ViewChange" class="v17-view" hidden><h2>修改登入密碼</h2><p>修改成功後，其他裝置的舊登入憑證會失效。</p>
       <form id="v17ChangeForm">
@@ -6833,14 +6889,14 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
 (()=>{'use strict';
   const gate=document.getElementById('ubeeV17MemberGate');
   const $=id=>document.getElementById(id);
-  const views=['login','register','existing','forgot','reset','account','change'];
+  const views=['login','register','existing','forgot','reset','account','security','linebind','change'];
   const official='https://lin.ee/8HLQtl4';
   let callback=null,starting=false,busy=false,member=null,resetToken='',bindingCommand='';
   const phone=value=>String(value||'').replace(/\D/g,'').slice(0,10);
   const validPhone=value=>/^09\d{8}$/.test(phone(value));
   const status=(value='',ok=false)=>{const node=$('v17MemberStatus');node.textContent=String(value||'');node.style.color=ok?'#1b7c46':'#b42318'};
   function setBusy(value){busy=Boolean(value);gate.querySelectorAll('button,input').forEach(el=>{el.disabled=busy});}
-  function show(view){if(!views.includes(view))view='login';views.forEach(v=>{$('v17View'+v[0].toUpperCase()+v.slice(1)).hidden=v!==view});gate.hidden=false;document.body.classList.add('ubee-customer-auth-open');status('');}
+  function show(view){if(!views.includes(view))view='login';if(view!=='linebind'){bindingCommand='';$('v17BindPassword').value='';$('v17BindCode').textContent='';$('v17BindInstructions').hidden=true;}views.forEach(v=>{$('v17View'+v[0].toUpperCase()+v.slice(1)).hidden=v!==view});gate.hidden=false;document.body.classList.add('ubee-customer-auth-open');status('');}
   function hide(){gate.hidden=true;document.body.classList.remove('ubee-customer-auth-open');document.documentElement.classList.remove('ubee-member-check');}
   async function api(path,data,method='POST'){
     const response=await fetch(path,{method,credentials:'include',cache:'no-store',headers:{Accept:'application/json',...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify(data||{})}:{})});
@@ -6866,7 +6922,7 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
   $('v17ExistingSupport').addEventListener('click',()=>window.open(official,'_blank','noopener'));
   $('v17ResetForm').addEventListener('submit',e=>{e.preventDefault();task(async()=>{const pass=$('v17ResetPassword').value;validatePassword(pass,$('v17ResetConfirm').value);if(!resetToken)throw Error('密碼重設連結無效，請返回 LINE 官方帳號重新申請。');await api('/api/customer-auth/password-reset/complete',{token:resetToken,password:pass});resetToken='';history.replaceState(history.state,'',location.pathname);show('login');status('密碼已重設完成，請使用新密碼登入。',true);})});
   $('v17ChangeForm').addEventListener('submit',e=>{e.preventDefault();task(async()=>{const pass=$('v17NewPassword').value;validatePassword(pass,$('v17NewConfirm').value);await api('/api/customer-auth/password/update',{currentPassword:$('v17CurrentPassword').value,password:pass});await authenticated();show('account');await refreshAccount();status('密碼修改成功。',true);})});
-  document.querySelectorAll('[data-v17-view]').forEach(b=>b.addEventListener('click',()=>{show(b.dataset.v17View);if(b.dataset.v17View==='account')refreshAccount().catch(err=>status(err.message))}));
+  document.querySelectorAll('[data-v17-view]').forEach(b=>b.addEventListener('click',()=>{show(b.dataset.v17View);if(b.dataset.v17View==='account'||b.dataset.v17View==='security')refreshAccount().catch(err=>status(err.message))}));
   $('v17OpenLineForgot').onclick=()=>window.open(official,'_blank','noopener');
   $('v17OpenLineBind').onclick=()=>window.open(official,'_blank','noopener');
   $('v17AccountSupport').onclick=()=>window.open(official,'_blank','noopener');
@@ -6876,7 +6932,7 @@ html.ubee-member-check .app,html.ubee-member-check #productionOrderFlow{visibili
   $('v17AccountNotifications').onclick=()=>{hide();window.openUBeeNotificationPage?.()};
   $('v17BindLine').onclick=()=>task(async()=>{const currentPassword=$('v17BindPassword').value;if(!currentPassword)throw Error('請輸入目前登入密碼。');const r=await api('/api/customer-auth/recovery-line/start',{currentPassword});$('v17BindPassword').value='';bindingCommand=String(r.command||'');if(!bindingCommand)throw Error('後端沒有產生綁定指令。');$('v17BindCode').textContent=bindingCommand;$('v17BindInstructions').hidden=false;status('請把綁定指令貼到 LINE 官方帳號的一對一對話。',true)});
   $('v17Logout').onclick=()=>task(async()=>{await api('/api/customer-auth/logout',{});member=null;window.__ubeeCurrentCustomer=null;try{localStorage.removeItem('ubee_current_order_id')}catch(_){};if(typeof currentCustomer!=='undefined')currentCustomer=null;if(typeof userId!=='undefined')userId='';show('login');document.documentElement.classList.add('ubee-member-check');location.replace('/order.html');});
-  async function refreshAccount(){member=await me();$('v17AccountSummary').textContent=(member.name||'UBee 會員')+' · '+(member.memberNumber||'');$('v17AccountPhone').textContent=member.maskedPhone||member.phone||'—';$('v17AccountLinked').textContent=member.recoveryLineLinked?'已安全綁定':'尚未綁定';}
+  async function refreshAccount(){member=await me();$('v17AccountName').textContent=member.name||'UBee 會員';$('v17AccountSummary').textContent=member.memberNumber||'正式會員';$('v17AccountPhone').textContent=member.maskedPhone||member.phone||'—';$('v17AccountLinked').textContent=member.recoveryLineLinked?'已安全綁定':'尚未綁定';}
   window.UBeeMemberGate=Object.freeze({
     async bootstrap(activate){callback=activate;show('login');if(starting)return;starting=true;
       const params=new URLSearchParams(location.search);resetToken=String(params.get('passwordResetToken')||'');
