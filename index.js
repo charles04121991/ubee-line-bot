@@ -6067,6 +6067,10 @@ app.post('/api/customer-auth/password/update', requireCustomerAuth, async (req, 
   res.setHeader('Cache-Control', 'no-store');
   try {
     const auth = req.customerAuth;
+    // HF2: Guest Order sessions must never be upgraded through legacy member password APIs.
+    if (auth?.account?.authMode === 'guest_order') {
+      return res.status(403).json({success:false, code:'GUEST_PASSWORD_UPDATE_DISABLED', message:'訪客訂單身分不提供會員密碼設定。'});
+    }
     const nextPassword = String(req.body?.password || '');
     const currentPassword = String(req.body?.currentPassword || '');
     const hash = await hashCustomerPassword(nextPassword, auth.account.phone || '');
