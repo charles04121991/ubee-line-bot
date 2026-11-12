@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf4-1-clean-service-header" rel="manifest"/>
+<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf4-2-clean-address-layout" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -5796,7 +5796,7 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 </style>
 
 <style id="ubee-address-step-hf3">
-#productionOrderFlow .ubee-address-step-progress{font-size:14px;font-weight:900;color:#8b7000;margin:8px 0 3px}
+
 #productionOrderFlow .ubee-address-step-actions{display:flex;gap:10px;align-items:stretch}
 #productionOrderFlow .ubee-address-step-actions .flow-secondary{flex:0 0 32%;border-radius:16px}
 #productionOrderFlow .ubee-address-step-actions .flow-primary{flex:1;min-width:0}
@@ -9522,16 +9522,10 @@ function clearNearbyAutoFill(clearFields){
 
 }
 
-function setHomeLocationUiState(buttonText, detailText){
+function setHomeLocationUiState(buttonText){
   const cityButton = qs('flowCityButton');
-  const locationText = qs('flowLocationText');
-
   if(cityButton && buttonText){
     cityButton.textContent = buttonText;
-  }
-
-  if(locationText && detailText){
-    locationText.textContent = detailText;
   }
 }
 
@@ -15303,7 +15297,7 @@ body.flow-active>.app{display:none!important;}
 
 
 
-.flow-location-line{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px 12px;border-radius:14px;background:#f7f8f9;color:#555b61;font-size:14px;font-weight:850;}.flow-location-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;}
+
 .flow-route-card{position:relative;overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff;}
 .flow-route-card::before{content:"";position:absolute;left:27px;top:39px;bottom:39px;width:2px;background:#d9dcdf;}
 .flow-address-button{position:relative;z-index:1;width:100%;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:76px;padding:13px 14px;border:none;background:#fff;text-align:left;}.flow-address-button+.flow-address-button{border-top:1px solid #eef0f1;}
@@ -15819,16 +15813,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <!-- RC3.2 form is a separate view of the SAME home/order controller, not a duplicate checkout. -->
 <div class="ubee-rc32-form-header" id="ubeeRC32FormHeader">
  <button class="ubee-rc32-back" id="ubeeRC32FormBack" type="button" aria-label="返回服務選擇">‹ <span>返回服務選擇</span></button>
- <div class="ubee-address-step-progress" id="ubeeAddressStepProgress" aria-live="polite"></div>
  <div class="ubee-rc32-form-selection"><span>目前服務</span><strong id="ubeeRC32SelectedService">幫我送</strong><button id="ubeeRC32ChangeService" type="button">更換服務</button></div>
- <div class="ubee-rc32-hint" id="ubeeRC32StepHint" aria-live="polite">請先選擇取件地點。</div>
 </div>
-
-
-
-
-
-<div class="flow-location-line"><span class="flow-location-dot"></span><span id="flowLocationText">正在確認目前服務地區</span></div>
 <div id="ubeeAddressFormHF4" class="ubee-hf4-address-form" aria-label="逐步填寫地址">
   <div class="ubee-hf4-heading" id="ubeeHF4Heading">選擇取件地點</div>
   <div class="ubee-hf4-caption" id="ubeeHF4Caption">請先填寫小U需要前往的地點</div>
@@ -16772,7 +16758,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const single=state.service==='queue'||(state.service==='helper'&&state.singlePointTask===true);
     const secondAllowed=!single;
     const setText=(id,text)=>{const el=$(id);if(el)el.textContent=text};
-    setText('ubeeAddressStepProgress',`${step+1} / 2　${pickup?copy.pickupLabel:copy.dropoffLabel}`);
     setText('ubeeHF4Heading',pickup?`選擇${copy.pickupLabel}`:`選擇${copy.dropoffLabel}`);
     setText('ubeeHF4Caption',pickup?'請先填寫小U需要前往的地點':single?'此服務的完成地點會與起點自動同步':'請填寫小U需要送達的地點');
     setText('ubeeHF4AddressLabel',pickup?`${copy.pickupLabel}地址`:`${copy.dropoffLabel}地址`);
@@ -16787,7 +16772,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const clear=$('ubeeHF4SecondStopClear');if(clear)clear.hidden=!state.dropoff2;
     const back=$('ubeeAddressStepBack');if(back)back.hidden=pickup;
     setText('flowHomeNext',pickup?'下一步：送達地點':(copy.next||'下一步：填寫任務內容'));
-    const hint=$('ubeeRC32StepHint');if(hint)hint.textContent=pickup?'完成取件資料後進入下一步。':'完成送達資料後即可繼續。';
     const preview=$('flowTaskPreview');if(preview)preview.hidden=true;
   }
 
@@ -16807,8 +16791,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
     // Single state source: display-only summary on form and address hint.
     if($('ubeeRC32SelectedService'))$('ubeeRC32SelectedService').textContent=serviceLabels[state.service]||serviceLabels.send;
-    const hint=$('ubeeRC32StepHint');
-    if(hint)hint.textContent=!p?`先填寫${copy.pickupLabel}。`:!d?`接著填寫${copy.dropoffLabel}。`:'地點已填寫，可以繼續填寫任務內容。';
 
     if($('flowPickupLabel')) $('flowPickupLabel').textContent=copy.pickupLabel;
     if($('flowDropoffLabel')) $('flowDropoffLabel').textContent=copy.dropoffLabel;
@@ -18155,23 +18137,21 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   async function detectLocation(){
-    const cityButton=$('flowCityButton'),text=$('flowLocationText');
+    const cityButton=$('flowCityButton');
 
     if(!navigator.geolocation){
-      cityButton.textContent='選擇服務地區';
-      text.textContent='目前裝置不支援定位，請手動選擇服務地區';
+      if(cityButton)cityButton.textContent='選擇服務地區';
       return false;
     }
 
     // 已經拿到座標就先顯示，不把右上角重新改回「定位中」。
     if(hasValidLatLng(currentLocationLat,currentLocationLng)){
-      setHomeLocationUiState('目前位置','已取得目前位置，正在辨識服務地區');
+      setHomeLocationUiState('目前位置');
       await syncCurrentLocationHomeUi(currentLocationLat,currentLocationLng);
       return true;
     }
 
-    cityButton.textContent='定位中…';
-    text.textContent='正在確認目前位置與服務地區';
+    if(cityButton)cityButton.textContent='定位中…';
 
     const position = await ensureCustomerInitialLocationGate();
     if(!position){
@@ -18583,7 +18563,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf4-1-clean-service-header';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf4-2-clean-address-layout';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -19461,12 +19441,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   }
 
-  #productionOrderFlow .flow-location-line{
-    min-height:42px !important;
-    margin-bottom:12px !important;
-    border:1px solid #eceef0 !important;
-    background:#f7f8f9 !important;
-  }
+  
 
   #productionOrderFlow .flow-route-card{
     border-radius:19px !important;
@@ -21272,20 +21247,9 @@ window.addEventListener('pageshow',()=>setActive(document.body?.dataset.ubeePrim
 
 /* ---------- 地址 ---------- */
 
-#productionOrderFlow #flowPageHome .flow-location-line{
-  margin:0 4px 7px!important;
-  padding:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  color:#6f747a!important;
-  font-size:13px!important;
-}
 
-#productionOrderFlow #flowPageHome .flow-location-dot{
-  width:7px!important;
-  height:7px!important;
-  flex:0 0 7px!important;
-}
+
+
 
 #productionOrderFlow #flowPageHome .flow-route-card{
   border:1px solid #e4e6e8!important;
@@ -22667,15 +22631,15 @@ body:not(.flow-active) .app select,
 #productionOrderFlow #flowPageHome .ubee-rc32-discovery .flow-home-store-shortcut{display:flex!important;width:100%!important;margin:14px 0 0!important;background:#fff!important;border:1px solid #e9edf0!important;border-radius:16px!important;box-shadow:none!important}
 #productionOrderFlow #flowPageHome .flow-home-active-task-card{margin:0 0 12px!important;background:#fffdf0!important;border:1px solid #eacf6b!important}
 #productionOrderFlow #flowPageHome .flow-card#ubeeRC32Form{margin:0!important;padding:13px 14px!important;background:#fff!important;border:1px solid #ededed!important;border-radius:18px!important;scroll-margin-top:12px!important}
-#productionOrderFlow #flowPageHome .ubee-rc32-form-header{margin:0 0 11px;padding:0 0 12px;border-bottom:1px solid #f1f1f1}
+#productionOrderFlow #flowPageHome .ubee-rc32-form-header{margin:0 0 12px;padding:0;border:0}
 #productionOrderFlow #flowPageHome .ubee-rc32-back{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 4px;border:0;background:transparent;color:#4d5159;font-size:25px;cursor:pointer}
 #productionOrderFlow #flowPageHome .ubee-rc32-back span{font-size:12px;font-weight:750}
 
-#productionOrderFlow #flowPageHome .ubee-rc32-form-selection{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid #e6e7e9;border-radius:12px;background:#fff;margin-bottom:8px}
+#productionOrderFlow #flowPageHome .ubee-rc32-form-selection{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid #e6e7e9;border-radius:12px;background:#fff;margin-bottom:0}
 #productionOrderFlow #flowPageHome .ubee-rc32-form-selection span{font-size:12px;font-weight:750;color:#757a80}
 #productionOrderFlow #flowPageHome .ubee-rc32-form-selection strong{font-size:15px;color:#181818;flex:1;font-weight:950}
 #productionOrderFlow #flowPageHome .ubee-rc32-form-selection button{border-radius:10px;background:#fff;border:1px solid #e4e5e7;padding:8px 12px;min-height:39px;color:#333;font-size:12px;font-weight:850;cursor:pointer}
-#productionOrderFlow #flowPageHome .ubee-rc32-hint{font-size:12px;color:#606772;font-weight:650;padding:3px 3px 7px;line-height:1.5}
+
 #productionOrderFlow #flowPageHome .flow-route-card{margin-top:10px!important}
 #productionOrderFlow #flowPageHome .ubee-rc32-banner-cta:focus-visible,#productionOrderFlow #flowPageHome .flow-service-tab:focus-visible,#productionOrderFlow #flowPageHome .ubee-rc32-scenario:focus-visible,#productionOrderFlow #flowPageHome .ubee-rc32-back:focus-visible,#productionOrderFlow #flowPageHome #ubeeRC32ChangeService:focus-visible{outline:3px solid #161616!important;outline-offset:3px}
 @media(max-width:359px){#productionOrderFlow #flowPageHome .flow-home-scroll{padding-left:10px!important;padding-right:10px!important}#productionOrderFlow #flowPageHome .ubee-rc32-banner h2{font-size:25px!important}}
