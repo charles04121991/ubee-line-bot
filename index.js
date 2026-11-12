@@ -12060,27 +12060,27 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       riderId,
     });
     
-    const snap = await db
-      .collection('orders')
-      .where(
-        'status',
-        'in',
-        [
-          'pending_dispatch',
-          'pending_schedule',
-          'pending',
-          'waiting',
-          'searching',
-          'dispatching',
-          'redispatching',
-        ]
-      )
-      .limit(300)
-      .get();
+    // Schedule Pool HF1：即時單與預約單分開查詢，避免共用 limit(300)
+    // 時被大量即時待派單佔滿，導致 pending_schedule 永遠無法進入候選池。
+    // 仍只查待承接狀態；scheduled_reserved/confirmed 必須走 /scheduled-orders。
+    const [dispatchSnap, scheduleSnap] = await Promise.all([
+      db.collection('orders')
+        .where('status', 'in', UBEE_RIDER_PENDING_DISPATCH_STATUSES)
+        .limit(300)
+        .get(),
+      db.collection('orders')
+        .where('status', '==', 'pending_schedule')
+        .limit(300)
+        .get(),
+    ]);
+    const candidateDocuments = new Map();
+    for (const doc of [...dispatchSnap.docs, ...scheduleSnap.docs]) {
+      candidateDocuments.set(doc.id, doc);
+    }
 
     const nowMs = Date.now();
 
-    const orders = snap.docs
+    const eligibleOrders = Array.from(candidateDocuments.values())
       .map(doc => {
         const rawOrder = {
           id: doc.id,
@@ -12132,8 +12132,23 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
           b.createdAtMs || b.createdAt || b.updatedAtMs || b.updatedAt
         );
         return bTime - aTime;
+      });
+
+    // 預約與即時各保留最多 30 筆，避免最後總量裁切又吃掉所有預約單。
+    // 預約以最早開始的時間優先；所有縣市、本人、跳過、資格與時段 Hard Lock
+    // 已在上面的 eligibleOrders 過濾完成，不在這裡放寬任何接單權限。
+    const immediateCandidates = eligibleOrders
+      .filter(order => order.status === 'pending_dispatch')
+      .slice(0, 30);
+    const scheduledCandidates = eligibleOrders
+      .filter(order => order.status === 'pending_schedule')
+      .sort((a, b) => {
+        const aStart = getScheduleTimestampMs(a.scheduledStartAtMs || a.requestedScheduleAtMs) || Number.MAX_SAFE_INTEGER;
+        const bStart = getScheduleTimestampMs(b.scheduledStartAtMs || b.requestedScheduleAtMs) || Number.MAX_SAFE_INTEGER;
+        return aStart - bStart;
       })
-      .slice(0, 30)
+      .slice(0, 30);
+    const orders = [...immediateCandidates, ...scheduledCandidates]
       .map(order =>
         buildRiderPendingTaskPreview({
           ...order,
@@ -12149,13 +12164,24 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       orders,
       tasks: orders,
       availableTaskCount: orders.length,
+      immediateTaskCount: immediateCandidates.length,
+      scheduledTaskCount: scheduledCandidates.length,
+      // 僅揭露小U自己的設定摘要，不回傳未符合資格或跨縣市的訂單。
+      schedulePreferenceStatus: {
+        acceptScheduled: rider.acceptScheduledOrders !== false,
+        acceptFlexible: rider.acceptFlexibleOrders !== false,
+        availabilityConfigured: Boolean(riderHasConfiguredAvailability(rider)),
+        enabledWeeklyDays: Object.values(normalizeRiderAvailabilitySchedule(rider.availabilitySchedule || {}))
+          .filter(day => day.enabled === true).length,
+        temporaryEnabled: normalizeTemporaryAvailability(rider.temporaryAvailability || {}).enabled === true,
+      },
       serviceCity: getRiderDispatchServiceCity(rider),
       mapPickupEnabled: true,
       visibilityMode: 'city_isolated_task_pool',
       radiusLimited: false,
       dispatchRadiusKm: null,
       taskPoolLabel: `${getRiderDispatchServiceCity(rider) || '目前縣市'}待接任務`,
-      apiVersion: 'rider-city-isolated-task-pool-v1-self-order-guard-v1',
+      apiVersion: 'rider-city-isolated-task-pool-v1-self-order-guard-v1-schedule-pool-hf1',
       supportedWaitingStatuses: [
         ...UBEE_RIDER_PENDING_DISPATCH_STATUSES,
         'pending_schedule',
