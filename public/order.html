@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261111-customer-v1-7-0-rc6" rel="manifest"/>
+<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-1-photo-hf1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -12725,6 +12725,143 @@ function isOrderPaymentConfirmed(order, status){
    Step 5：客人任務明細
    ============================== */
 
+/* ============================================================
+   UBee Customer V1.7.0 RC6.1 Photo Stability HF1
+   - 照片清單採增量更新，輪詢不重建既有 img DOM。
+   - 私有短效簽名 URL 只在圖片原始載入失敗且有更新簽名時才重試。
+   - 訂單詳細資料表的 HTML 未變時不反覆重新寫入，避免收據照片重下載。
+   - 不變更上傳 / API / 訂單狀態 / 計價 / 派單契約。
+   ============================================================ */
+(function(){
+  'use strict';
+  function safePhotoUrl(value){
+    const raw=String(value||'').trim();
+    if(!raw) return '';
+    try{
+      const parsed=new URL(raw,window.location.href);
+      if(!['https:','http:'].includes(parsed.protocol)) return '';
+      return parsed.href;
+    }catch(_){ return ''; }
+  }
+  function pathKey(value){
+    const href=safePhotoUrl(value);
+    if(!href)return '';
+    try{const url=new URL(href);return url.origin+url.pathname;}catch(_){return href.split('?')[0].split('#')[0];}
+  }
+  function wirePhoto(img,url){
+    const next=safePhotoUrl(url);
+    if(!next)return;
+    img.__ubeeLatestPhotoUrl=next;
+    if(img.__ubeePhotoBound)return;
+    img.__ubeePhotoBound=true;
+    img.addEventListener('error',()=>{
+      img.__ubeePhotoLoadFailed=true;
+      const latest=img.__ubeeLatestPhotoUrl;
+      if(latest && latest!==img.src && latest!==img.__ubeeLastPhotoRetry){
+        img.__ubeeLastPhotoRetry=latest;
+        img.src=latest;
+      }
+    });
+    img.addEventListener('load',()=>{img.__ubeePhotoLoadFailed=false;});
+  }
+  function updateLatestFromHtml(target,markup){
+    const fragment=document.createElement('template');
+    fragment.innerHTML=markup;
+    const incoming=Array.from(fragment.content.querySelectorAll('img'));
+    const current=Array.from(target.querySelectorAll('img'));
+    if(incoming.length!==current.length)return;
+    incoming.forEach((next,index)=>{
+      const old=current[index];
+      const newUrl=next.getAttribute('src');
+      if(pathKey(newUrl)!==pathKey(old.getAttribute('src')))return;
+      wirePhoto(old,newUrl);
+      const replacement=old.__ubeeLatestPhotoUrl;
+      if(old.__ubeePhotoLoadFailed && replacement && old.src!==replacement && replacement!==old.__ubeeLastPhotoRetry){
+        old.__ubeeLastPhotoRetry=replacement;
+        old.src=replacement;
+      }
+    });
+  }
+  function signatureOfHtml(markup){
+    // 動態簽名參數經常更新；相同檔案不應因此重畫。
+    return markup.replace(/(<img\b[^>]*?\bsrc=")([^"]+)(")/gi,(_all,prefix,src,suffix)=>prefix+pathKey(src)+suffix);
+  }
+  function updateReceipt(target,markup,orderId){
+    const identity=String(orderId||'').trim();
+    const signature=signatureOfHtml(markup);
+    if(target.__ubeeReceiptIdentity===identity && target.__ubeeReceiptSignature===signature){
+      updateLatestFromHtml(target,markup);
+      return;
+    }
+    target.innerHTML=markup;
+    target.__ubeeReceiptIdentity=identity;
+    target.__ubeeReceiptSignature=signature;
+    target.querySelectorAll('img').forEach(img=>wirePhoto(img,img.getAttribute('src')));
+  }
+  function updateTimeline(target,events,orderId){
+    if(!target)return 0;
+    const identity=String(orderId||'').trim().toUpperCase();
+    if(target.__ubeePhotoOrderId!==identity){
+      target.replaceChildren();
+      target.__ubeePhotoOrderId=identity;
+      target.__ubeePhotoEverShown=false;
+    }
+    let timeline=target.querySelector('.ubee-native-photo-timeline');
+    if(!Array.isArray(events)||!events.length){
+      // 訂單狀態摘要可能不帶照片：同一筆任務維持已載入影像，不閃白。
+      return target.__ubeePhotoEverShown ? (timeline?.querySelectorAll('img').length||0):0;
+    }
+    if(!timeline){
+      timeline=document.createElement('div');
+      timeline.className='ubee-native-photo-timeline';
+      target.appendChild(timeline);
+    }
+    const known=new Map(Array.from(timeline.querySelectorAll('.ubee-native-photo-event[data-ubee-photo-key]'))
+      .map(el=>[el.dataset.ubeePhotoKey,el]));
+    const incoming=new Set();
+    events.forEach((item,index)=>{
+      const url=safePhotoUrl(item.url);
+      if(!url)return;
+      // 圖片路徑與回報階段決定圖片身分，忽略定期輪替的 signed URL token。
+      const key=`${item.proofKey||index}|${pathKey(url)}|${String(item.label||'')}`;
+      incoming.add(key);
+      let card=known.get(key);
+      if(card){
+        const time=card.querySelector('.ubee-native-photo-event-head span');
+        if(time && time.textContent!==String(item.time||''))time.textContent=String(item.time||'');
+        const img=card.querySelector('img');
+        if(img){
+          wirePhoto(img,url);
+          if(img.__ubeePhotoLoadFailed && img.src!==img.__ubeeLatestPhotoUrl && img.__ubeeLastPhotoRetry!==img.__ubeeLatestPhotoUrl){
+            img.__ubeeLastPhotoRetry=img.__ubeeLatestPhotoUrl;
+            img.src=img.__ubeeLatestPhotoUrl;
+          }
+        }
+      }else{
+        card=document.createElement('div');
+        card.className='ubee-native-photo-event';
+        card.dataset.ubeePhotoKey=key;
+        const head=document.createElement('div');
+        head.className='ubee-native-photo-event-head';
+        const title=document.createElement('strong');title.textContent=String(item.label||'小U 現場照片');
+        const time=document.createElement('span');time.textContent=String(item.time||'');
+        head.append(title,time);
+        const img=document.createElement('img');
+        img.alt=String(item.label||'小U 現場照片');
+        img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';
+        wirePhoto(img,url);img.src=url;
+        card.append(head,img);
+        timeline.appendChild(card);
+      }
+    });
+    // 不主動移除同單舊照片：tracking 摘要可能只含部分 proof。
+    const count=timeline.querySelectorAll('img').length;
+    if(count>0)target.__ubeePhotoEverShown=true;
+    return count;
+  }
+  window.UBeeCustomerPhotoStabilityHF1=Object.freeze({updateReceipt,updateTimeline,safePhotoUrl,pathKey});
+})();
+
 function renderStep5TaskDetail(order){
 
   const target =
@@ -12977,7 +13114,7 @@ function renderStep5TaskDetail(order){
      正式產生任務明細
      ============================== */
 
-  target.innerHTML = `
+  const photoStableReceiptHtml = `
 
     <div class="task-receipt-item">
 
@@ -13137,6 +13274,9 @@ function renderStep5TaskDetail(order){
     `}
 
   `;
+  window.UBeeCustomerPhotoStabilityHF1.updateReceipt(
+    target, photoStableReceiptHtml, String(data.id||data.orderId||data.orderNo||currentOrderId||'')
+  );
 
 }
 
@@ -18970,13 +19110,37 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const proofs=normalizeProfileArrivalProofs(order);
     const execution=order?.taskExecutionReport&&typeof order.taskExecutionReport==='object'?order.taskExecutionReport:{};
     const events=[];
-    proofs.forEach(proof=>{const url=String(proof.photoUrl||proof.signedUrl||proof.url||'').trim();if(url)events.push({label:String(proof.stageLabel||proof.label||'小U 到場照片').trim(),url,time:profileProofTime(proof.submittedAtMs)})});
+    proofs.forEach((proof,index)=>{
+      const url=String(proof.photoUrl||proof.signedUrl||proof.url||'').trim();
+      if(url)events.push({proofKey:String(proof.proofKey||proof.stage||index),label:String(proof.stageLabel||proof.label||'小U 到場照片').trim(),url,time:profileProofTime(proof.submittedAtMs)});
+    });
     const completionUrl=String(execution.photoUrl||execution.signedPhotoUrl||'').trim();
-    if(completionUrl)events.push({label:'小U 完成回報',url:completionUrl,time:profileProofTime(execution.submittedAtMs)});
-    if(!events.length){target.innerHTML='<section class="ubee-native-detail-group"><div class="ubee-native-detail-group-title">執行紀錄</div><div class="ubee-native-photo-empty">目前尚無現場照片；小U抵達或完成回報後，照片會自動出現在這筆任務。</div></section>';return}
-    target.innerHTML=`<section class="ubee-native-detail-group"><div class="ubee-native-detail-group-title">執行紀錄</div><div class="ubee-native-photo-timeline">${events.map(item=>`<div class="ubee-native-photo-event"><div class="ubee-native-photo-event-head"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.time||'')}</span></div><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.label)}" loading="lazy" referrerpolicy="no-referrer"></div>`).join('')}</div></section>`;
+    if(completionUrl)events.push({proofKey:'completion',label:'小U 完成回報',url:completionUrl,time:profileProofTime(execution.submittedAtMs)});
+    const orderId=String(order?.id||order?.orderNo||order?.orderId||'').trim().toUpperCase();
+    let group=target.querySelector('.ubee-native-detail-group[data-ubee-stable-photos]');
+    if(!group || target.dataset.ubeePhotosForOrder!==orderId){
+      target.replaceChildren();
+      target.dataset.ubeePhotosForOrder=orderId;
+      group=document.createElement('section');
+      group.className='ubee-native-detail-group';
+      group.dataset.ubeeStablePhotos='1';
+      const heading=document.createElement('div');
+      heading.className='ubee-native-detail-group-title';
+      heading.textContent='執行紀錄';
+      group.appendChild(heading);
+      const host=document.createElement('div');host.className='ubee-native-photo-host';
+      group.appendChild(host);
+      target.appendChild(group);
+    }
+    const host=group.querySelector('.ubee-native-photo-host');
+    const count=window.UBeeCustomerPhotoStabilityHF1.updateTimeline(host,events,orderId);
+    let empty=group.querySelector('.ubee-native-photo-empty');
+    if(count){empty?.remove();return;}
+    if(!empty){
+      empty=document.createElement('div');empty.className='ubee-native-photo-empty';group.appendChild(empty);
+    }
+    empty.textContent='目前尚無現場照片；小U抵達或完成回報後，照片會自動出現在這筆任務。';
   }
-
 
   function renderProfileOrderCancelAction(order){
     order=window.UBeeCustomerRatingLockV1?.apply?.(order)||order;
@@ -19023,6 +19187,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     target.innerHTML=ratingHtml+cancelHtml;
   }
 
+  let profilePhotoRequestSequence=0;
   async function openProfileOrderDetail(index){
     const order=state.profileOrders[Number(index)];
     if(!order)return;
@@ -19064,7 +19229,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     ];
     $('flowProfileDetailList').innerHTML=groups.map(([title,rows])=>`<section class="ubee-native-detail-group"><div class="ubee-native-detail-group-title">${escapeHtml(title)}</div><div class="ubee-native-detail-list">${rows.map(([label,value])=>`<div class="ubee-native-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</div></section>`).join('');
     const photoTarget=$('flowProfileDetailPhotos');
-    if(photoTarget)photoTarget.innerHTML='<section class="ubee-native-detail-group"><div class="ubee-native-detail-group-title">執行紀錄</div><div class="ubee-native-photo-empty">正在讀取小U現場照片…</div></section>';
+    const photoRequestSequence=++profilePhotoRequestSequence;
+    // 已有同一張照片時保留原 image，不在查詢期間先刪除。
+    const requestedOrderId=String(order?.id||order?.orderNo||order?.orderId||'').trim().toUpperCase();
+    if(photoTarget && photoTarget.dataset.ubeePhotosForOrder!==requestedOrderId){
+      photoTarget.replaceChildren();
+      photoTarget.dataset.ubeePhotosForOrder=requestedOrderId;
+      const loading=document.createElement('section');loading.className='ubee-native-detail-group';
+      loading.textContent='正在讀取小U現場照片…';photoTarget.appendChild(loading);
+    }
     showPage('profileDetail');
 
     // 任務清單只帶摘要；照片採私有 Storage + 短效 signed URL，
@@ -19076,14 +19249,16 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }
     try{
       const fullData=await customerApiFetch(`/api/orders/${encodeURIComponent(orderId)}?t=${Date.now()}`);
+      if(photoRequestSequence!==profilePhotoRequestSequence)return;
       const merged={...order,...(fullData?.summary||{}),...(fullData?.order||{}),id:orderId};
       state.profileOrders[Number(index)]=merged;
       state.selectedProfileOrder=merged;
       renderProfileOrderCancelAction(merged);
       renderProfileOrderArrivalPhotos(merged);
     }catch(error){
+      if(photoRequestSequence!==profilePhotoRequestSequence)return;
       console.warn('讀取歷史任務到場照片失敗：',error);
-      if(photoTarget)photoTarget.innerHTML='<section class="ubee-native-detail-group"><div class="ubee-native-detail-group-title">執行紀錄</div><div class="ubee-native-photo-empty">照片暫時無法載入，請稍後再開啟此任務。</div></section>';
+      if(photoTarget && !photoTarget.querySelector('img'))photoTarget.innerHTML='<section class="ubee-native-detail-group"><div class="ubee-native-detail-group-title">執行紀錄</div><div class="ubee-native-photo-empty">照片暫時無法載入，請稍後再開啟此任務。</div></section>';
     }
   }
 
@@ -19640,7 +19815,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261111-customer-v1-7-0-rc6';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-1-photo-hf1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -20041,15 +20216,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       const value=Number(ms||0);if(!value)return'';
       try{return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit'}).format(new Date(value))}catch(_){return''}
     };
-    proofs.forEach(proof=>{
+    proofs.forEach((proof,index)=>{
       const url=safe(proof.photoUrl||proof.signedUrl||proof.url);
-      if(url)events.push({label:safe(proof.stageLabel||proof.label)||'小U 到場照片',url,time:timeText(proof.submittedAtMs)});
+      if(url)events.push({proofKey:safe(proof.proofKey||proof.stage||String(index)),label:safe(proof.stageLabel||proof.label)||'小U 到場照片',url,time:timeText(proof.submittedAtMs)});
     });
     const completionUrl=safe(execution.photoUrl||execution.signedPhotoUrl);
-    if(completionUrl)events.push({label:'小U 完成回報',url:completionUrl,time:timeText(execution.submittedAtMs)});
-    section.hidden=events.length===0;
-    if(!events.length){target.innerHTML='';return}
-    target.innerHTML=`<div class="ubee-native-photo-timeline">${events.map(item=>`<div class="ubee-native-photo-event"><div class="ubee-native-photo-event-head"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.time)}</span></div><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.label)}" loading="lazy" referrerpolicy="no-referrer"></div>`).join('')}</div>`;
+    if(completionUrl)events.push({proofKey:'completion',label:'小U 完成回報',url:completionUrl,time:timeText(execution.submittedAtMs)});
+    const orderId=safe(order?.id||order?.orderId||order?.orderNo||(typeof currentOrderId!=='undefined'?currentOrderId:'')).toUpperCase();
+    const count=window.UBeeCustomerPhotoStabilityHF1.updateTimeline(target,events,orderId);
+    section.hidden=count===0;
   }
 
   function renderStage(order){
@@ -20229,7 +20404,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   ensureTrackingCards();
   renderAppTracking(typeof currentOrderData !== 'undefined' ? currentOrderData : null);
-  setInterval(() => renderAppTracking(typeof currentOrderData !== 'undefined' ? currentOrderData : null),5000);
+  // HF1：移除每 5 秒無條件重畫；訂單更新仍由既有主輪詢觸發。
   setTimeout(openPushOrderFromUrl,900);
 })();
 </script>
