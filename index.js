@@ -19440,51 +19440,189 @@ function serializeDispatchIncident(doc) {
 // - /api/dispatch 下所有讀取與寫入端點均受同一管理授權保護。
 // - 保留原有接單交易、縣市隔離、Smart Stack 與財務處理邏輯。
 // ============================================================
+// ============================================================
+// UBee Dispatch V6.4.2 RC1 | Trusted Browser Session
+// Only this authentication boundary is changed. Customer/rider/finance/order
+// transaction endpoints and the existing dispatch business APIs are untouched.
+// The admin key remains a SERVER-SIDE enrollment/recovery secret, not a daily login.
+// ============================================================
 function getDispatchAdminSecretV601(){
   return String(
     process.env.DISPATCH_ADMIN_KEY ||
     process.env.DISPATCH_ADMIN_TOKEN ||
-    process.env.UBEE_SUPPORT_ADMIN_KEY ||
-    ''
+    process.env.UBEE_SUPPORT_ADMIN_KEY || ''
   ).trim();
 }
 const dispatchAuthFailuresV601 = new Map();
-function verifyDispatchAdminV6(req,res,next){
+const UBEE_DISPATCH_DEVICE_COOKIE_V642 = '__Secure-UBeeDispatchDevice';
+const UBEE_DISPATCH_DEVICE_COLLECTION_V642 = 'dispatchTrustedDevicesV1';
+const UBEE_DISPATCH_DEVICE_MAX_AGE_MS_V642 = 180 * 86400000;
+const UBEE_DISPATCH_DEVICE_RENEW_WINDOW_MS_V642 = 90 * 86400000;
+
+function dispatchDenyV642(res,status,code,message){
+  return res.status(status).json({success:false,code,message});
+}
+function dispatchNoStoreV642(res){
   res.setHeader('Cache-Control','no-store, private');
+  res.setHeader('Pragma','no-cache');
   res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Referrer-Policy','no-referrer');
+}
+function dispatchSameOriginMutationV642(req){
+  const fetchSite=String(req.get('Sec-Fetch-Site') || '').toLowerCase();
+  if(fetchSite && !['same-origin','none'].includes(fetchSite))return false;
+  const origin=String(req.get('Origin') || '').trim();
+  if(!origin)return true; // Non-browser clients still need the key or a CSRF header.
+  try{
+    const url=new URL(origin);
+    const host=String(req.get('host') || '').toLowerCase();
+    // Render's externally visible console must be HTTPS. Localhost HTTP only in non-production.
+    const localHost=/^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host);
+    return url.host.toLowerCase()===host &&
+      (url.protocol==='https:' || (localHost && process.env.NODE_ENV!=='production' && url.protocol==='http:'));
+  }catch(_){return false;}
+}
+function dispatchReadCookieV642(req,name){
+  const cookies=String(req.get('Cookie')||'').split(';');
+  const found=cookies.map(s=>s.trim()).find(s=>s.startsWith(name+'='));
+  return found ? found.slice(name.length+1) : '';
+}
+function dispatchCookieV642(res,token,maxAgeSeconds){
+  const value=token || '';
+  res.setHeader('Set-Cookie',[
+    `${UBEE_DISPATCH_DEVICE_COOKIE_V642}=${value}`,
+    'Path=/api/dispatch','HttpOnly','Secure','SameSite=Strict',
+    'Max-Age='+Math.max(0,Math.floor(maxAgeSeconds))
+  ].join('; '));
+}
+function dispatchTokenHashV642(token){
+  return crypto.createHash('sha256').update(token,'utf8').digest('hex');
+}
+function dispatchCsrfV642(token){
+  return crypto.createHmac('sha256',token).update('UBee_Dispatch_Device_CSRF_V642').digest('hex');
+}
+function dispatchEqualV642(a,b){
+  const one=Buffer.from(String(a||''),'utf8');
+  const two=Buffer.from(String(b||''),'utf8');
+  return one.length>0 && one.length===two.length && crypto.timingSafeEqual(one,two);
+}
+function verifyDispatchLegacyKeyV642(req,res,next){
   const expected=getDispatchAdminSecretV601();
   if(!expected){
-    return res.status(503).json({
-      success:false,code:'DISPATCH_ADMIN_NOT_CONFIGURED',
-      message:'Render 尚未設定 DISPATCH_ADMIN_KEY。請到 Render → Environment 新增 DISPATCH_ADMIN_KEY 並重新部署；如已設定 UBEE_SUPPORT_ADMIN_KEY 可直接使用既有金鑰。'
-    });
+    return dispatchDenyV642(res,503,'DISPATCH_ADMIN_NOT_CONFIGURED',
+      'Render 未設定 DISPATCH_ADMIN_KEY；無法註冊或恢復管理裝置。');
   }
   const address=String(req.ip||req.socket?.remoteAddress||'unknown');
   const now=Date.now();
   const failed=dispatchAuthFailuresV601.get(address);
-  if(failed && failed.until<=now) dispatchAuthFailuresV601.delete(address);
+  if(failed && failed.until<=now)dispatchAuthFailuresV601.delete(address);
   if(failed && failed.until>now && failed.count>=20){
     res.setHeader('Retry-After',String(Math.ceil((failed.until-now)/1000)));
-    return res.status(429).json({success:false,code:'DISPATCH_AUTH_RATE_LIMIT',message:'管理驗證失敗次數過多，請稍後再試。'});
+    return dispatchDenyV642(res,429,'DISPATCH_AUTH_RATE_LIMIT','管理驗證錯誤次數過多，請稍後重試。');
   }
   const provided=String(req.get('X-UBee-Dispatch-Admin-Key')||req.get('X-Dispatch-Admin-Token')||'').trim();
-  const a=Buffer.from(expected,'utf8');
-  const b=Buffer.from(provided,'utf8');
-  const accepted=b.length===a.length && b.length>0 && crypto.timingSafeEqual(a,b);
-  if(!accepted){
-    const current=dispatchAuthFailuresV601.get(address);
+  if(!dispatchEqualV642(expected,provided)){
     dispatchAuthFailuresV601.set(address,{
-      count:(current && current.until>now?current.count:0)+1,
-      until:current && current.until>now?current.until:now+15*60*1000
+      count:(failed&&failed.until>now?failed.count:0)+1,
+      until:failed&&failed.until>now?failed.until:now+15*60*1000
     });
-    return res.status(401).json({success:false,code:'DISPATCH_ADMIN_UNAUTHORIZED',message:'調度管理金鑰不正確，請重新輸入。'});
+    return dispatchDenyV642(res,401,'DISPATCH_ADMIN_UNAUTHORIZED','管理授權金鑰不正確。');
   }
   dispatchAuthFailuresV601.delete(address);
+  req.dispatchAdminAuthV642={mode:'legacy_key'};
   return next();
 }
+
+// Enroll via an explicit, one-time admin-key proof. It MUST stay before the
+// /api/dispatch middleware so an unregistered browser can bootstrap safely.
+app.post('/api/dispatch/device/enroll', async(req,res,next)=>{
+  dispatchNoStoreV642(res);
+  if(!dispatchSameOriginMutationV642(req))
+    return dispatchDenyV642(res,403,'DISPATCH_ORIGIN_REJECTED','來源網站未通過管理裝置授權檢查。');
+  return verifyDispatchLegacyKeyV642(req,res,next);
+},async(req,res)=>{
+  try{
+    const token=crypto.randomBytes(48).toString('base64url');
+    const fingerprint=dispatchTokenHashV642(token);
+    const now=Date.now();
+    const deviceName=String(req.body?.deviceName||'管理瀏覽器').replace(/[\r\n<>]/g,'').trim().slice(0,60)||'管理瀏覽器';
+    await db.collection(UBEE_DISPATCH_DEVICE_COLLECTION_V642).doc(fingerprint).create({
+      deviceName,createdAtMs:now,lastUsedAtMs:now,expiresAtMs:now+UBEE_DISPATCH_DEVICE_MAX_AGE_MS_V642,
+      revokedAtMs:null,version:'6.4.2-RC1',
+      userAgentFingerprint:crypto.createHash('sha256').update(String(req.get('user-agent')||'')).digest('hex')
+    });
+    dispatchCookieV642(res,token,UBEE_DISPATCH_DEVICE_MAX_AGE_MS_V642/1000);
+    return res.json({success:true,registered:true,message:'裝置已完成一次性授權，後續開啟將自動驗證。'});
+  }catch(err){
+    console.error('UBee dispatch device enrollment error:',err?.message||err);
+    return dispatchDenyV642(res,503,'DISPATCH_DEVICE_ENROLL_FAILED','裝置授權未完成，請檢查 Firestore 與 Render 後端設定。');
+  }
+});
+
+async function verifyDispatchAdminV6(req,res,next){
+  dispatchNoStoreV642(res);
+  // Keep existing admin-key compatibility for emergency rollback and maintenance;
+  // the V6.4.2 frontend no longer transmits or remembers this key after enrollment.
+  const legacy=String(req.get('X-UBee-Dispatch-Admin-Key')||req.get('X-Dispatch-Admin-Token')||'').trim();
+  if(legacy){
+    if(!['GET','HEAD','OPTIONS'].includes(req.method.toUpperCase())&&!dispatchSameOriginMutationV642(req))
+      return dispatchDenyV642(res,403,'DISPATCH_ORIGIN_REJECTED','不允許跨來源管理操作。');
+    return verifyDispatchLegacyKeyV642(req,res,next);
+  }
+  if(process.env.DISPATCH_DEVICE_ACCESS_ENABLED==='false')
+    return dispatchDenyV642(res,403,'DISPATCH_DEVICE_ACCESS_DISABLED','裝置自動登入已由伺服器停用。');
+  const token=dispatchReadCookieV642(req,UBEE_DISPATCH_DEVICE_COOKIE_V642);
+  if(!/^[A-Za-z0-9_-]{64}$/.test(token))
+    return dispatchDenyV642(res,401,'DISPATCH_DEVICE_UNAUTHORIZED','此瀏覽器尚未完成裝置授權。');
+  try{
+    const deviceRef=db.collection(UBEE_DISPATCH_DEVICE_COLLECTION_V642).doc(dispatchTokenHashV642(token));
+    const snap=await deviceRef.get();
+    const device=snap.exists?(snap.data()||{}):null;
+    const now=Date.now();
+    if(!device||device.revokedAtMs||!Number.isFinite(Number(device.expiresAtMs))||Number(device.expiresAtMs)<=now){
+      dispatchCookieV642(res,'',0);
+      return dispatchDenyV642(res,401,'DISPATCH_DEVICE_UNAUTHORIZED','這台裝置的授權已失效，請重新完成一次性授權。');
+    }
+    if(!['GET','HEAD','OPTIONS'].includes(req.method.toUpperCase())){
+      if(!dispatchSameOriginMutationV642(req))
+        return dispatchDenyV642(res,403,'DISPATCH_ORIGIN_REJECTED','不允許跨來源管理操作。');
+      const csrf=String(req.get('X-UBee-Dispatch-CSRF')||'');
+      if(!dispatchEqualV642(csrf,dispatchCsrfV642(token)))
+        return dispatchDenyV642(res,403,'DISPATCH_DEVICE_CSRF_INVALID','管理操作安全驗證失敗，請重新整理頁面。');
+    }
+    req.dispatchAdminAuthV642={mode:'trusted_device',deviceRef,deviceId:deviceRef.id,token};
+    // Sliding expiry: refresh quietly on active use, but do not write every poll.
+    if(Number(device.expiresAtMs)-now < UBEE_DISPATCH_DEVICE_RENEW_WINDOW_MS_V642){
+      await deviceRef.update({expiresAtMs:now+UBEE_DISPATCH_DEVICE_MAX_AGE_MS_V642,lastUsedAtMs:now});
+      dispatchCookieV642(res,token,UBEE_DISPATCH_DEVICE_MAX_AGE_MS_V642/1000);
+    }
+    return next();
+  }catch(err){
+    console.error('UBee dispatch device auth error:',err?.message||err);
+    return dispatchDenyV642(res,503,'DISPATCH_DEVICE_AUTH_TEMPORARY_ERROR','管理裝置驗證暫時無法使用，請勿重複執行派單操作。');
+  }
+}
 app.use('/api/dispatch',verifyDispatchAdminV6);
-// 前端登入驗證的輕量端點：不載入 Firestore，也不洩漏環境變數。
-app.get('/api/dispatch/auth/check',(req,res)=>res.json({success:true,authenticated:true,version:'V6.0.1'}));
+// Legacy check continues for maintenance and old clients; new frontend uses /device/session.
+app.get('/api/dispatch/auth/check',(req,res)=>res.json({success:true,authenticated:true,version:'V6.4.2-RC1'}));
+app.get('/api/dispatch/device/session',(req,res)=>{
+  if(req.dispatchAdminAuthV642?.mode!=='trusted_device')
+    return dispatchDenyV642(res,401,'DISPATCH_DEVICE_UNAUTHORIZED','請先完成此裝置的一次性授權。');
+  return res.json({success:true,authenticated:true,mode:'trusted_device',
+    csrfToken:dispatchCsrfV642(req.dispatchAdminAuthV642.token)});
+});
+app.post('/api/dispatch/device/revoke',async(req,res)=>{
+  if(req.dispatchAdminAuthV642?.mode!=='trusted_device')
+    return dispatchDenyV642(res,403,'DISPATCH_DEVICE_UNAUTHORIZED','目前沒有可解除的裝置授權。');
+  try{
+    await req.dispatchAdminAuthV642.deviceRef.update({revokedAtMs:Date.now(),expiresAtMs:0});
+    dispatchCookieV642(res,'',0);
+    return res.json({success:true,revoked:true,message:'已解除此瀏覽器的管理授權。'});
+  }catch(err){
+    console.error('UBee dispatch device revoke error:',err?.message||err);
+    return dispatchDenyV642(res,503,'DISPATCH_DEVICE_REVOKE_FAILED','裝置授權解除失敗，請勿將此電腦交給他人使用。');
+  }
+});
 
 // ============================================================
 // UBee Dispatch V6.4.1 RC2: 專用只讀清單 API（已受上方 verifyDispatchAdminV6 保護）
