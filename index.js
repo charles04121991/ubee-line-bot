@@ -19632,6 +19632,7 @@ app.post('/api/dispatch/device/revoke',async(req,res)=>{
 // ============================================================
 const UBEE_DISPATCH_CONSOLE_V641_STATUS = Object.freeze({
   waiting:Object.freeze(['pending_dispatch','pending','waiting','searching','dispatching','redispatching']),
+  scheduled:Object.freeze(['pending_schedule','scheduled_reserved','scheduled_confirmed']),
   pickup:Object.freeze(['accepted','going_to_pickup','heading_to_pickup','arrived_pickup']),
   delivery:Object.freeze(['picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff','queued','delivering','in_delivery','in_progress']),
 });
@@ -19672,6 +19673,11 @@ function dispatchConsoleV641Order(doc){
     statusLabel:(()=>{try{return typeof getStatusLabel==='function'?getStatusLabel(status):status;}catch(_){return status;}})(),
     serviceType:String(o.serviceType||o.serviceCategory||''),
     serviceCategory:String(o.serviceCategory||''),
+    orderTimingType:String(o.orderTimingType||''),
+    scheduleLabel:String(o.scheduleLabel||''),
+    scheduledStartAtMs:Number(o.scheduledStartAtMs||0)||dispatchConsoleV641Ms(o.scheduledStartAt),
+    scheduledEndAtMs:Number(o.scheduledEndAtMs||0)||dispatchConsoleV641Ms(o.scheduledEndAt),
+    timingCategory:(String(o.orderTimingType||'').trim().toLowerCase()==='scheduled'||['pending_schedule','scheduled_reserved','scheduled_confirmed'].includes(String(o.status||'').trim().toLowerCase())||Number(o.scheduledStartAtMs||0)>0)?'scheduled':'immediate',
     pickupAddress:String(o.pickupAddress||o.fromAddress||''),
     dropoffAddress:String(o.dropoffAddress||o.toAddress||''),
     pickupDistrict:String(o.pickupDistrict||''),
