@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf4-address-form-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf4-1-clean-service-header" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -15819,9 +15819,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <!-- RC3.2 form is a separate view of the SAME home/order controller, not a duplicate checkout. -->
 <div class="ubee-rc32-form-header" id="ubeeRC32FormHeader">
  <button class="ubee-rc32-back" id="ubeeRC32FormBack" type="button" aria-label="返回服務選擇">‹ <span>返回服務選擇</span></button>
- <div class="ubee-rc32-form-title">逐步填寫地點</div>
  <div class="ubee-address-step-progress" id="ubeeAddressStepProgress" aria-live="polite"></div>
- <div class="ubee-rc32-form-selection"><span>已選擇</span><strong id="ubeeRC32SelectedService">幫我送</strong><button id="ubeeRC32ChangeService" type="button">更換</button></div>
+ <div class="ubee-rc32-form-selection"><span>目前服務</span><strong id="ubeeRC32SelectedService">幫我送</strong><button id="ubeeRC32ChangeService" type="button">更換服務</button></div>
  <div class="ubee-rc32-hint" id="ubeeRC32StepHint" aria-live="polite">請先選擇取件地點。</div>
 </div>
 
@@ -18584,7 +18583,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf4-address-form-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf4-1-clean-service-header';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22671,11 +22670,11 @@ body:not(.flow-active) .app select,
 #productionOrderFlow #flowPageHome .ubee-rc32-form-header{margin:0 0 11px;padding:0 0 12px;border-bottom:1px solid #f1f1f1}
 #productionOrderFlow #flowPageHome .ubee-rc32-back{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 4px;border:0;background:transparent;color:#4d5159;font-size:25px;cursor:pointer}
 #productionOrderFlow #flowPageHome .ubee-rc32-back span{font-size:12px;font-weight:750}
-#productionOrderFlow #flowPageHome .ubee-rc32-form-title{font-size:22px;font-weight:1000;color:#171717;margin:6px 0 14px}
-#productionOrderFlow #flowPageHome .ubee-rc32-form-selection{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid #ffe7a1;border-radius:13px;background:#fff8df;margin-bottom:8px}
-#productionOrderFlow #flowPageHome .ubee-rc32-form-selection span{font-size:11px;font-weight:750;color:#856615}
+
+#productionOrderFlow #flowPageHome .ubee-rc32-form-selection{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid #e6e7e9;border-radius:12px;background:#fff;margin-bottom:8px}
+#productionOrderFlow #flowPageHome .ubee-rc32-form-selection span{font-size:12px;font-weight:750;color:#757a80}
 #productionOrderFlow #flowPageHome .ubee-rc32-form-selection strong{font-size:15px;color:#181818;flex:1;font-weight:950}
-#productionOrderFlow #flowPageHome .ubee-rc32-form-selection button{border-radius:10px;background:#fff;border:1px solid #eccc76;padding:8px 12px;min-height:39px;color:#614a12;font-size:12px;font-weight:850;cursor:pointer}
+#productionOrderFlow #flowPageHome .ubee-rc32-form-selection button{border-radius:10px;background:#fff;border:1px solid #e4e5e7;padding:8px 12px;min-height:39px;color:#333;font-size:12px;font-weight:850;cursor:pointer}
 #productionOrderFlow #flowPageHome .ubee-rc32-hint{font-size:12px;color:#606772;font-weight:650;padding:3px 3px 7px;line-height:1.5}
 #productionOrderFlow #flowPageHome .flow-route-card{margin-top:10px!important}
 #productionOrderFlow #flowPageHome .ubee-rc32-banner-cta:focus-visible,#productionOrderFlow #flowPageHome .flow-service-tab:focus-visible,#productionOrderFlow #flowPageHome .ubee-rc32-scenario:focus-visible,#productionOrderFlow #flowPageHome .ubee-rc32-back:focus-visible,#productionOrderFlow #flowPageHome #ubeeRC32ChangeService:focus-visible{outline:3px solid #161616!important;outline-offset:3px}
@@ -22807,7 +22806,7 @@ body > #ubeePersistentBottomNav > button.active{color:#b18700!important;}
 #productionOrderFlow #flowPageHome #ubeeRC32ChangeService{display:none!important;}
 #productionOrderFlow #flowPageHome .flow-service-tabs{margin-bottom:4px!important;}
 #productionOrderFlow #flowPageHome .ubee-rc32-section-head h3{font-size:19px!important;}
-#productionOrderFlow #flowPageHome .ubee-rc32-form-title{font-size:18px!important;}
+
 </style>
 <style id="ubee-v17-rc3-native-my-style">
 /* UBee Customer V1.7.0 RC3: My native UI; scoped to new pages only. */
