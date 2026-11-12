@@ -1,3 +1,4 @@
+// UBee Customer V1.7.0 RC6.2 — Multistop V2 + Rider Minimum NT$58 — TEST CANDIDATE (NOT DEPLOYED)
 // UBee Customer V1.7.0 RC6 — LEGACY CUSTOMER RETIREMENT CANDIDATE, NOT DEPLOYED.
 // UBee Customer RC2 — customer membership growth & new customer referrals retired (候選，尚未正式部署)
 // UBee Rider Review V4.0.2-HF1 supplement stability hotfix — shared backend
@@ -18063,6 +18064,9 @@ app.get('/api/rider/completed-orders/:orderId', riderAuthMiddleware, async (req,
         weatherLabel:String(order.weatherLabel || ''),
         dynamicPricingFee:Math.max(0, Math.round(Number(order.dynamicPricingFee || order.dynamicFee || 0))),
         multiStopFee:Math.max(0, Math.round(Number(order.multiStopFee || order.extraStopFee || 0))),
+        multiStopRiderIncome:Math.max(0, Math.round(Number(order.multiStopRiderIncome || 0))),
+        multiStopPlatformIncome:Math.max(0, Math.round(Number(order.multiStopPlatformIncome || 0))),
+        multiStopPricingVersion:String(order.multiStopPricingVersion || ''),
         overweightFee:Math.max(0, Math.round(Number(order.overweightFee || 0))),
         nightFee:Math.max(0, Math.round(Number(order.nightFee || 0))),
         cancellationCompensation:Math.max(0, Math.round(Number(order.cancellationCompensation || order.cancellationFee || 0))),
@@ -20165,7 +20169,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         routeSegments: Array.isArray(o.routeSegments) ? o.routeSegments.slice(0, 20) : [],
         extraStopFee: Math.max(0, Number(o.extraStopFee || o.multiStopFee || 0)),
         extraStopCount: Math.max(0, Number(o.extraStopCount || 0)),
-        extraStopUnitFee: Math.max(0, Number(o.extraStopUnitFee || CUSTOMER_EXTRA_STOP_FEE || 50)),
+        extraStopUnitFee: Math.max(0, Number(o.extraStopUnitFee || o.extraStopFee || 0)),
         advancePayment: Math.max(0, Number(getOrderAdvancePaymentAmount(o) || 0)),
 
         total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
@@ -29026,8 +29030,8 @@ const PRICING = {
 
   // 小U每筆有效任務最低收入。
   // 僅補足小U收入，不直接提高客戶報價；差額由原平台收入吸收。
-  riderMinimumTaskIncome: 50,
-  riderMinimumIncomeVersion: 'RIDER_MIN_50_V1_20260831',
+  riderMinimumTaskIncome: 58,
+  riderMinimumIncomeVersion: 'RIDER_MIN_58_V2_20261112',
 
   // 小U收入制度 V2：
   // 70/30 僅作用於任務服務費；額外時間／勞力／風險加價 100% 歸小U。
@@ -29124,11 +29128,11 @@ function getCanonicalUpstairsFee(option) {
 // =====================================================
 // UBee 小U最低收入 V1
 // - 任務費本體仍依原本 70 / 30 計算
-// - 小U原始分潤低於 NT$50 時，由 UBee 補足至 NT$50
+// - 新單的小U原始分潤低於 NT$58 時，由 UBee 補足至 NT$58；歷史訂單依保存的保底金額
 // - taskSubtotal <= 0 時不憑空產生保底收入
 // - 天候／動態調度等 100% 給小U的加價，於保底後再加上
 // =====================================================
-function calculateRiderTaskIncomeWithMinimum(taskSubtotal = 0) {
+function calculateRiderTaskIncomeWithMinimum(taskSubtotal = 0, minimumTaskIncome = PRICING.riderMinimumTaskIncome) {
   const safeTaskSubtotal = Math.max(
     0,
     Math.round(Number(taskSubtotal || 0))
@@ -29143,7 +29147,7 @@ function calculateRiderTaskIncomeWithMinimum(taskSubtotal = 0) {
 
   const riderMinimumTaskIncome = Math.max(
     0,
-    Math.round(Number(PRICING.riderMinimumTaskIncome || 50))
+    Math.round(Number(minimumTaskIncome))
   );
 
   const riderIncome =
@@ -29163,7 +29167,7 @@ function calculateRiderTaskIncomeWithMinimum(taskSubtotal = 0) {
     riderMinimumApplied: riderGuaranteeSubsidy > 0,
     riderMinimumTaskIncome,
     riderIncomePolicyVersion: String(
-      PRICING.riderMinimumIncomeVersion || 'RIDER_MIN_50_V1_20260831'
+      (riderMinimumTaskIncome === 58 ? PRICING.riderMinimumIncomeVersion : 'RIDER_MIN_50_V1_20260831')
     ),
   };
 }
@@ -30333,6 +30337,7 @@ async function createDynamicPricingQuoteSnapshot({
     quoteId,
     source,
     status: 'active',
+    pricingContractVersion: CUSTOMER_PRICING_CONTRACT_VERSION,
     quotedAtMs,
     expiresAtMs,
     serviceType: String(requestData.serviceType || ''),
@@ -31624,7 +31629,7 @@ function validateOrderInput(data) {
     if (!vehicle.plate) errors.push('請填寫代駕車輛車牌。');
     if (!vehicle.makeModel) errors.push('請填寫代駕車輛品牌／車型。');
     if (!vehicle.transmission) errors.push('請選擇代駕車輛為自排或手排。');
-    if (deliveryStops.length > 1) errors.push('代駕 V1 目前僅支援單一目的地。');
+    // V2: 代駕可增加第二停靠點，依鎖定的正式報價收取固定停靠費。
   }
 
   const isPurchaseOrder =
@@ -32500,14 +32505,15 @@ async function getDistanceMatrixCached(origin, destination) {
 
 
 // =====================================================
-// UBee Customer Multi-stop Delivery V1
-// 一般客戶第一版最多 2 個送達點：第 1 點必填、第 2 點選填。
-// 多點報價以實際道路「取件 → 第1點 → 第2點」總距離／總時間計算；
-// 多點配送正式規則：第 1 個送達點不加價；每新增 1 個有效送達點固定 +NT$50。
-// 第一版最多 2 個送達點，因此目前最多加收 NT$50；公式保留未來擴點能力。
+// UBee Customer Multi-stop V2
+// 新客戶報價：配送第一站里程單獨計價；第二站依第1→第2站道路距離階梯加價。
+// 第二站 60/40 小U/UBee，不加入一般 70/30 服務費池。
+// 舊訂單缺少 V2 policy 的多點金額仍由歷史財務重算採原先 70/30。
 // =====================================================
 const CUSTOMER_MAX_DELIVERY_STOPS = 2;
-const CUSTOMER_EXTRA_STOP_FEE = 50;
+const CUSTOMER_MULTISTOP_V2_VERSION = 'CUSTOMER_MULTISTOP_V2_20261112';
+const CUSTOMER_PRICING_CONTRACT_VERSION = 'CUSTOMER_QUOTE_MULTISTOP_V2_MIN58_20261112';
+const CUSTOMER_DRIVE_SECOND_STOP_FEE = 150;
 
 function normalizeCustomerDeliveryStopAddress(value) {
   return cleanText(value || '', ORDER_INPUT_LIMITS?.dropoffAddress || 160);
@@ -32584,53 +32590,84 @@ async function calculateCustomerRouteThroughStops(originAddress, stops = []) {
 }
 
 // =====================================================
-// UBee Customer Multi-stop Fee V1
-// 第 1 個送達點不加價；每新增 1 個有效送達點固定 +NT$50。
-// multiStopFee 屬既有 A 類任務服務費，沿用平台既有 70 / 30 財務核心。
-// =====================================================
-function applyCustomerMultiStopFee(price = {}, stopCount = 1) {
+// UBee 第二送達點 V2 唯一新單計價函式：完全取代固定 +50 / 70:30 舊路徑。
+// 邊界採距離原始公尺數，不先四捨五入（22.0 km 起 $360）。
+function getCustomerSecondStopTierFee(distanceMeters) {
+  const meters = Number(distanceMeters);
+  if (!Number.isFinite(meters) || meters < 0) {
+    const error = new Error('第二送達點距離資料無效，請重新估價。');
+    error.code = 'SECOND_STOP_DISTANCE_INVALID';error.statusCode = 422;throw error;
+  }
+  if (meters > 30000) {
+    const error = new Error('第二送達點目前僅支援 30 公里內，請調整地址。');
+    error.code = 'SECOND_STOP_DISTANCE_OVER_LIMIT';error.statusCode = 422;throw error;
+  }
+  if (meters <= 3000) return 50;
+  if (meters <= 5000) return 70;
+  if (meters <= 7000) return 90;
+  if (meters <= 10000) return 120;
+  if (meters < 11000) return 140;
+  if (meters <= 15000) return 180;
+  if (meters <= 17000) return 220;
+  if (meters <= 20000) return 280;
+  if (meters < 22000) return 310;
+  if (meters < 25000) return 360;
+  if (meters < 28000) return 400;
+  return 420;
+}
+
+function applyCustomerSecondStopPrice(price = {}, route = null, serviceMode = 'normal') {
   const result = { ...(price || {}) };
-  const safeStopCount = Math.max(
-    1,
-    Math.min(
-      CUSTOMER_MAX_DELIVERY_STOPS,
-      Math.round(Number(stopCount || 1))
-    )
-  );
-  const extraStopCount = Math.max(0, safeStopCount - 1);
-  const multiStopFee = extraStopCount * CUSTOMER_EXTRA_STOP_FEE;
-
-  const financials = calculateFinancialSplit({
-    deliveryFee: result.deliveryFee,
-    crossZoneFee: result.crossZoneFee,
-    multiStopFee,
-    returnTripFee: result.returnTripFee,
-    specialTaskFee: result.specialTaskFee,
-    taskHandlingFee: result.taskHandlingFee,
-
-    serviceFee: result.serviceFee,
-
-    speedFee: result.speedFee,
-    upstairsFee: result.upstairsFee,
-    waitingFee: result.waitingFee,
-    itemSizeFee: result.itemSizeFee,
-    overweightFee: result.overweightFee,
-    nightFee: result.nightFee,
-    weatherFee: result.weatherFee,
-    dynamicPricingFee: result.dynamicPricingFee || result.dynamicFee,
-    cancellationCompensation: result.cancellationCompensation,
-  });
-
-  return {
-    ...result,
-    ...financials,
-    stopCount: safeStopCount,
-    extraStopCount,
-    extraStopUnitFee: CUSTOMER_EXTRA_STOP_FEE,
-    extraStopFee: multiStopFee,
-    multiStopFee,
-    total: financials.serviceSubtotal,
+  const segments = Array.isArray(route?.routeSegments) ? route.routeSegments : [];
+  const extraStopCount = segments.length > 1 ? 1 : 0;
+  const secondLeg = extraStopCount ? segments[1] : null;
+  if (extraStopCount && (!Number.isFinite(Number(secondLeg?.distanceMeters)) || Number(secondLeg.distanceMeters) < 0)) {
+    const error = new Error('第二送達點道路路線不完整，請重新估價。');
+    error.code = 'SECOND_STOP_ROUTE_INVALID';error.statusCode = 422;throw error;
+  }
+  if (extraStopCount && serviceMode === 'queue') {
+    const error = new Error('幫排隊不適用第二送達點。');
+    error.code = 'SECOND_STOP_UNSUPPORTED';error.statusCode = 400;throw error;
+  }
+  const multiStopFee = !extraStopCount ? 0
+    : serviceMode === 'drive' ? CUSTOMER_DRIVE_SECOND_STOP_FEE
+    : getCustomerSecondStopTierFee(secondLeg.distanceMeters);
+  const multiStopRiderIncome = Math.round(multiStopFee * 0.6);
+  const multiStopPlatformIncome = multiStopFee - multiStopRiderIncome;
+  const secondStopDistanceMeters = extraStopCount ? Math.round(Number(secondLeg.distanceMeters)) : 0;
+  const attributes = {
+    multiStopPricingVersion: CUSTOMER_MULTISTOP_V2_VERSION,
+    stopCount: extraStopCount + 1,
+    extraStopCount, extraStopUnitFee:multiStopFee,
+    extraStopFee:multiStopFee, multiStopFee,
+    multiStopRiderIncome,multiStopPlatformIncome,
+    secondStopDistanceMeters,
+    secondStopDistanceKm:Math.round(secondStopDistanceMeters / 10) / 100,
+    firstStopDistanceKm:segments[0] ? Math.round(Number(segments[0].distanceMeters || 0) / 10) / 100 : Number(result.distanceKm || 0),
+    distanceKm:Number.isFinite(Number(route?.distanceMeters)) ? Math.round(Number(route.distanceMeters)/10)/100 : result.distanceKm,
   };
+  if (serviceMode === 'drive') {
+    // 代駕原里程費按「完整駕駛路線」計價，停靠費另加 150；
+    // 原代駕階梯/深夜/等待 80:20 分潤絕不送入一般配送 70:30 計算器。
+    const riderIncome = Math.max(0, Math.round(Number(result.riderIncome || 0))) + multiStopRiderIncome;
+    const total = Math.max(0, Math.round(Number(result.serviceSubtotal || result.total || 0))) + multiStopFee;
+    const platformFee = Math.max(0, total - riderIncome);
+    return {...result,...attributes,
+      riderIncome,driverFee:riderIncome,riderFee:riderIncome,estimatedRiderIncome:riderIncome,
+      platformFee,platformIncome:platformFee,platformServiceFee:platformFee,serviceFee:platformFee,
+      taskSubtotal:total,serviceSubtotal:total,total};
+  }
+  const financials = calculateFinancialSplit({
+    deliveryFee:result.deliveryFee,crossZoneFee:result.crossZoneFee,multiStopFee,
+    multiStopPricingVersion:CUSTOMER_MULTISTOP_V2_VERSION,
+    returnTripFee:result.returnTripFee,specialTaskFee:result.specialTaskFee,taskHandlingFee:result.taskHandlingFee,
+    serviceFee:result.serviceFee,speedFee:result.speedFee,upstairsFee:result.upstairsFee,
+    waitingFee:result.waitingFee,itemSizeFee:result.itemSizeFee,overweightFee:result.overweightFee,
+    nightFee:result.nightFee,weatherFee:result.weatherFee,
+    dynamicPricingFee:result.dynamicPricingFee || result.dynamicFee,
+    cancellationCompensation:result.cancellationCompensation,
+  });
+  return {...result,...financials,...attributes,total:financials.serviceSubtotal};
 }
 
 function calculateDistanceTierFee(distanceKm) {
@@ -32657,6 +32694,8 @@ function calculateFinancialSplit({
   deliveryFee = 0,
   crossZoneFee = 0,
   multiStopFee = 0,
+  multiStopPricingVersion = '',
+  riderMinimumTaskIncomeOverride = null,
   returnTripFee = 0,
   specialTaskFee = 0,
   taskHandlingFee = 0,
@@ -32681,6 +32720,9 @@ function calculateFinancialSplit({
   const safeDeliveryFee = safeMoney(deliveryFee);
   const safeCrossZoneFee = safeMoney(crossZoneFee);
   const safeMultiStopFee = safeMoney(multiStopFee);
+  const isSecondStopV2 = multiStopPricingVersion === CUSTOMER_MULTISTOP_V2_VERSION;
+  const secondStopRiderIncome = isSecondStopV2 ? Math.round(safeMultiStopFee * 0.6) : 0;
+  const secondStopPlatformIncome = isSecondStopV2 ? safeMultiStopFee - secondStopRiderIncome : 0;
   const safeReturnTripFee = safeMoney(returnTripFee);
   const safeSpecialTaskFee = safeMoney(specialTaskFee);
   const safeTaskHandlingFee = safeMoney(taskHandlingFee);
@@ -32698,22 +32740,23 @@ function calculateFinancialSplit({
 
   const safeServiceFee = safeMoney(serviceFee);
 
-  // A｜只有這一桶參與 70 / 30，並套用每單最低 NT$50。
+  // A｜只對原任務池套 70/30、最低 NT$58（歷史單仍按保存的保底）；V2第二站另算60/40。
   const shareableTaskSubtotal =
     safeDeliveryFee +
     safeCrossZoneFee +
-    safeMultiStopFee +
+    (isSecondStopV2 ? 0 : safeMultiStopFee) +
     safeReturnTripFee +
     safeSpecialTaskFee +
     safeTaskHandlingFee;
 
   const riderIncomeInfo =
     calculateRiderTaskIncomeWithMinimum(
-      shareableTaskSubtotal
+      shareableTaskSubtotal,
+      riderMinimumTaskIncomeOverride === null ? PRICING.riderMinimumTaskIncome : riderMinimumTaskIncomeOverride
     );
 
   const riderBaseIncome =
-    riderIncomeInfo.riderIncome;
+    riderIncomeInfo.riderIncome + secondStopRiderIncome;
 
   // B｜這一桶全部直接給小U，不再乘 70%。
   const riderOnlySurchargeSubtotal =
@@ -32735,7 +32778,8 @@ function calculateFinancialSplit({
   // 避免客戶端與既有訂單總額欄位失去相容性。
   const taskSubtotal =
     shareableTaskSubtotal +
-    riderOnlySurchargeSubtotal;
+    riderOnlySurchargeSubtotal +
+    (isSecondStopV2 ? safeMultiStopFee : 0);
 
   const platformServiceFee = safeServiceFee;
 
@@ -32753,6 +32797,9 @@ function calculateFinancialSplit({
     deliveryFee: safeDeliveryFee,
     crossZoneFee: safeCrossZoneFee,
     multiStopFee: safeMultiStopFee,
+    multiStopPricingVersion: isSecondStopV2 ? CUSTOMER_MULTISTOP_V2_VERSION : '',
+    multiStopRiderIncome:secondStopRiderIncome,
+    multiStopPlatformIncome:secondStopPlatformIncome,
     returnTripFee: safeReturnTripFee,
     specialTaskFee: safeSpecialTaskFee,
     taskHandlingFee: safeTaskHandlingFee,
@@ -32785,9 +32832,9 @@ function calculateFinancialSplit({
     // 這裡的「保底前收入」包含 100% 小U加價，
     // 因此 riderIncome - riderIncomeBeforeGuarantee 仍只會等於真正的保底補貼。
     riderBaseIncomeBeforeGuarantee:
-      riderIncomeInfo.riderIncomeBeforeGuarantee,
+      riderIncomeInfo.riderIncomeBeforeGuarantee + secondStopRiderIncome,
     riderIncomeBeforeGuarantee:
-      riderIncomeInfo.riderIncomeBeforeGuarantee +
+      riderIncomeInfo.riderIncomeBeforeGuarantee + secondStopRiderIncome +
       riderOnlySurchargeSubtotal,
     riderGuaranteeSubsidy:
       riderIncomeInfo.riderGuaranteeSubsidy,
@@ -32835,13 +32882,14 @@ function getCanonicalOrderRiderIncome(order = {}) {
   const directShareableTaskSubtotal =
     getOrderMoneyValue(order, ['shareableTaskSubtotal']);
 
+  const isSecondStopV2 = order.multiStopPricingVersion === CUSTOMER_MULTISTOP_V2_VERSION;
   const shareableTaskSubtotal =
     directShareableTaskSubtotal !== null
       ? directShareableTaskSubtotal
       : [
           'deliveryFee',
           'crossZoneFee',
-          'multiStopFee',
+          ...(isSecondStopV2 ? [] : ['multiStopFee']),
           'returnTripFee',
           'specialTaskFee',
           'taskHandlingFee',
@@ -32878,14 +32926,16 @@ function getCanonicalOrderRiderIncome(order = {}) {
   const riderBaseIncome =
     shareableTaskSubtotal > 0
       ? calculateRiderTaskIncomeWithMinimum(
-          shareableTaskSubtotal
+          shareableTaskSubtotal,
+          Math.max(0, Number(order.riderMinimumTaskIncome || 50))
         ).riderIncome
       : 0;
 
   return Math.max(
     0,
     Math.round(
-      riderBaseIncome + riderOnlySurchargeSubtotal
+      riderBaseIncome + riderOnlySurchargeSubtotal +
+      (isSecondStopV2 ? Math.round(Math.max(0,Number(order.multiStopFee || 0))*0.6) : 0)
     )
   );
 }
@@ -33196,7 +33246,7 @@ function calculateQuickServicePrice({
 // - 3～8 km 每公里 +NT$12
 // - 8 km 以上每公里 +NT$11
 // - 導航時間只作 ETA，不再列入一般配送價格
-// - 維持任務費 70/30 與小U最低 NT$50
+// - 維持第一站任務費 70/30 與新單小U最低 NT$58
 // - 約 25.2 km 標準件目標總價 NT$350
 // =====================================================
 function calculateRouteDeliveryCore({
@@ -33479,7 +33529,7 @@ function applyCustomTaskHandlingFee(
   }
 
   // 全能跑腿的「任務處理時間費」仍屬 A 類任務服務費，
-  // 參與 70 / 30，並與配送費一起判斷小U最低 NT$50。
+  // 參與 70 / 30，並與配送費一起判斷新單小U最低 NT$58。
   result.shareableTaskSubtotal =
     Math.max(
       0,
@@ -33592,8 +33642,11 @@ function recalculateOrderFinancials(order) {
       else if (baseFare <= 400) riderBaseIncome = 335;
       else riderBaseIncome = 375 + Math.max(0, Math.round((baseFare - 450) / 50)) * 40;
     }
-    const riderIncome = riderBaseIncome + Math.round(nightFee * 0.8) + Math.round(waitingFee * 0.8);
-    const serviceSubtotal = baseFare + nightFee + waitingFee;
+    const secondStopFee = order.multiStopPricingVersion === CUSTOMER_MULTISTOP_V2_VERSION ? Math.max(0, Math.round(Number(order.multiStopFee || 0))) : 0;
+    const multiStopRiderIncome = Math.round(secondStopFee * 0.6);
+    const riderIncome = riderBaseIncome + Math.round(nightFee * 0.8) + Math.round(waitingFee * 0.8) + multiStopRiderIncome;
+    const serviceSubtotal = baseFare + nightFee + waitingFee + secondStopFee;
+    order.multiStopRiderIncome=multiStopRiderIncome;order.multiStopPlatformIncome=secondStopFee-multiStopRiderIncome;
     const platformFee = Math.max(0, serviceSubtotal - riderIncome);
     order.deliveryFee = baseFare;
     order.driveBaseFare = baseFare;
@@ -33713,6 +33766,8 @@ function recalculateOrderFinancials(order) {
     deliveryFee: order.deliveryFee,
     crossZoneFee: order.crossZoneFee,
     multiStopFee: order.multiStopFee,
+    multiStopPricingVersion: order.multiStopPricingVersion || '',
+    riderMinimumTaskIncomeOverride: Math.max(0, Number(order.riderMinimumTaskIncome || 50)),
     returnTripFee: order.returnTripFee,
     specialTaskFee: order.specialTaskFee,
     taskHandlingFee: order.taskHandlingFee,
@@ -33771,6 +33826,8 @@ function recalculateOrderFinancials(order) {
 
   order.multiStopFee =
     financials.multiStopFee;
+  order.multiStopRiderIncome = financials.multiStopRiderIncome;
+  order.multiStopPlatformIncome = financials.multiStopPlatformIncome;
 
   order.returnTripFee =
     financials.returnTripFee;
@@ -36138,6 +36195,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       : normalizeItemSize(req.query.itemSize || 'unspecified');
     const isQueueTask = resolvedServiceMode === 'queue';
     const isCustomTask = resolvedServiceMode === 'custom';
+    if (to2 && isQueueTask) return res.status(400).json({success:false,code:'SECOND_STOP_UNSUPPORTED',error:'幫排隊不開放第二送達點。'});
     const singlePointTask =
       isCustomTask &&
       (
@@ -36146,6 +36204,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         String(req.query.singlePointTask || '').trim().toLowerCase() === 'true'
       );
 
+    if (to2 && singlePointTask) return res.status(400).json({success:false,code:'SECOND_STOP_UNSUPPORTED',error:'同地點完成任務不能新增第二送達點。'});
     let distance = null;
     let price = null;
     let queueMinutes = 0;
@@ -36155,10 +36214,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       if (!from || !to) {
         return res.status(400).json({ success:false, error:'請完整填寫車輛所在地與代駕目的地。' });
       }
-      if (to2) {
-        return res.status(400).json({ success:false, error:'代駕 V1 僅支援單一目的地。' });
-      }
-      distance = await calculateCustomerRouteThroughStops(from, [to]);
+      distance = await calculateCustomerRouteThroughStops(from, quoteStopAddresses);
       price = calculateDrivePrice({ distanceMeters:distance.distanceMeters, nowMs:getDrivePricingReferenceMs(req.query) });
     } else if (isQueueTask) {
       if (!from) {
@@ -36307,8 +36363,8 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         distance = await calculateCustomerRouteThroughStops(from, quoteStopAddresses);
 
         price = calculatePrice({
-          distanceMeters: distance.distanceMeters,
-          durationSeconds: distance.durationSeconds,
+          distanceMeters: distance.routeSegments?.[0]?.distanceMeters ?? distance.distanceMeters,
+          durationSeconds: distance.routeSegments?.[0]?.durationSeconds ?? distance.durationSeconds,
           speedType,
           upstairsFee,
         });
@@ -36338,15 +36394,15 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
 
       if (quickServiceType) {
         price = calculateQuickServicePrice({
-          distanceMeters: distance.distanceMeters,
+          distanceMeters: distance.routeSegments?.[0]?.distanceMeters ?? distance.distanceMeters,
           speedType,
           upstairsFee,
           serviceType: quickServiceType,
         });
       } else {
         price = calculatePrice({
-          distanceMeters: distance.distanceMeters,
-          durationSeconds: distance.durationSeconds,
+          distanceMeters: distance.routeSegments?.[0]?.distanceMeters ?? distance.distanceMeters,
+          durationSeconds: distance.routeSegments?.[0]?.durationSeconds ?? distance.durationSeconds,
           speedType,
           upstairsFee,
         });
@@ -36376,16 +36432,9 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       price = applyWeatherSurchargeToPrice(price, weatherAdjustment);
     }
 
-    // 多點配送費由後端正式計價：第 1 點不加價，每新增 1 點固定 +NT$50。
-    // queue 與全能跑腿「同地點完成」不套用多點費。
-    const pricedStopCount =
-      isDriveTask || isQueueTask || (isCustomTask && singlePointTask)
-        ? 1
-        : Math.max(1, quoteStopAddresses.length || 1);
-
-    if (!isDriveTask) {
-      price = applyCustomerMultiStopFee(price, pricedStopCount);
-    }
+    // V2 唯一入口：第一站一般配送計價後，第二站單獨按距離階梯／代駕停靠費計價。
+    // queue 與同地點任務已在上方阻擋第二站，不再執行固定 +50 舊函式。
+    price = applyCustomerSecondStopPrice(price, distance, resolvedServiceMode);
 
     const quoteSnapshot = await createDynamicPricingQuoteSnapshot({
       price,
@@ -36464,6 +36513,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
 
       speedType,
       speedLabel: speed.label,
+      pricingContractVersion: CUSTOMER_PRICING_CONTRACT_VERSION,
 
       ...price,
 
@@ -36488,11 +36538,9 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
   } catch (error) {
     console.error('❌ API 估價失敗：', error);
 
-    return res.status(500).json({
-      success: false,
-      error:
-        error?.message ||
-        '估價失敗，請確認地址是否正確',
+    return res.status(error?.statusCode || 500).json({
+      success:false,code:error?.code || 'QUOTE_ERROR',
+      error:error?.message || '估價失敗，請確認地址是否正確',
     });
   }
 });
@@ -39776,6 +39824,10 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     }
 
     const lockedQuote = quoteValidation.data || {};
+    // 不讓舊 50 元固定費／舊 NT$50 保底的快取報價混入新版訂單。
+    if (lockedQuote.pricingContractVersion !== CUSTOMER_PRICING_CONTRACT_VERSION) {
+      return res.status(409).json({success:false,code:'QUOTE_PRICING_VERSION_EXPIRED',error:'計價規則已更新，請重新估價後送出。'});
+    }
 
     const quoteOrderValidation = validateLockedQuoteAgainstOrder(
       lockedQuote,
@@ -39812,7 +39864,7 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       data.serviceMode === 'custom' && data.singlePointTask === true;
 
     if (data.serviceMode === 'drive') {
-      distance = await calculateCustomerRouteThroughStops(data.pickupAddress, [data.dropoffAddress]);
+      distance = await calculateCustomerRouteThroughStops(data.pickupAddress, Array.isArray(data.deliveryStops)&&data.deliveryStops.length>1 ? data.deliveryStops : [data.dropoffAddress]);
       price = calculateDrivePrice({ distanceMeters:distance.distanceMeters, nowMs:getDrivePricingReferenceMs(data) });
     } else     if (data.serviceMode === 'queue') {
   const queueMinutes = Math.max(
@@ -40010,7 +40062,7 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
   if (quickServiceType) {
     // 只有「幫我取 / 幫代買」走專用即時配送計價。
     price = calculateQuickServicePrice({
-      distanceMeters: distance.distanceMeters,
+      distanceMeters: distance.routeSegments?.[0]?.distanceMeters ?? distance.distanceMeters,
       speedType: data.speedType,
       upstairsFee: data.upstairsFee,
       serviceType: quickServiceType,
@@ -40019,8 +40071,8 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
   } else {
     // 幫我送、全能跑腿、急件專送與其他一般路線任務統一走 Route Pricing V3。
     price = calculatePrice({
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
+      distanceMeters: distance.routeSegments?.[0]?.distanceMeters ?? distance.distanceMeters,
+      durationSeconds: distance.routeSegments?.[0]?.durationSeconds ?? distance.durationSeconds,
       speedType: data.speedType,
       upstairsFee: data.upstairsFee,
     });
@@ -40054,6 +40106,9 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       });
     }
 
+    if (Number(lockedPrice.secondStopDistanceMeters || 0) > 30000) {
+      return res.status(409).json({success:false,code:'SECOND_STOP_DISTANCE_OVER_LIMIT',error:'第二送達點超過 30 公里，請重新估價。'});
+    }
     price = {
       ...lockedPrice,
       quoteId: String(lockedQuote.quoteId || req.body.quoteId || ''),
@@ -40266,7 +40321,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     Array.isArray(distance?.routeSegments) ? distance.routeSegments : [],
   extraStopFee: Math.max(0, Math.round(Number(price.extraStopFee || price.multiStopFee || 0))),
   extraStopCount: Math.max(0, Math.round(Number(price.extraStopCount || 0))),
-  extraStopUnitFee: Math.max(0, Math.round(Number(price.extraStopUnitFee || CUSTOMER_EXTRA_STOP_FEE))),
+  extraStopUnitFee: Math.max(0, Math.round(Number(price.extraStopUnitFee || 0))),
 
   // ==============================
   // 任務設定
@@ -47717,6 +47772,10 @@ function buildFinanceClosureSnapshot(order = {}) {
     riderMinimumApplied,
     riderMinimumTaskIncome,
     riderIncomePolicyVersion,
+    // V2 加值欄位：不修改原財務總帳公式，供前端稽核 60/40 明細。
+    multiStopPricingVersion:String(order.multiStopPricingVersion || ''),
+    multiStopRiderIncome:firstFinanceMoney(order,['multiStopRiderIncome'],0),
+    multiStopPlatformIncome:firstFinanceMoney(order,['multiStopPlatformIncome'],0),
 
     stackTransferSubsidy,
     stackTransferSubsidyPayer,
