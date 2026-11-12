@@ -11228,6 +11228,12 @@ function buildRiderPendingTaskPreview(order = {}) {
     multiDropoff: previewMultiDropoff,
     multiStopFee: previewMultiStopFee,
     extraStopFee: previewMultiStopFee,
+    // 唯讀：僅傳遞後端已保存的分潤快照，不重新計價。
+    multiStopPricingVersion: String(order.multiStopPricingVersion || ''),
+    multiStopRiderIncome: Number.isFinite(Number(order.multiStopRiderIncome)) && order.multiStopRiderIncome != null
+      ? Math.max(0, Math.round(Number(order.multiStopRiderIncome))) : null,
+    multiStopPlatformIncome: Number.isFinite(Number(order.multiStopPlatformIncome)) && order.multiStopPlatformIncome != null
+      ? Math.max(0, Math.round(Number(order.multiStopPlatformIncome))) : null,
 
     // 待接任務地圖只保留取件座標；送達座標接單後才回傳。
     riderMapPickup: pickupPoint
