@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf3-step-address-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf4-address-form-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -5804,6 +5804,21 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 #productionOrderFlow #flowClearDropoff2[hidden],
 #productionOrderFlow #ubeeAddressStepBack[hidden],
 #productionOrderFlow #flowTaskPreview[hidden]{display:none!important}
+</style>
+<style id="ubee-hf4-address-form-style">
+#productionOrderFlow .ubee-hf4-legacy-address-buttons{display:none!important}
+#productionOrderFlow .ubee-hf4-address-form{display:flex;flex-direction:column;gap:10px;margin:14px 0 18px}
+#productionOrderFlow .ubee-hf4-heading{font-size:20px;font-weight:900;color:#171717}
+#productionOrderFlow .ubee-hf4-caption{font-size:14px;color:#777;margin-bottom:2px}
+#productionOrderFlow .ubee-hf4-progress-track{height:5px;border-radius:999px;background:#eeeeee;overflow:hidden;margin:0 0 12px}
+#productionOrderFlow .ubee-hf4-progress-fill{height:100%;background:#f3c400;transition:width .18s}
+#productionOrderFlow .ubee-hf4-field{width:100%;min-height:72px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:7px;background:#f5f5f5;border:1px solid #dedede;border-radius:14px;padding:13px 15px;color:#171717}
+#productionOrderFlow .ubee-hf4-field small{font-size:13px;color:#666;font-weight:600}
+#productionOrderFlow .ubee-hf4-field strong{font-size:15px;font-weight:800;line-height:1.4;overflow-wrap:anywhere}
+#productionOrderFlow .ubee-hf4-second-stop{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+#productionOrderFlow .ubee-hf4-second-stop[hidden]{display:none!important}
+#productionOrderFlow .ubee-hf4-second-stop button{padding:11px;border:1px solid #e6cf65;border-radius:12px;background:#fff9dc;color:#4b3900;font-weight:800}
+#productionOrderFlow #ubeeAddressStepBack[hidden]{display:none!important}
 </style>
 </head>
 <body class="ubee-app-starting" style="background:#ffffff;">
@@ -15815,7 +15830,20 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
 
 <div class="flow-location-line"><span class="flow-location-dot"></span><span id="flowLocationText">正在確認目前服務地區</span></div>
-<div class="flow-route-card">
+<div id="ubeeAddressFormHF4" class="ubee-hf4-address-form" aria-label="逐步填寫地址">
+  <div class="ubee-hf4-heading" id="ubeeHF4Heading">選擇取件地點</div>
+  <div class="ubee-hf4-caption" id="ubeeHF4Caption">請先填寫小U需要前往的地點</div>
+  <div class="ubee-hf4-progress-track"><div id="ubeeHF4ProgressBar" class="ubee-hf4-progress-fill"></div></div>
+  <button type="button" class="ubee-hf4-field" data-hf4-field="address"><small id="ubeeHF4AddressLabel">取件地址</small><strong id="ubeeHF4AddressValue">點選搜尋地址或使用目前位置</strong></button>
+  <button type="button" class="ubee-hf4-field" data-hf4-field="name"><small id="ubeeHF4NameLabel">取件聯絡人</small><strong id="ubeeHF4NameValue">點選填寫</strong></button>
+  <button type="button" class="ubee-hf4-field" data-hf4-field="phone"><small>聯絡電話</small><strong id="ubeeHF4PhoneValue">點選填寫</strong></button>
+  <button type="button" class="ubee-hf4-field" data-hf4-field="note"><small>樓層及補充說明（選填）</small><strong id="ubeeHF4NoteValue">點選填寫</strong></button>
+  <div id="ubeeHF4SecondStop" class="ubee-hf4-second-stop" hidden>
+    <button type="button" id="ubeeHF4SecondStopOpen">新增第二站（選填）</button>
+    <button type="button" id="ubeeHF4SecondStopClear" hidden>移除第二站</button>
+  </div>
+</div>
+<div class="flow-route-card ubee-hf4-legacy-address-buttons" aria-hidden="true">
 <button class="flow-address-button" id="flowPickupButton" type="button">
 <span class="flow-address-dot"></span>
 <span class="flow-address-text"><small id="flowPickupLabel">取件地點</small><strong id="flowPickupText">請選擇取件地址</strong><em id="flowPickupMeta">填寫取件聯絡人與電話</em></span>
@@ -16735,30 +16763,43 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   // HF3: Single canonical address state; presentation-only wizard (no duplicate address model).
   let ubeeAddressStep=0;
+  // HF4 canonical form: only two mandatory stages. Existing address detail/search flow owns the data.
   function renderUBeeAddressStep(){
-    const pickup=$('flowPickupButton'),drop=$('flowDropoffButton'),second=$('flowDropoff2Button');
-    if(!pickup||!drop||!second)return;
-    const p=state.pickup,d=state.dropoff;
-    const auto=state.service==='queue'||(state.service==='helper'&&state.singlePointTask===true);
-    const allowSecond=state.service!=='queue'&&!(state.service==='helper'&&state.singlePointTask===true);
-    if(ubeeAddressStep>2)ubeeAddressStep=2;
-    pickup.hidden=ubeeAddressStep!==0;
-    drop.hidden=ubeeAddressStep!==1;
-    second.hidden=ubeeAddressStep!==2||!allowSecond;
-    const clear=$('flowClearDropoff2');
-    if(clear)clear.hidden=ubeeAddressStep!==2||!allowSecond||!state.dropoff2;
-    const back=$('ubeeAddressStepBack');
-    if(back)back.hidden=ubeeAddressStep===0;
-    const progress=$('ubeeAddressStepProgress');
-    const titles=['第一步｜取件地點','第二步｜送達地點','第三步｜第二站（選填）'];
+    const step=Math.max(0,Math.min(1,ubeeAddressStep));
+    ubeeAddressStep=step;
+    const pickup=step===0;
+    const data=pickup?state.pickup:state.dropoff;
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
-    if(progress)progress.textContent=ubeeAddressStep===0?'1 / 3　'+copy.pickupLabel:ubeeAddressStep===1?'2 / 3　'+copy.dropoffLabel:'3 / 3　第二站（選填）';
-    const hint=$('ubeeRC32StepHint');
-    if(hint)hint.textContent=ubeeAddressStep===0?'請選擇取件地址並填寫聯絡資料。':ubeeAddressStep===1?(auto?'此服務會自動同步任務完成地點。':'請選擇送達地址並填寫聯絡資料。'):'可新增第二站，也可以直接繼續。';
-    const next=$('flowHomeNext');
-    if(next)next.textContent=ubeeAddressStep===0?'下一步：送達地點':ubeeAddressStep===1?'下一步：第二站（選填）':(copy.next||'下一步：填寫任務內容');
-    const preview=$('flowTaskPreview');
-    if(preview)preview.hidden=ubeeAddressStep!==2;
+    const single=state.service==='queue'||(state.service==='helper'&&state.singlePointTask===true);
+    const secondAllowed=!single;
+    const setText=(id,text)=>{const el=$(id);if(el)el.textContent=text};
+    setText('ubeeAddressStepProgress',`${step+1} / 2　${pickup?copy.pickupLabel:copy.dropoffLabel}`);
+    setText('ubeeHF4Heading',pickup?`選擇${copy.pickupLabel}`:`選擇${copy.dropoffLabel}`);
+    setText('ubeeHF4Caption',pickup?'請先填寫小U需要前往的地點':single?'此服務的完成地點會與起點自動同步':'請填寫小U需要送達的地點');
+    setText('ubeeHF4AddressLabel',pickup?`${copy.pickupLabel}地址`:`${copy.dropoffLabel}地址`);
+    setText('ubeeHF4NameLabel',pickup?'取件聯絡人':'收件聯絡人');
+    setText('ubeeHF4AddressValue',data?.address||'點選搜尋地址或使用目前位置');
+    setText('ubeeHF4NameValue',data?.contactName||'點選填寫');
+    setText('ubeeHF4PhoneValue',data?.phone||'點選填寫');
+    setText('ubeeHF4NoteValue',data?.addressDetail||data?.note||'點選填寫');
+    const progress=$('ubeeHF4ProgressBar');if(progress)progress.style.width=pickup?'50%':'100%';
+    const second=$('ubeeHF4SecondStop');if(second)second.hidden=pickup||!secondAllowed;
+    setText('ubeeHF4SecondStopOpen',state.dropoff2?`第二站：${state.dropoff2.address||'已填寫'}（點選修改）`:'新增第二站（選填）');
+    const clear=$('ubeeHF4SecondStopClear');if(clear)clear.hidden=!state.dropoff2;
+    const back=$('ubeeAddressStepBack');if(back)back.hidden=pickup;
+    setText('flowHomeNext',pickup?'下一步：送達地點':(copy.next||'下一步：填寫任務內容'));
+    const hint=$('ubeeRC32StepHint');if(hint)hint.textContent=pickup?'完成取件資料後進入下一步。':'完成送達資料後即可繼續。';
+    const preview=$('flowTaskPreview');if(preview)preview.hidden=true;
+  }
+
+  function editUBeeHF4Field(field){
+    const target=ubeeAddressStep===0?'pickup':'dropoff';
+    const existing=target==='pickup'?state.pickup:state.dropoff;
+    if(field==='address'||!existing?.address){openAddress(target);return}
+    state.addressTarget=target;
+    openDetail(existing);
+    const focusId={name:'flowDetailName',phone:'flowDetailPhone',note:'flowDetailNote'}[field];
+    if(focusId)setTimeout(()=>$ (focusId)?.focus(),90);
   }
 
   function updateHome(){
@@ -17034,9 +17075,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }
     syncSinglePointTask();
     if($('flowSaveAddress').checked)await persistAddress(item);
-    if(state.addressTarget==='pickup')ubeeAddressStep=1;
-    else if(state.addressTarget==='dropoff')ubeeAddressStep=2;
-    else if(state.addressTarget==='dropoff2')ubeeAddressStep=2;
+    if(state.addressTarget==='pickup')ubeeAddressStep=0;
+    else if(state.addressTarget==='dropoff')ubeeAddressStep=1;
+    else if(state.addressTarget==='dropoff2')ubeeAddressStep=1;
     updateHome();syncLegacy();
     try{UBeeEnhancements?.saveDraft?.()}catch(_){ }
     showPage('home');
@@ -18181,25 +18222,27 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
     }));
     $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));$('flowDropoff2Button')?.addEventListener('click',()=>openAddress('dropoff2'));$('flowClearDropoff2')?.addEventListener('click',()=>{state.dropoff2=null;syncLegacy();updateHome();try{if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();}catch(_){ }});
-    $('ubeeAddressStepBack').addEventListener('click',()=>{ubeeAddressStep=Math.max(0,ubeeAddressStep-1);renderUBeeAddressStep();status('flowHomeStatus','')});
+    $('ubeeAddressStepBack').addEventListener('click',()=>{ubeeAddressStep=0;renderUBeeAddressStep();status('flowHomeStatus','')});
+    $('ubeeAddressFormHF4').addEventListener('click',event=>{
+      const button=event.target.closest('[data-hf4-field]');
+      if(button)editUBeeHF4Field(button.dataset.hf4Field);
+    });
+    $('ubeeHF4SecondStopOpen').addEventListener('click',()=>openAddress('dropoff2'));
+    $('ubeeHF4SecondStopClear').addEventListener('click',()=>{$('flowClearDropoff2')?.click()});
     $('flowHomeNext').addEventListener('click',()=>{
       const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
-      if(ubeeAddressStep===0){
-        if(!state.pickup){status('flowHomeStatus',`請先填寫${copy.pickupLabel}。`,true);return}
-        ubeeAddressStep=1;renderUBeeAddressStep();status('flowHomeStatus','');return;
+      const required=ubeeAddressStep===0?state.pickup:state.dropoff;
+      if(!required?.address||!required?.contactName||!required?.phone){
+        status('flowHomeStatus',`請先完成${ubeeAddressStep===0?copy.pickupLabel:copy.dropoffLabel}的地址、聯絡人及電話。`,true);
+        if(!required?.address)openAddress(ubeeAddressStep===0?'pickup':'dropoff');
+        else editUBeeHF4Field(!required?.contactName?'name':'phone');
+        return;
       }
-      if(ubeeAddressStep===1){
-        if(!state.dropoff){status('flowHomeStatus',`請先填寫${copy.dropoffLabel}。`,true);return}
-        ubeeAddressStep=2;renderUBeeAddressStep();status('flowHomeStatus','');return;
-      }
-      if(!state.pickup||!state.dropoff){
-        ubeeAddressStep=!state.pickup?0:1;renderUBeeAddressStep();
-        status('flowHomeStatus','請先完成必要的地點資料。',true);return;
-      }
-      status('flowHomeStatus','');
-      syncServiceSelectors();
-      showPage('task');
-    });$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
+      if(ubeeAddressStep===0){ubeeAddressStep=1;renderUBeeAddressStep();status('flowHomeStatus','');return}
+      if(!state.pickup||!state.dropoff){ubeeAddressStep=!state.pickup?0:1;renderUBeeAddressStep();return}
+      status('flowHomeStatus','');syncServiceSelectors();showPage('task');
+    });
+    $('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
     root.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.go)));
     $('flowServiceTypeChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-type-index]');if(!btn)return;captureCurrentTaskDraft();state.serviceTypeIndex=Number(btn.dataset.serviceTypeIndex)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];syncServiceSelectors()});
     $('flowServiceCategoryChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-category]');if(!btn)return;captureCurrentTaskDraft();state.serviceCategory=btn.dataset.serviceCategory||'';$('flowServiceCategory').value=state.serviceCategory;syncServiceSelectors()});
@@ -18541,7 +18584,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf3-step-address-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf4-address-form-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
