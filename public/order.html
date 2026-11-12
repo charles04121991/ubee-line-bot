@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-2-multistop-v2-min58" rel="manifest"/>
+<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-native-text-tabs-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -910,248 +910,6 @@
   border-radius:999px;
 
   background:#d5d5d5;
-}
-
-/* ==============================
-   第三階段：首頁主服務分類列
-   ============================== */
-
-/* 隱藏首頁大型標題與說明
-   讓服務分類直接出現在白色面板頂部 */
-
-/* 六大服務改成平面文字分頁 */
-
-.category-tabs{
-  position:relative;
-
-  display:flex;
-
-  gap:0;
-
-  overflow-x:auto;
-
-  margin:
-    0
-    -16px
-    14px;
-
-  padding:
-    0
-    12px
-    0;
-
-  border-bottom:
-    1px solid var(--line);
-
-  scrollbar-width:none;
-
-  -webkit-overflow-scrolling:touch;
-}
-
-.category-tabs::-webkit-scrollbar{
-  display:none;
-}
-
-/* 每一個主分類 */
-
-.category-tab{
-  position:relative;
-
-  flex:
-    0
-    0
-    auto;
-
-  min-width:78px;
-
-  min-height:50px;
-
-  padding:
-    0
-    10px
-    14px;
-
-  border:none;
-
-  border-radius:0;
-
-  background:transparent;
-
-  color:#8a8d91;
-
-  font-size:15px !important;
-
-  font-weight:900;
-
-  white-space:nowrap;
-}
-
-/* 取消原本黑色膠囊 */
-
-.category-tab.active{
-  border:none;
-
-  background:transparent;
-
-  color:#111111;
-
-}
-
-/* 選中服務的黃色底線 */
-
-.category-tab.active::after{
-  content:"";
-
-  position:absolute;
-
-  left:50%;
-
-  bottom:0;
-
-  width:30px;
-
-  height:4px;
-
-  transform:
-    translateX(-50%);
-
-  border-radius:999px;
-
-  background:
-    var(--accentStrong);
-}
-
-/* ==============================
-   第四階段：任務細項改成圖示入口
-   ============================== */
-
-/* 不再顯示「任務細項」文字 */
-
-/* 細項服務改成圖示型入口 */
-
-.service-grid-new{
-  display:flex;
-
-  gap:0;
-
-  overflow-x:auto;
-
-  margin:
-    4px
-    -16px
-    12px;
-
-  padding:
-    4px
-    10px
-    8px;
-
-  scrollbar-width:none;
-
-  -webkit-overflow-scrolling:touch;
-}
-
-.service-grid-new::-webkit-scrollbar{
-  display:none;
-}
-
-/* 每一個服務細項 */
-
-.service-item{
-  position:relative;
-
-  flex:
-    0
-    0
-    76px;
-
-  min-height:76px;
-
-  padding:
-    7px
-    4px
-    11px;
-
-  border:none;
-
-  border-radius:0;
-
-  background:transparent;
-
-  color:#777;
-
-  text-align:center;
-
-  transition:.15s ease;
-}
-
-/* 圖示 */
-
-.service-item-icon{
-  display:flex;
-
-  align-items:center;
-  justify-content:center;
-
-  width:34px;
-  height:34px;
-
-  margin:
-    0
-    auto
-    5px;
-
-  font-size:24px;
-
-  line-height:1;
-}
-
-/* 服務名稱 */
-
-.service-item-title{
-  font-size:14px;
-
-  font-weight:900;
-
-  line-height:1.3;
-
-  white-space:nowrap;
-
-  color:inherit;
-}
-
-/* 被選中的服務 */
-
-.service-item.active{
-  border:none;
-
-  background:transparent;
-
-  color:#111;
-
-}
-
-/* 被選中的黃色底線 */
-
-.service-item.active::after{
-  content:"";
-
-  position:absolute;
-
-  left:50%;
-
-  bottom:0;
-
-  width:26px;
-  height:4px;
-
-  transform:
-    translateX(-50%);
-
-  border-radius:999px;
-
-  background:
-    var(--accentStrong);
 }
 
 /* ==============================
@@ -3816,52 +3574,6 @@ body{background:#eef0f2;}
   letter-spacing:-.45px;
 }
 
-.category-tabs{
-  display:flex;
-  gap:9px;
-  overflow-x:auto;
-  padding:1px 1px 10px;
-  margin:0 -1px 5px;
-  scrollbar-width:none;
-}
-.category-tabs::-webkit-scrollbar{display:none;}
-.category-tab{
-  flex:0 0 auto;
-  min-height:48px;
-  padding:0 18px;
-  border:1px solid var(--ubee-line);
-  border-radius:999px;
-  background:#fff;
-  color:#666b72;
-  font-size:16px !important;
-  font-weight:1000;
-
-}
-.category-tab.active{background:#111;color:#fff;border-color:#111;}
-
-.service-grid-new{
-  display:flex!important;
-  gap:10px!important;
-  overflow-x:auto;
-  padding:2px 1px 12px;
-  margin:0 -1px 7px;
-  scrollbar-width:none;
-}
-.service-grid-new::-webkit-scrollbar{display:none;}
-.service-grid-new > *{flex:0 0 112px!important;min-width:112px!important;}
-.service-card-new,.service-item,.service-option{
-  min-height:112px!important;
-  border:1px solid var(--ubee-line)!important;
-  border-radius:21px!important;
-  background:#fff!important;
-
-}
-.service-card-new.active,.service-item.active,.service-option.active,.service-card-new.selected,.service-item.selected,.service-option.selected{
-  border-color:var(--ubee-yellow-deep)!important;
-
-  background:linear-gradient(180deg,#fffef8,#fff8d9)!important;
-}
-
 .address-card{
   overflow:hidden;
   margin-top:3px;
@@ -4039,74 +3751,6 @@ body{background:#eef0f2;}
   padding-top:21px !important;
 }
 
-.category-tabs{
-  gap:8px !important;
-  margin:0 -4px 18px !important;
-  padding:0 4px 8px !important;
-  border-bottom:none !important;
-}
-
-.category-tab{
-  min-width:104px !important;
-  min-height:58px !important;
-  padding:15px 15px !important;
-  border:1px solid var(--line) !important;
-  border-radius:17px !important;
-  background:#fff !important;
-  color:#62666b !important;
-
-  font-size:16px !important;
-}
-
-.category-tab.active{
-  border-color:#111 !important;
-  background:#111 !important;
-  color:#fff !important;
-}
-
-.category-tab.active::after{
-  display:none !important;
-}
-
-.service-grid-new{
-  margin:0 -4px 20px !important;
-  padding:0 4px 6px !important;
-  gap:10px !important;
-}
-
-.service-item{
-  flex:0 0 96px !important;
-  min-height:94px !important;
-  padding:13px 8px 12px !important;
-  border:1px solid var(--line) !important;
-  border-radius:18px !important;
-  background:#fff !important;
-
-}
-
-.service-item.active{
-  border-color:#e1b400 !important;
-  background:#fffbea !important;
-  color:#111 !important;
-
-}
-
-.service-item.active::after{
-  display:none !important;
-}
-
-.service-item-icon{
-  width:40px !important;
-  height:40px !important;
-  margin-bottom:7px !important;
-  font-size:27px !important;
-}
-
-.service-item-title{
-  font-size:14px !important;
-  white-space:normal !important;
-}
-
 #step1 .address-card{
   margin-top:10px !important;
 }
@@ -4157,9 +3801,6 @@ body{background:#eef0f2;}
 }
 
 @media (max-width:380px){
-  
-  .category-tab{min-width:96px !important;}
-  .service-item{flex-basis:90px !important;}
 }
 
 /* =====================================================
@@ -4232,90 +3873,6 @@ body{background:#eef0f2;}
 .home-service-status-time{margin-top:0!important;font-size:13px!important;color:#999da2!important;}
 .home-service-status-note{display:none!important;}
 
-.category-tabs{
-  display:flex!important;
-  gap:0!important;
-  overflow-x:auto!important;
-  margin:0 -16px 13px!important;
-  padding:0 12px!important;
-  border-bottom:1px solid #e8e9eb!important;
-  scrollbar-width:none!important;
-}
-.category-tab{
-  position:relative!important;
-  flex:0 0 auto!important;
-  min-width:78px!important;
-  min-height:52px!important;
-  padding:0 10px 15px!important;
-  border:none!important;
-  border-radius:0!important;
-  background:transparent!important;
-  color:#96999d!important;
-
-  font-size:15px!important;
-  font-weight:1000!important;
-  white-space:nowrap!important;
-}
-.category-tab.active{
-  background:transparent!important;
-  color:#111!important;
-  border:none!important;
-
-}
-.category-tab.active::after{
-  display:block!important;
-  content:""!important;
-  position:absolute!important;
-  left:50%!important;
-  bottom:0!important;
-  width:30px!important;
-  height:4px!important;
-  transform:translateX(-50%)!important;
-  border-radius:999px!important;
-  background:var(--accentStrong)!important;
-}
-
-.service-grid-new{
-  display:flex!important;
-  gap:0!important;
-  overflow-x:auto!important;
-  margin:0 -16px 16px!important;
-  padding:3px 10px 7px!important;
-  scrollbar-width:none!important;
-}
-.service-grid-new > *{flex:0 0 78px!important;min-width:78px!important;}
-.service-item,.service-card-new,.service-option{
-  position:relative!important;
-  min-height:80px!important;
-  padding:7px 4px 12px!important;
-  border:none!important;
-  border-radius:0!important;
-  background:transparent!important;
-  color:#85898e!important;
-
-  text-align:center!important;
-}
-.service-item-icon{width:35px!important;height:35px!important;margin:0 auto 5px!important;font-size:25px!important;}
-.service-item-title{font-size:14px!important;font-weight:1000!important;line-height:1.3!important;white-space:nowrap!important;}
-.service-item.active,.service-card-new.active,.service-option.active,.service-item.selected,.service-card-new.selected,.service-option.selected{
-  border:none!important;
-  background:transparent!important;
-  color:#111!important;
-
-}
-.service-item.active::after,.service-card-new.active::after,.service-option.active::after{
-  display:block!important;
-  content:""!important;
-  position:absolute!important;
-  left:50%!important;
-  bottom:0!important;
-  width:28px!important;
-  height:4px!important;
-  transform:translateX(-50%)!important;
-  border-radius:999px!important;
-  background:var(--accentStrong)!important;
-}
-
 #step1 .address-card{
   position:relative!important;
   margin:4px 0 0!important;
@@ -4335,9 +3892,6 @@ body{background:#eef0f2;}
 #step1 .home-next-btn{height:56px!important;min-height:56px!important;border-radius:17px!important;font-size:18px!important;}
 
 @media (max-width:390px){
-  
-  .category-tab{min-width:76px!important;padding-left:9px!important;padding-right:9px!important;}
-  .service-grid-new > *{flex-basis:74px!important;min-width:74px!important;}
 
 }
 
@@ -4850,66 +4404,6 @@ body{background:#eef0f2;}
       font-weight: 1000;
     }
 
-    #step1 .ubee-v4-service-tabs{
-      display: grid !important;
-      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-      gap: 11px !important;
-      width: 100% !important;
-      margin: 0 0 16px !important;
-      padding: 0 !important;
-      overflow: visible !important;
-    }
-
-    #step1 .ubee-v4-service-tabs .category-tab{
-      min-width: 0 !important;
-      min-height: 116px !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      justify-content: center !important;
-      gap: 4px !important;
-      padding: 15px !important;
-      border: 1px solid #e3e5e8 !important;
-      border-radius: 20px !important;
-      background: #fff !important;
-      color: #111 !important;
-
-      text-align: left !important;
-      font-size:19px !important;
-      font-weight: 1000 !important;
-      white-space: normal !important;
-    }
-
-    #step1 .ubee-v4-service-tabs .category-tab:last-child{
-      grid-column: 1 / -1;
-      min-height: 96px !important;
-    }
-
-    #step1 .ubee-v4-service-tabs .category-tab.active{
-      border-color: #e5bd00 !important;
-      background: linear-gradient(145deg, #fff9d8, #ffffff) !important;
-
-    }
-
-    #step1 .ubee-v4-service-tabs .category-tab::after{
-      display: none !important;
-    }
-
-    .ubee-v4-service-icon{
-      display: block;
-      margin-bottom: 3px;
-      font-size:27px;
-      line-height: 1;
-    }
-
-    #step1 .ubee-v4-service-tabs .category-tab small{
-      display: block;
-      color: #7b8086;
-      font-size:13px;
-      line-height: 1.45;
-      font-weight: 800;
-    }
-
     #step1 .home-service-status{
       margin: 0 0 17px !important;
       border-radius: 18px !important;
@@ -4917,15 +4411,101 @@ body{background:#eef0f2;}
     }
 
     @media (max-width: 370px){
-      #step1 .ubee-v4-service-tabs{
-        gap: 8px !important;
-      }
-      #step1 .ubee-v4-service-tabs .category-tab{
-        min-height: 108px !important;
-        padding: 13px !important;
-        font-size:18px !important;
-      }
     }
+
+
+/* UBee Customer RC6.3 — Native Text Tabs V1
+   單一服務分類樣式：六欄兩排、純文字、白底黃底線。
+   原本圖片式分類及細項圖示樣式已移除。 */
+#step1 .ubee-v4-service-tabs.category-tabs{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:0 !important;
+  width:100% !important;
+  margin:0 0 16px !important;
+  padding:0 !important;
+  border-bottom:1px solid #e8e9eb !important;
+  overflow:visible !important;
+}
+#step1 .ubee-v4-service-tabs .category-tab{
+  position:relative !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:0 !important;
+  width:100% !important;
+  min-height:54px !important;
+  padding:13px 2px 14px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  color:#92969b !important;
+  font-size:15px !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+}
+#step1 .ubee-v4-service-tabs .category-tab.active{
+  background:#fff !important;
+  color:#111 !important;
+}
+#step1 .ubee-v4-service-tabs .category-tab.active::after{
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  left:50% !important;
+  bottom:0 !important;
+  transform:translateX(-50%) !important;
+  width:30px !important;
+  height:4px !important;
+  border-radius:999px !important;
+  background:var(--accentStrong) !important;
+}
+#step1 .service-grid-new{
+  display:flex !important;
+  gap:0 !important;
+  overflow-x:auto !important;
+  margin:0 -16px 16px !important;
+  padding:3px 10px 7px !important;
+  scrollbar-width:none !important;
+}
+#step1 .service-grid-new::-webkit-scrollbar{display:none;}
+#step1 .service-grid-new .service-item{
+  position:relative !important;
+  flex:0 0 auto !important;
+  min-width:82px !important;
+  min-height:54px !important;
+  padding:12px 10px 13px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  color:#85898e !important;
+  text-align:center !important;
+}
+#step1 .service-grid-new .service-item-title{
+  font-size:14px !important;
+  font-weight:900 !important;
+  line-height:1.35 !important;
+  white-space:nowrap !important;
+}
+#step1 .service-grid-new .service-item.active{
+  background:#fff !important;
+  color:#111 !important;
+}
+#step1 .service-grid-new .service-item.active::after{
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  left:50% !important;
+  bottom:0 !important;
+  transform:translateX(-50%) !important;
+  width:28px !important;
+  height:4px !important;
+  border-radius:999px !important;
+  background:var(--accentStrong) !important;
+}
+@media(max-width:380px){
+ #step1 .ubee-v4-service-tabs .category-tab{font-size:14px !important;}
+}
 </style>
 <style id="ubee-order-timing-v1-style">
     .ubee-timing-mode-list{
@@ -6858,21 +6438,12 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 </div>
 <div class="ubee-v4-service-title">選擇服務</div>
 <div aria-label="UBee 跑腿服務" class="category-tabs ubee-v4-service-tabs" role="tablist">
-<button class="category-tab active" onclick="selectServiceFromTab(this,'send')" type="button">
-<span class="ubee-v4-service-icon">📦</span><span>幫我送</span><small>文件、包裹、物品配送</small>
-</button>
-<button class="category-tab" onclick="selectServiceFromTab(this,'pickup')" type="button">
-<span class="ubee-v4-service-icon">🛍️</span><span>幫我取</span><small>到店取貨、代領取件</small>
-</button>
-<button class="category-tab" onclick="selectServiceFromTab(this,'buy')" type="button">
-<span class="ubee-v4-service-icon">🛒</span><span>幫我買</span><small>商品、餐點、生活用品</small>
-</button>
-<button class="category-tab" onclick="selectServiceFromTab(this,'queue')" type="button">
-<span class="ubee-v4-service-icon">🕒</span><span>幫排隊</span><small>現場排隊、代候位</small>
-</button>
-<button class="category-tab" onclick="selectServiceFromTab(this,'helper')" type="button">
-<span class="ubee-v4-service-icon">🐝</span><span>全能跑腿</span><small>其他生活任務與代辦</small>
-</button>
+<button class="category-tab active" onclick="selectServiceFromTab(this,'send')" type="button"><span>幫我送</span></button>
+<button class="category-tab" onclick="selectServiceFromTab(this,'pickup')" type="button"><span>幫我取</span></button>
+<button class="category-tab" onclick="selectServiceFromTab(this,'buy')" type="button"><span>幫我買</span></button>
+<button class="category-tab" onclick="selectServiceFromTab(this,'queue')" type="button"><span>幫排隊</span></button>
+<button class="category-tab" onclick="selectServiceFromTab(this,'helper')" type="button"><span>全能跑腿</span></button>
+<button class="category-tab" onclick="selectServiceFromTab(this,'drive')" type="button"><span>代駕</span></button>
 </div>
 <!-- ==============================
      任務細項
@@ -9745,53 +9316,53 @@ let nearbyAutoFilledPhone = '';
 
 const serviceGroups = {
   send:[
-    { icon:'📄', title:'文件急送', categories:['一般文件','合約文件','簽約文件','發票收據','公司文件','其他文件'] },
-    { icon:'📦', title:'物品配送', categories:['個人物品','小型包裹','3C用品','衣物用品','易碎物品','其他物品'] },
-    { icon:'🔑', title:'鑰匙急送', categories:['住家鑰匙','車鑰匙','遙控鑰匙','公司鑰匙','備用鑰匙','其他鑰匙'] },
-    { icon:'🏠', title:'忘帶急送', categories:['忘帶文件','忘帶鑰匙','忘帶3C用品','忘帶證件','忘帶生活用品','其他忘帶物品'] },
-    { icon:'🏪', title:'店家配送', categories:['商品配送','分店調貨','訂單配送','樣品配送','耗材配送','其他店家配送'] }
+    { title:'文件急送', categories:['一般文件','合約文件','簽約文件','發票收據','公司文件','其他文件'] },
+    { title:'物品配送', categories:['個人物品','小型包裹','3C用品','衣物用品','易碎物品','其他物品'] },
+    { title:'鑰匙急送', categories:['住家鑰匙','車鑰匙','遙控鑰匙','公司鑰匙','備用鑰匙','其他鑰匙'] },
+    { title:'忘帶急送', categories:['忘帶文件','忘帶鑰匙','忘帶3C用品','忘帶證件','忘帶生活用品','其他忘帶物品'] },
+    { title:'店家配送', categories:['商品配送','分店調貨','訂單配送','樣品配送','耗材配送','其他店家配送'] }
   ],
   pickup:[
-    { icon:'📦', title:'包裹代取', categories:['超商包裹','門市包裹','宅配包裹','公司包裹','其他包裹'] },
-    { icon:'📄', title:'文件代取', categories:['一般文件','公司文件','發票收據','資料文件','其他文件'] },
-    { icon:'🏪', title:'門市取件', categories:['已付款商品','預約商品','訂購商品','門市留貨','其他門市取件'] },
-    { icon:'🧺', title:'生活取件', categories:['洗衣取件','藥局取件','用品取件','餐點取件','遺失物取件','其他生活取件'] },
-    { icon:'🔧', title:'維修品取件', categories:['手機3C','電腦設備','眼鏡鐘錶','衣物鞋包','家電用品','其他維修品'] }
+    { title:'包裹代取', categories:['超商包裹','門市包裹','宅配包裹','公司包裹','其他包裹'] },
+    { title:'文件代取', categories:['一般文件','公司文件','發票收據','資料文件','其他文件'] },
+    { title:'門市取件', categories:['已付款商品','預約商品','訂購商品','門市留貨','其他門市取件'] },
+    { title:'生活取件', categories:['洗衣取件','藥局取件','用品取件','餐點取件','遺失物取件','其他生活取件'] },
+    { title:'維修品取件', categories:['手機3C','電腦設備','眼鏡鐘錶','衣物鞋包','家電用品','其他維修品'] }
   ],
   buy:[
-    { icon:'🍱', title:'餐點代買', categories:['便當店','小吃店','早餐店','簡餐店','麵食館','速食店','其他餐點'] },
-    { icon:'🧋', title:'飲料代買', categories:['手搖飲','咖啡廳','果汁店','連鎖飲料店','其他飲品'] },
-    { icon:'🏪', title:'超商代買', categories:['7-ELEVEN','全家','萊爾富','OK','其他超商'] },
-    { icon:'💊', title:'藥局代買', categories:['一般藥局','丁丁藥局','大樹藥局','啄木鳥藥局','其他藥局商品'] },
-    { icon:'🧻', title:'生活代買', categories:['清潔用品','衛生用品','日用品','嬰幼兒用品','寵物用品','其他生活用品'] },
-    { icon:'🥬', title:'生鮮代買', categories:['蔬菜','水果','肉品','海鮮','其他生鮮'] },
-    { icon:'🍰', title:'蛋糕甜點', categories:['生日蛋糕','甜點','麵包','伴手禮','其他甜點'] },
-    { icon:'🛒', title:'賣場代買', categories:['全聯','康達盛通','寶雅','小北百貨','楓康超市','美廉社'] },
-    { icon:'💐', title:'花束禮品', categories:['鮮花花束','盆花植栽','生日禮品','節慶禮品','客製禮品','其他花禮'] },
-    { icon:'🔧', title:'五金急買', categories:['五金耗材','電池燈泡','膠帶黏著','延長線電料','簡易工具','其他五金'] },
-    { icon:'🧾', title:'其他代買', categories:['指定商品','門市商品','臨時採買','特殊規格','其他代買需求'] }
+    { title:'餐點代買', categories:['便當店','小吃店','早餐店','簡餐店','麵食館','速食店','其他餐點'] },
+    { title:'飲料代買', categories:['手搖飲','咖啡廳','果汁店','連鎖飲料店','其他飲品'] },
+    { title:'超商代買', categories:['7-ELEVEN','全家','萊爾富','OK','其他超商'] },
+    { title:'藥局代買', categories:['一般藥局','丁丁藥局','大樹藥局','啄木鳥藥局','其他藥局商品'] },
+    { title:'生活代買', categories:['清潔用品','衛生用品','日用品','嬰幼兒用品','寵物用品','其他生活用品'] },
+    { title:'生鮮代買', categories:['蔬菜','水果','肉品','海鮮','其他生鮮'] },
+    { title:'蛋糕甜點', categories:['生日蛋糕','甜點','麵包','伴手禮','其他甜點'] },
+    { title:'賣場代買', categories:['全聯','康達盛通','寶雅','小北百貨','楓康超市','美廉社'] },
+    { title:'花束禮品', categories:['鮮花花束','盆花植栽','生日禮品','節慶禮品','客製禮品','其他花禮'] },
+    { title:'五金急買', categories:['五金耗材','電池燈泡','膠帶黏著','延長線電料','簡易工具','其他五金'] },
+    { title:'其他代買', categories:['指定商品','門市商品','臨時採買','特殊規格','其他代買需求'] }
   ],
   queue:[
-    { icon:'🍽️', title:'餐廳候位', categories:['現場候位','領號碼牌','排隊訂位','代等座位','其他候位'] },
-    { icon:'🏥', title:'醫院候號', categories:['門診候號','報到等候','檢查排隊','領藥等候','其他醫院等候'] },
-    { icon:'🎫', title:'活動排隊', categories:['活動入場','限量商品','展場排隊','現場報到','其他活動排隊'] },
-    { icon:'🔢', title:'代領號碼牌', categories:['餐廳號碼牌','醫院號碼牌','活動號碼牌','服務櫃台號碼牌','其他號碼牌'] },
-    { icon:'🪑', title:'代等座位', categories:['餐廳座位','活動座位','公共空間','現場等位','其他等位'] },
-    { icon:'👥', title:'現場排隊', categories:['門市排隊','櫃台排隊','限量商品','一般排隊','其他排隊'] }
+    { title:'餐廳候位', categories:['現場候位','領號碼牌','排隊訂位','代等座位','其他候位'] },
+    { title:'醫院候號', categories:['門診候號','報到等候','檢查排隊','領藥等候','其他醫院等候'] },
+    { title:'活動排隊', categories:['活動入場','限量商品','展場排隊','現場報到','其他活動排隊'] },
+    { title:'代領號碼牌', categories:['餐廳號碼牌','醫院號碼牌','活動號碼牌','服務櫃台號碼牌','其他號碼牌'] },
+    { title:'代等座位', categories:['餐廳座位','活動座位','公共空間','現場等位','其他等位'] },
+    { title:'現場排隊', categories:['門市排隊','櫃台排隊','限量商品','一般排隊','其他排隊'] }
   ],
   helper:[
-    { icon:'⭐', title:'全能協助', categories:['臨時協助','生活協助','到場幫忙','特殊任務','其他需求'] },
-    { icon:'📍', title:'現場代辦', categories:['到場確認','現場詢問','文件送件','資料領取','取號報到','櫃台代辦','拍照回報','其他代辦'] },
-    { icon:'💼', title:'商務支援', categories:['文件送簽','分店調貨','商品補貨','耗材補給','樣品配送','展場支援','公司跑腿','店家救援','其他商務'] },
-    { icon:'💝', title:'送禮服務', categories:['花束送禮','蛋糕送禮','禮物送達','代買＋送禮','指定時間送達','驚喜送達','其他送禮'] },
-    { icon:'🔄', title:'退換歸還', categories:['商品退貨','商品換貨','維修送件','租借歸還','鑰匙歸還','物品歸還','其他歸還'] },
-    { icon:'🚨', title:'臨時救援', categories:['店家缺料','活動補件','現場急需','生活救急','臨時跑一趟','其他緊急協助'] }
+    { title:'全能協助', categories:['臨時協助','生活協助','到場幫忙','特殊任務','其他需求'] },
+    { title:'現場代辦', categories:['到場確認','現場詢問','文件送件','資料領取','取號報到','櫃台代辦','拍照回報','其他代辦'] },
+    { title:'商務支援', categories:['文件送簽','分店調貨','商品補貨','耗材補給','樣品配送','展場支援','公司跑腿','店家救援','其他商務'] },
+    { title:'送禮服務', categories:['花束送禮','蛋糕送禮','禮物送達','代買＋送禮','指定時間送達','驚喜送達','其他送禮'] },
+    { title:'退換歸還', categories:['商品退貨','商品換貨','維修送件','租借歸還','鑰匙歸還','物品歸還','其他歸還'] },
+    { title:'臨時救援', categories:['店家缺料','活動補件','現場急需','生活救急','臨時跑一趟','其他緊急協助'] }
   ],
   drive:[
-    { icon:'◉', title:'代駕', categories:['一般代駕'] }
+    { title:'代駕', categories:['一般代駕'] }
   ],
   urgent:[
-    { icon:'⚡', title:'急件專送', categories:['急送小包裹','急送餐點','急送生活用品','急送店家商品','限時取送','其他急件'] }
+    { title:'急件專送', categories:['急送小包裹','急送餐點','急送生活用品','急送店家商品','限時取送','其他急件'] }
   ]
 };
 
@@ -10063,10 +9634,6 @@ function renderServiceGrid(group){
       type="button"
       onclick="selectServiceItem(${index})"
     >
-      <div class="service-item-icon">
-        ${escapeHtml(item.icon || '●')}
-      </div>
-
       <div class="service-item-title">
         ${escapeHtml(item.title)}
       </div>
@@ -19817,7 +19384,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-2-multistop-v2-min58';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-native-text-tabs-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
