@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf2-1-remove-legacy-supply" rel="manifest"/>
+<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf3-step-address-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -5795,6 +5795,16 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 
 </style>
 
+<style id="ubee-address-step-hf3">
+#productionOrderFlow .ubee-address-step-progress{font-size:14px;font-weight:900;color:#8b7000;margin:8px 0 3px}
+#productionOrderFlow .ubee-address-step-actions{display:flex;gap:10px;align-items:stretch}
+#productionOrderFlow .ubee-address-step-actions .flow-secondary{flex:0 0 32%;border-radius:16px}
+#productionOrderFlow .ubee-address-step-actions .flow-primary{flex:1;min-width:0}
+#productionOrderFlow .flow-route-card>.flow-address-button[hidden],
+#productionOrderFlow #flowClearDropoff2[hidden],
+#productionOrderFlow #ubeeAddressStepBack[hidden],
+#productionOrderFlow #flowTaskPreview[hidden]{display:none!important}
+</style>
 </head>
 <body class="ubee-app-starting" style="background:#ffffff;">
 
@@ -15794,7 +15804,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <!-- RC3.2 form is a separate view of the SAME home/order controller, not a duplicate checkout. -->
 <div class="ubee-rc32-form-header" id="ubeeRC32FormHeader">
  <button class="ubee-rc32-back" id="ubeeRC32FormBack" type="button" aria-label="返回服務選擇">‹ <span>返回服務選擇</span></button>
- <div class="ubee-rc32-form-title">填寫地點與需求</div>
+ <div class="ubee-rc32-form-title">逐步填寫地點</div>
+ <div class="ubee-address-step-progress" id="ubeeAddressStepProgress" aria-live="polite"></div>
  <div class="ubee-rc32-form-selection"><span>已選擇</span><strong id="ubeeRC32SelectedService">幫我送</strong><button id="ubeeRC32ChangeService" type="button">更換</button></div>
  <div class="ubee-rc32-hint" id="ubeeRC32StepHint" aria-live="polite">請先選擇取件地點。</div>
 </div>
@@ -15824,7 +15835,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <button class="flow-text-link" id="flowClearDropoff2" type="button" hidden style="margin-top:8px">移除送達點 2</button>
 <div class="flow-task-preview" id="flowTaskPreview"><div class="flow-task-preview-text" id="flowTaskPreviewText"></div><button class="flow-text-link" id="flowEditTaskButton" type="button">修改</button></div>
 <div class="flow-status" id="flowHomeStatus" role="status" aria-live="polite"></div>
-<button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步：填寫任務內容</button>
+<div class="ubee-address-step-actions"><button class="flow-secondary" id="ubeeAddressStepBack" type="button" hidden>上一步</button><button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步</button></div>
 </div>
 </div>
 </section>
@@ -16413,6 +16424,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       resetNewTask(true);
     }
     state.userSelectedService=true;
+    ubeeAddressStep=0;
     setService(service);
     updateHome();
     status('flowHomeStatus','');
@@ -16721,6 +16733,34 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     syncServiceSelectors();updateHome();
   }
 
+  // HF3: Single canonical address state; presentation-only wizard (no duplicate address model).
+  let ubeeAddressStep=0;
+  function renderUBeeAddressStep(){
+    const pickup=$('flowPickupButton'),drop=$('flowDropoffButton'),second=$('flowDropoff2Button');
+    if(!pickup||!drop||!second)return;
+    const p=state.pickup,d=state.dropoff;
+    const auto=state.service==='queue'||(state.service==='helper'&&state.singlePointTask===true);
+    const allowSecond=state.service!=='queue'&&!(state.service==='helper'&&state.singlePointTask===true);
+    if(ubeeAddressStep>2)ubeeAddressStep=2;
+    pickup.hidden=ubeeAddressStep!==0;
+    drop.hidden=ubeeAddressStep!==1;
+    second.hidden=ubeeAddressStep!==2||!allowSecond;
+    const clear=$('flowClearDropoff2');
+    if(clear)clear.hidden=ubeeAddressStep!==2||!allowSecond||!state.dropoff2;
+    const back=$('ubeeAddressStepBack');
+    if(back)back.hidden=ubeeAddressStep===0;
+    const progress=$('ubeeAddressStepProgress');
+    const titles=['第一步｜取件地點','第二步｜送達地點','第三步｜第二站（選填）'];
+    const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+    if(progress)progress.textContent=ubeeAddressStep===0?'1 / 3　'+copy.pickupLabel:ubeeAddressStep===1?'2 / 3　'+copy.dropoffLabel:'3 / 3　第二站（選填）';
+    const hint=$('ubeeRC32StepHint');
+    if(hint)hint.textContent=ubeeAddressStep===0?'請選擇取件地址並填寫聯絡資料。':ubeeAddressStep===1?(auto?'此服務會自動同步任務完成地點。':'請選擇送達地址並填寫聯絡資料。'):'可新增第二站，也可以直接繼續。';
+    const next=$('flowHomeNext');
+    if(next)next.textContent=ubeeAddressStep===0?'下一步：送達地點':ubeeAddressStep===1?'下一步：第二站（選填）':(copy.next||'下一步：填寫任務內容');
+    const preview=$('flowTaskPreview');
+    if(preview)preview.hidden=ubeeAddressStep!==2;
+  }
+
   function updateHome(){
     $('flowPageHome')?.classList.toggle('ubee-service-chosen',state.userSelectedService===true);
     const p=state.pickup,d=state.dropoff,d2=state.dropoff2;
@@ -16762,7 +16802,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       : (state.service==='drive'?'第二停靠點固定 NT$150':'第二站依距離計價・上限30公里');
     if($('flowClearDropoff2'))$('flowClearDropoff2').hidden=!multiStopAvailable||!d2;
 
-    if($('flowHomeNext')) $('flowHomeNext').textContent=copy.next;
+    renderUBeeAddressStep();
 
     const preview=$('flowTaskPreview');
     const previewTaskNote=state.service==='helper'?buildHelperTaskNote(state.taskNote,state.helperDetails):state.taskNote;
@@ -16994,6 +17034,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }
     syncSinglePointTask();
     if($('flowSaveAddress').checked)await persistAddress(item);
+    if(state.addressTarget==='pickup')ubeeAddressStep=1;
+    else if(state.addressTarget==='dropoff')ubeeAddressStep=2;
+    else if(state.addressTarget==='dropoff2')ubeeAddressStep=2;
     updateHome();syncLegacy();
     try{UBeeEnhancements?.saveDraft?.()}catch(_){ }
     showPage('home');
@@ -18138,14 +18181,20 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
     }));
     $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));$('flowDropoff2Button')?.addEventListener('click',()=>openAddress('dropoff2'));$('flowClearDropoff2')?.addEventListener('click',()=>{state.dropoff2=null;syncLegacy();updateHome();try{if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();}catch(_){ }});
+    $('ubeeAddressStepBack').addEventListener('click',()=>{ubeeAddressStep=Math.max(0,ubeeAddressStep-1);renderUBeeAddressStep();status('flowHomeStatus','')});
     $('flowHomeNext').addEventListener('click',()=>{
+      const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+      if(ubeeAddressStep===0){
+        if(!state.pickup){status('flowHomeStatus',`請先填寫${copy.pickupLabel}。`,true);return}
+        ubeeAddressStep=1;renderUBeeAddressStep();status('flowHomeStatus','');return;
+      }
+      if(ubeeAddressStep===1){
+        if(!state.dropoff){status('flowHomeStatus',`請先填寫${copy.dropoffLabel}。`,true);return}
+        ubeeAddressStep=2;renderUBeeAddressStep();status('flowHomeStatus','');return;
+      }
       if(!state.pickup||!state.dropoff){
-        const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
-        const missingPickup=!state.pickup;
-        const button=missingPickup?$('flowPickupButton'):$('flowDropoffButton');
-        status('flowHomeStatus',`請先填寫${missingPickup?copy.pickupLabel:copy.dropoffLabel}，再繼續下一步。`,true);
-        try{button?.scrollIntoView({block:'center',behavior:'smooth'});button?.focus({preventScroll:true})}catch(_){button?.focus()}
-        return;
+        ubeeAddressStep=!state.pickup?0:1;renderUBeeAddressStep();
+        status('flowHomeStatus','請先完成必要的地點資料。',true);return;
       }
       status('flowHomeStatus','');
       syncServiceSelectors();
@@ -18492,7 +18541,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf2-1-remove-legacy-supply';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf3-step-address-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
