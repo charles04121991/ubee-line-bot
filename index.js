@@ -10042,6 +10042,29 @@ app.delete('/api/admin/rider-benefits/:benefitId', async (req, res) => {
   }
 });
 
+// Notification Center HF1: singleflight announcement reconciliation; do not block Inbox reads.
+const riderInboxAnnouncementSyncState = new Map();
+function scheduleRiderInboxAnnouncementReconciliation(riderDocId){
+  const key=String(riderDocId||'').trim();
+  if(!key)return;
+  const now=Date.now();
+  const existing=riderInboxAnnouncementSyncState.get(key);
+  if(existing && (existing.running || now-existing.lastAttemptAt<120000))return;
+  const state={running:true,lastAttemptAt:now};
+  riderInboxAnnouncementSyncState.set(key,state);
+  Promise.resolve().then(()=>syncGlobalRiderAnnouncementsToInbox(key))
+    .catch(err=>console.warn('Rider announcement reconciliation:',err?.message||err))
+    .finally(()=>{
+      state.running=false;
+      // Bound process-local map growth without retaining rider identities indefinitely.
+      if(riderInboxAnnouncementSyncState.size>500){
+        for(const [id,entry] of riderInboxAnnouncementSyncState){
+          if(!entry.running && Date.now()-entry.lastAttemptAt>120000)riderInboxAnnouncementSyncState.delete(id);
+        }
+      }
+    });
+}
+
 app.get('/api/rider/notifications', riderAuthMiddleware, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
@@ -10050,7 +10073,7 @@ app.get('/api/rider/notifications', riderAuthMiddleware, async (req, res) => {
 
     const riderDocId = resolved.riderDoc.id;
     const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDocId);
-    await syncGlobalRiderAnnouncementsToInbox(riderDocId);
+    if(!['1','true','yes'].includes(String(req.query?.summary||'').trim().toLowerCase())) scheduleRiderInboxAnnouncementReconciliation(riderDocId);
     const freshRiderDoc = await riderRef.get();
     const rider = freshRiderDoc.exists ? (freshRiderDoc.data() || {}) : (resolved.rider || {});
     const unreadCount = Math.max(0, Number(rider.notificationUnreadCount || 0));
@@ -10059,23 +10082,40 @@ app.get('/api/rider/notifications', riderAuthMiddleware, async (req, res) => {
       return res.json({ success:true, unreadCount, notifications:[] });
     }
 
-    const requestedLimit = Number(req.query?.limit || 60);
-    const limit = Number.isFinite(requestedLimit)
-      ? Math.max(1, Math.min(RIDER_NOTIFICATION_LIST_LIMIT, Math.round(requestedLimit)))
-      : 60;
-    const snapshot = await riderRef
-      .collection(RIDER_NOTIFICATION_SUBCOLLECTION)
-      .orderBy('createdAtMs', 'desc')
-      .limit(limit)
-      .get();
-    const notifications = snapshot.docs.map(doc => riderNotificationApiPayload(doc));
-    const derivedUnread = notifications.filter(item => item.read !== true).length;
-
+    const requestedLimit=Number(req.query?.limit||20);
+    const limit=Number.isFinite(requestedLimit)?Math.max(1,Math.min(40,Math.floor(requestedLimit))):20;
+    const cursor=cleanText(req.query?.cursor||'',80);
+    const collection=riderRef.collection(RIDER_NOTIFICATION_SUBCOLLECTION);
+    let after=null;
+    if(cursor){
+      const cursorDoc=await collection.doc(cursor).get();
+      if(!cursorDoc.exists)return res.status(400).json({success:false,message:'通知分頁位置已失效，請重新整理。'});
+      after=cursorDoc;
+    }
+    const notifications=[];
+    let lastDoc=null,exhausted=false;
+    // Legacy Inbox records have no hidden field. Filter server-side while scanning bounded pages.
+    for(let scan=0;scan<12 && notifications.length<limit;scan++){
+      let query=collection.orderBy('createdAtMs','desc').limit(60);
+      if(after)query=query.startAfter(after);
+      const page=await query.get();
+      if(page.empty){exhausted=true;break;}
+      let processed=0;
+      for(const doc of page.docs){
+        processed++;
+        lastDoc=doc;
+        if(doc.data()?.hidden!==true)notifications.push(riderNotificationApiPayload(doc));
+        if(notifications.length>=limit)break;
+      }
+      if(processed===page.size&&page.size<60){exhausted=true;break;}
+      after=lastDoc;
+    }
     return res.json({
       success:true,
-      unreadCount: Number.isFinite(Number(rider.notificationUnreadCount)) ? unreadCount : derivedUnread,
+      unreadCount,
       notifications,
-      count: notifications.length,
+      count:notifications.length,
+      nextCursor:!exhausted&&lastDoc?lastDoc.id:null,
     });
   } catch (error) {
     console.error('❌ 讀取 Rider Notification Inbox 失敗：', error);
@@ -10128,39 +10168,75 @@ app.post('/api/rider/notifications/read', riderAuthMiddleware, async (req, res) 
   }
 });
 
-app.post('/api/rider/notifications/read-all', riderAuthMiddleware, async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const resolved = await resolveRiderNotificationRequest(req, req.body || {});
-    if (!resolved.ok) return res.status(resolved.statusCode || 403).json({ success:false, message:resolved.message || '小U身分驗證失敗。' });
+app.post('/api/rider/notifications/read-all', riderAuthMiddleware, async (req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    const resolved=await resolveRiderNotificationRequest(req,req.body||{});
+    if(!resolved.ok)return res.status(resolved.statusCode||403).json({success:false,message:resolved.message||'小U身分驗證失敗。'});
+    const riderRef=db.collection(RIDER_V2_COLLECTIONS.riders).doc(resolved.riderDoc.id);
+    const snapshot=await riderRef.collection(RIDER_NOTIFICATION_SUBCOLLECTION).where('read','==',false).limit(150).get();
+    const now=Date.now();
+    let unreadCount=0,updated=0;
+    await db.runTransaction(async tx=>{
+      const riderDoc=await tx.get(riderRef);
+      const docs=await Promise.all(snapshot.docs.map(d=>tx.get(d.ref)));
+      updated=0;
+      for(let i=0;i<docs.length;i++){
+        const doc=docs[i];
+        if(!doc.exists||doc.data()?.read===true)continue;
+        updated++;
+        tx.set(doc.ref,{read:true,readAtMs:now,readAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:now,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      const previous=Math.max(0,Number(riderDoc.data()?.notificationUnreadCount||0));
+      unreadCount=Math.max(0,previous-updated);
+      tx.set(riderRef,{notificationUnreadCount:unreadCount,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+    });
+    return res.json({success:true,updated,unreadCount,hasMore:snapshot.size===150});
+  }catch(error){
+    console.error('Rider Inbox read-all:',error);
+    return res.status(500).json({success:false,message:'全部已讀暫時失敗，請重試。'});
+  }
+});
 
-    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(resolved.riderDoc.id);
-    const snapshot = await riderRef.collection(RIDER_NOTIFICATION_SUBCOLLECTION).where('read', '==', false).limit(400).get();
-    const nowMs = Date.now();
-    if (!snapshot.empty) {
-      const batch = db.batch();
-      snapshot.docs.forEach(doc => batch.set(doc.ref, {
-        read:true,
-        readAtMs:nowMs,
-        readAt:admin.firestore.FieldValue.serverTimestamp(),
-        updatedAtMs:nowMs,
-        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge:true }));
-      batch.set(riderRef, {
-        notificationUnreadCount:Math.max(0, Number((resolved.rider || {}).notificationUnreadCount || 0) - snapshot.size),
-        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge:true });
-      await batch.commit();
-    } else {
-      await riderRef.set({ notificationUnreadCount:0, updatedAt:admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
+// Hide only this rider's Inbox copies; never remove original orders, finance, dispatch or announcements.
+app.post('/api/rider/notifications/clear',riderAuthMiddleware,async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    const resolved=await resolveRiderNotificationRequest(req,req.body||{});
+    if(!resolved.ok)return res.status(resolved.statusCode||403).json({success:false,message:resolved.message||'小U身分驗證失敗。'});
+    const mode=String(req.body?.mode||'');
+    if(!['read','all'].includes(mode))return res.status(400).json({success:false,message:'清除類型不正確。'});
+    const riderRef=db.collection(RIDER_V2_COLLECTIONS.riders).doc(resolved.riderDoc.id);
+    const collection=riderRef.collection(RIDER_NOTIFICATION_SUBCOLLECTION);
+    let query=collection.orderBy('createdAtMs','desc').limit(200);
+    const cursor=cleanText(req.body?.cursor||'',80);
+    if(cursor){
+      const cursorDoc=await collection.doc(cursor).get();
+      if(!cursorDoc.exists)return res.status(400).json({success:false,message:'清除進度已失效，請重試。'});
+      query=query.startAfter(cursorDoc);
     }
-
-    const latestRider = await riderRef.get();
-    const unreadCount = Math.max(0, Number(latestRider.data()?.notificationUnreadCount || 0));
-    return res.json({ success:true, updated:snapshot.size, unreadCount });
-  } catch (error) {
-    console.error('❌ Rider Notification 全部已讀失敗：', error);
-    return res.status(500).json({ success:false, message:'通知已讀狀態暫時無法更新。' });
+    const snapshot=await query.get();
+    const candidates=snapshot.docs.filter(d=>d.data()?.hidden!==true&&(mode==='all'||d.data()?.read===true));
+    const now=Date.now();
+    let unreadCount=0,removed=0;
+    await db.runTransaction(async tx=>{
+      const riderDoc=await tx.get(riderRef);
+      const current=await Promise.all(candidates.map(d=>tx.get(d.ref)));
+      let newlyHiddenUnread=0;
+      for(const doc of current){
+        if(!doc.exists||doc.data()?.hidden===true||(mode==='read'&&doc.data()?.read!==true))continue;
+        removed++;
+        if(doc.data()?.read!==true)newlyHiddenUnread++;
+        tx.set(doc.ref,{hidden:true,hiddenAtMs:now,read:true,readAtMs:doc.data()?.readAtMs||now,updatedAtMs:now,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      unreadCount=Math.max(0,Number(riderDoc.data()?.notificationUnreadCount||0)-newlyHiddenUnread);
+      tx.set(riderRef,{notificationUnreadCount:unreadCount,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+    });
+    const nextCursor=snapshot.size===200?snapshot.docs[snapshot.docs.length-1].id:null;
+    return res.json({success:true,removed,unreadCount,nextCursor});
+  }catch(error){
+    console.error('Rider Inbox clear:',error);
+    return res.status(500).json({success:false,message:'清除通知暫時失敗，請重試。'});
   }
 });
 
