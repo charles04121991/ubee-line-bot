@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261112-customer-v1-7-0-rc6-3-hf4-3-orders-notifications-typography" rel="manifest"/>
+<link href="/manifest-order.json?v=20261113-customer-v1-7-0-rc6-3-hf4-4-active-tracking-cleanup" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -7673,6 +7673,12 @@ function renderStep5LiveStatus(order,routeData = null){
 
   const data = order || currentOrderData || {};
   const status = String(data.status || 'pending_payment').trim().toLowerCase();
+  // HF4.4: only show payment confirmation prompts while they remain actionable.
+  // This does not alter backend payment state or dispatch.
+  const paymentPanel = qs('paymentInfo');
+  if (paymentPanel && !['pending_payment','pending_dispatch','pending_schedule','merchant_pending'].includes(status)) {
+    paymentPanel.classList.add('hidden');
+  }
   const service = String(data.serviceKey || data.serviceMode || '').trim().toLowerCase();
   const isDriveTask = isCustomerDriveOrder(data);
 
@@ -11727,9 +11733,8 @@ async function confirmPaid({skipDialog=false}={}){
       <div class="step5-payment-confirmed-compact">
         <div>
           <strong>現金單已確認</strong>
-          <span>系統正在媒合附近小U</span>
+          <span>付款方式：現金</span>
         </div>
-        <span class="step5-payment-card-badge">派單中</span>
       </div>
     `;
 
@@ -15067,6 +15072,8 @@ activateUBeeCustomerRuntime();
       title.textContent = options.source === 'api' ? '已完成重新同步' : '即時連線正常';
       desc.textContent = hasRider ? '訂單狀態與小U位置會自動同步。' : '訂單狀態會自動同步，小U接單後顯示即時位置。';
     }
+    // Normal synchronization is implicit in the main status. Keep actionable warnings visible.
+    card.classList.toggle('ubee-tracking-health-warning', offline || card.classList.contains('is-critical') || card.classList.contains('is-stale') || card.classList.contains('is-delayed'));
     const updateAt = locationAt || Number(order?._trackingSummary?.updatedAtMs || 0) || lastTrackingUpdateAtMs || Date.now();
     time.textContent = formatAge(updateAt);
   }
@@ -15453,12 +15460,12 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 #productionOrderFlow .ubee-native-task-menu-sheet{position:absolute;right:0;top:48px;z-index:30;min-width:190px;overflow:hidden;border:1px solid var(--flow-line);border-radius:15px;background:#fff;box-shadow:0 14px 32px rgba(17,24,39,.12)}
 #productionOrderFlow .ubee-native-task-menu-sheet button{width:100%;min-height:48px;border:0;border-bottom:1px solid #eef0f1;background:#fff;padding:11px 13px;text-align:left;color:#111;font-size:15px;font-weight:700}
 #productionOrderFlow .ubee-native-task-menu-sheet button:last-child{border-bottom:0}#productionOrderFlow .ubee-native-task-menu-sheet .ubee-native-danger{color:#c62828}
-#productionOrderFlow .ubee-native-active-summary{padding:14px 2px 16px}#productionOrderFlow .ubee-native-active-summary-top{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:end}
-#productionOrderFlow .ubee-native-active-kicker{color:#7b8086;font-size:13px;font-weight:700;line-height:1.35}#productionOrderFlow .ubee-native-active-primary{margin-top:7px;color:#111;font-size:32px;font-weight:850;letter-spacing:-1px;line-height:1}
-#productionOrderFlow .ubee-native-active-primary.is-long{font-size:22px;letter-spacing:-.4px;line-height:1.18}
+#productionOrderFlow .ubee-native-active-summary{padding:17px 16px 14px;margin:0 0 12px;border:1px solid var(--flow-line);border-radius:18px;background:#fff}#productionOrderFlow .ubee-native-active-summary-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+#productionOrderFlow .ubee-native-active-kicker{color:#7b8086;font-size:13px;font-weight:700;line-height:1.35}#productionOrderFlow .ubee-native-active-primary{margin-top:7px;color:#111;font-size:25px;font-weight:800;letter-spacing:-.5px;line-height:1.18}
+#productionOrderFlow .ubee-native-active-primary.is-long{font-size:21px;letter-spacing:-.3px;line-height:1.3}
 #productionOrderFlow .ubee-native-active-primary-label{margin-top:5px;color:#7b8086;font-size:13px;font-weight:650}#productionOrderFlow .ubee-native-active-status{min-width:0;padding-bottom:1px}
-#productionOrderFlow .ubee-native-active-status strong{display:block;color:#111;font-size:17px;font-weight:850;line-height:1.4}#productionOrderFlow .ubee-native-active-status span{display:block;margin-top:5px;color:#73787e;font-size:14px;font-weight:650;line-height:1.55}
-#productionOrderFlow .ubee-native-health-row{margin:0 0 14px;border:1px solid var(--flow-line);border-radius:16px;background:#fff;box-shadow:none}
+#productionOrderFlow .ubee-native-active-status strong{display:block;color:#111;font-size:15px;font-weight:800;line-height:1.45}#productionOrderFlow .ubee-native-active-status span{display:block;margin-top:5px;color:#73787e;font-size:14px;font-weight:650;line-height:1.55}
+#productionOrderFlow .ubee-native-health-row{display:none;margin:0 0 12px;border:1px solid var(--flow-line);border-radius:16px;background:#fff;box-shadow:none}#productionOrderFlow .ubee-native-health-row.ubee-tracking-health-warning{display:block}
 #productionOrderFlow .ubee-native-active-map-section{margin:0 0 18px}#productionOrderFlow .ubee-native-section-head{margin:0 4px 8px}
 #productionOrderFlow .ubee-native-section-head strong{display:block;font-size:16px;font-weight:800}#productionOrderFlow .ubee-native-section-head span{display:block;margin-top:3px;color:var(--flow-muted);font-size:13px;font-weight:650}
 #productionOrderFlow .ubee-native-active-map-shell{position:relative;width:100%;height:320px;overflow:hidden;border-radius:18px;background:#e8eaed}
@@ -15469,7 +15476,13 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 #productionOrderFlow .ubee-native-detail-disclosure{border:0;background:#fff}#productionOrderFlow .ubee-native-detail-disclosure>summary{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 13px;list-style:none;color:#111;font-size:15px;font-weight:750;cursor:pointer}
 #productionOrderFlow .ubee-native-detail-disclosure>summary::-webkit-details-marker{display:none}#productionOrderFlow .ubee-native-detail-disclosure>summary span:last-child{color:#8b9096;font-size:14px;font-weight:650}
 #productionOrderFlow .ubee-native-detail-disclosure[open]>summary{border-bottom:1px solid #eef0f1}#productionOrderFlow #statusBox,#productionOrderFlow .ubee-native-task-detail-content{margin:0;padding:13px;background:#fff;border:0;border-radius:0;color:#111}
-#productionOrderFlow .ubee-customer-rider-card,#productionOrderFlow .ubee-customer-progress-card{margin:0 0 18px;border:1px solid var(--flow-line);border-radius:17px;background:#fff;box-shadow:none}
+#productionOrderFlow .ubee-customer-rider-card,#productionOrderFlow .ubee-customer-progress-card{margin:0 0 12px;border:1px solid var(--flow-line);border-radius:17px;background:#fff;box-shadow:none}
+
+#productionOrderFlow .ubee-customer-active-page .ubee-native-group{margin-bottom:12px}
+#productionOrderFlow .ubee-customer-active-page .ubee-native-group-title{margin-bottom:5px}
+#productionOrderFlow .ubee-customer-active-page .ubee-customer-progress-card{padding:12px 14px}
+#productionOrderFlow .ubee-customer-active-page .ubee-customer-rider-card{padding:12px 13px}
+@media(max-width:380px){#productionOrderFlow .ubee-native-active-summary-top{grid-template-columns:minmax(0,1fr);gap:8px}#productionOrderFlow .ubee-native-active-status{padding:0}}
 
 /* Customer Order Lifecycle V1｜訂單頁原生狀態卡：進行中進度／完成評價／已評價 */
 .ubee-native-order-list{display:flex;flex-direction:column;gap:11px;overflow:visible;border:0;border-radius:0;background:transparent}
@@ -16130,18 +16143,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 </div>
 </section>
-<section class="ubee-native-active-meta-card" id="ubeeCustomerActiveMetaCard" aria-label="訂單時間與預計抵達">
-  <div class="ubee-native-active-meta-row">
-    <span>建立時間</span>
-    <strong id="ubeeCustomerCreatedAt">—</strong>
-  </div>
-  <div class="ubee-native-active-meta-row">
-    <span id="ubeeCustomerEtaLabel">預計幾分鐘抵達</span>
-    <strong id="ubeeCustomerEtaValue">小U接單後計算</strong>
-  </div>
-</section>
+
 <section id="ubeeCustomerProgressCard" class="ubee-customer-progress-card ubee-segmented-live-progress-v2" aria-label="任務進度">
-  <div class="ubee-customer-progress-head"><strong>任務進度</strong><span id="ubeeCustomerProgressText">系統同步中</span></div>
+  <div class="ubee-customer-progress-head"><strong>目前進度</strong><span id="ubeeCustomerProgressText">系統同步中</span></div>
   <div id="ubeeCustomerProgressTrack" class="ubee-customer-segmented-progress" role="progressbar" aria-label="任務即時進度" aria-valuemin="0" aria-valuemax="5" aria-valuenow="1">
     <i></i><i></i><i></i><i></i><i></i>
   </div>
@@ -18563,7 +18567,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261112-customer-v1-7-0-rc6-3-hf4-3-orders-notifications-typography';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261113-customer-v1-7-0-rc6-3-hf4-4-active-tracking-cleanup';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
