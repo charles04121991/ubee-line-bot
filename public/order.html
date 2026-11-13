@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261113-customer-v1-7-0-rc6-3-hf4-4-active-tracking-cleanup" rel="manifest"/>
+<link href="/manifest-order.json?v=20261113-customer-v1-7-0-rc6-3-hf4-5-checkout-detail-cleanup" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -12385,30 +12385,7 @@ function renderStep5TaskDetail(order){
      ============================== */
 
   const photoStableReceiptHtml = `
-
-    <div class="task-receipt-item">
-
-      <span class="task-receipt-count">
-        1
-      </span>
-
-      <div class="task-receipt-item-main">
-
-        <div class="task-receipt-item-title">
-          ${escapeHtml(serviceTypeText)}
-        </div>
-
-        <div class="task-receipt-item-meta">
-          ${escapeHtml(serviceMetaText)}
-        </div>
-
-      </div>
-
-    </div>
-
-    <div class="task-receipt-separator"></div>
-
-    <div class="task-receipt-section">
+<div class="task-receipt-section">
 
       <div class="task-receipt-section-title">
         任務內容
@@ -12424,7 +12401,7 @@ function renderStep5TaskDetail(order){
       `:''}
 
       <div class="task-receipt-separator"></div>
-      <div class="task-receipt-section-title">小U 到場照片</div>
+      ${arrivalProofs.length ? `<div class="task-receipt-section-title">小U 到場照片</div>` : ''}
       ${arrivalProofs.length
         ? arrivalProofs.map(proof => `
             <div style="margin-top:10px;padding:10px;border:1px solid rgba(15,23,42,.10);border-radius:14px;background:#f8fafc">
@@ -12432,7 +12409,7 @@ function renderStep5TaskDetail(order){
               ${proof.photoUrl?`<img src="${escapeHtml(proof.photoUrl)}" alt="${escapeHtml(proof.stageLabel||'小U 到場照片')}" style="display:block;width:100%;max-height:360px;object-fit:cover;border-radius:12px;margin-top:8px;border:1px solid rgba(15,23,42,.10)" referrerpolicy="no-referrer"/>`:''}
               ${proof.submittedAtMs?`<div style="margin-top:7px;color:#73787e;font-size:13px;font-weight:800">${escapeHtml(new Date(Number(proof.submittedAtMs)).toLocaleString('zh-TW'))}</div>`:''}
             </div>`).join('')
-        : `<div class="task-receipt-text" style="color:#73787e">小U 抵達任務地點／送達地點後，系統會要求拍照並自動回傳到這裡。</div>`}
+        : ''}
 
       ${['completed','done'].includes(String(data.status||'').toLowerCase())&&(executionReport.text||executionReport.hasPhoto||executionReport.handoffConfirmed)?`
         <div class="task-receipt-separator"></div>
@@ -12444,36 +12421,7 @@ function renderStep5TaskDetail(order){
       `:''}
 
     </div>
-
-    <div class="task-receipt-separator"></div>
-
-    <div class="task-receipt-section">
-
-      <div class="task-receipt-section-title">
-        商品與附加費
-      </div>
-
-      <div class="task-receipt-row">
-        <span class="task-receipt-label">商品體積</span>
-        <strong class="task-receipt-value">
-          ${escapeHtml(itemSizeLabel)}${itemSizeFee > 0 ? `・NT$${itemSizeFee}` : ''}
-        </strong>
-      </div>
-
-      ${
-        weatherFee > 0
-          ? `<div class="task-receipt-row"><span class="task-receipt-label">天候保障</span><strong class="task-receipt-value">${escapeHtml(weatherLabel)}・NT$${weatherFee}</strong></div>`
-          : ''
-      }
-
-      <div class="task-receipt-row">
-        <span class="task-receipt-label">現場等候</span>
-        <strong class="task-receipt-value">前 10 分鐘免費；之後 NT$50，再每分鐘 NT$5</strong>
-      </div>
-
-    </div>
-
-    <div class="task-receipt-separator"></div>
+<div class="task-receipt-separator"></div>
 
     <div class="task-receipt-section">
 
@@ -12740,7 +12688,8 @@ function renderTimeline(status, order){
           0,
           serviceSubtotal -
           platformServiceFee -
-          selectedSpeedFee
+          selectedSpeedFee -
+          itemSizeFee - weatherFee - operationalWaitingFee
         )
       : null;
 
@@ -12825,98 +12774,19 @@ function renderTimeline(status, order){
      正式渲染「外送詳細資訊」
      ============================== */
 
-  const statusBoxEl =
-    qs('statusBox');
-
-  if(statusBoxEl){
-
+  const statusBoxEl = qs('statusBox');
+  if (statusBoxEl) {
+    // HF4.5: one price row per charge; no redundant headings or zero-cost speed tag.
     statusBoxEl.innerHTML = `
-
-      <div class="delivery-details-head">
-
-        <div class="delivery-details-title">
-          外送詳細資訊
-        </div>
-
-        <div class="delivery-details-sub">
-          本筆任務費用明細
-        </div>
-
-      </div>
-
       <div class="delivery-details-list">
-
-        <div class="delivery-detail-row">
-
-          <span class="delivery-detail-label">
-            行程費用
-          </span>
-
-          <strong class="delivery-detail-value">
-            ${escapeHtml(
-              formatMoney(tripFee)
-            )}
-          </strong>
-
-        </div>
-
-        <div class="delivery-detail-row">
-
-          <span class="delivery-detail-label">
-            平台服務費
-          </span>
-
-          <strong class="delivery-detail-value">
-            ${escapeHtml(
-              formatMoney(platformServiceFee)
-            )}
-          </strong>
-
-        </div>
-
-        <div class="delivery-detail-row">
-
-          <div class="delivery-detail-speed-main">
-
-            <span class="delivery-detail-label">
-              ${escapeHtml(selectedSpeedLabel)}
-            </span>
-
-            <span class="delivery-detail-speed-tag">
-              已選擇
-            </span>
-
-          </div>
-
-          <strong class="delivery-detail-value">
-            ${escapeHtml(
-              formatMoney(selectedSpeedFee)
-            )}
-          </strong>
-
-        </div>
-
+        <div class="delivery-detail-row"><span class="delivery-detail-label">配送費</span><strong class="delivery-detail-value">${escapeHtml(formatMoney(tripFee))}</strong></div>
+        <div class="delivery-detail-row"><span class="delivery-detail-label">平台服務費</span><strong class="delivery-detail-value">${escapeHtml(formatMoney(platformServiceFee))}</strong></div>
+        ${selectedSpeedFee > 0 ? `<div class="delivery-detail-row"><span class="delivery-detail-label">時效服務費</span><strong class="delivery-detail-value">${escapeHtml(formatMoney(selectedSpeedFee))}</strong></div>` : ''}
         ${surchargeRows}
         ${advancePaymentRow}
-
       </div>
-
-      <div class="delivery-details-total">
-
-        <span>
-          總金額
-        </span>
-
-        <strong>
-          ${escapeHtml(
-            formatMoney(payableTotal)
-          )}
-        </strong>
-
-      </div>
-
+      <div class="delivery-details-total"><span>合計</span><strong>${escapeHtml(formatMoney(payableTotal))}</strong></div>
     `;
-
   }
 
   renderStep5TaskDetail(data);
@@ -15476,6 +15346,15 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 #productionOrderFlow .ubee-native-detail-disclosure{border:0;background:#fff}#productionOrderFlow .ubee-native-detail-disclosure>summary{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 13px;list-style:none;color:#111;font-size:15px;font-weight:750;cursor:pointer}
 #productionOrderFlow .ubee-native-detail-disclosure>summary::-webkit-details-marker{display:none}#productionOrderFlow .ubee-native-detail-disclosure>summary span:last-child{color:#8b9096;font-size:14px;font-weight:650}
 #productionOrderFlow .ubee-native-detail-disclosure[open]>summary{border-bottom:1px solid #eef0f1}#productionOrderFlow #statusBox,#productionOrderFlow .ubee-native-task-detail-content{margin:0;padding:13px;background:#fff;border:0;border-radius:0;color:#111}
+/* HF4.5：訂單明細採左標籤／右金額，避免既有舊樣式把費用擠成一段文字。 */
+#productionOrderFlow #statusBox .delivery-details-list{display:flex;flex-direction:column;gap:0;width:100%}
+#productionOrderFlow #statusBox .delivery-detail-row,#productionOrderFlow #statusBox .delivery-details-total{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:16px;width:100%;padding:10px 0;border-bottom:1px solid #eef0f1}
+#productionOrderFlow #statusBox .delivery-detail-label,#productionOrderFlow #statusBox .delivery-details-total>span{display:block;min-width:0;text-align:left;color:#62676d;font-size:14px;font-weight:700;line-height:1.45}
+#productionOrderFlow #statusBox .delivery-detail-value,#productionOrderFlow #statusBox .delivery-details-total>strong{display:block;min-width:76px;text-align:right;white-space:nowrap;color:#111;font-size:15px;font-weight:850;line-height:1.45}
+#productionOrderFlow #statusBox .delivery-details-total{border-bottom:0;padding-top:13px}
+#productionOrderFlow #statusBox .delivery-details-total>span,#productionOrderFlow #statusBox .delivery-details-total>strong{font-size:17px;color:#111;font-weight:900}
+#productionOrderFlow .ubee-native-consent-row small{line-height:1.5}
+
 #productionOrderFlow .ubee-customer-rider-card,#productionOrderFlow .ubee-customer-progress-card{margin:0 0 12px;border:1px solid var(--flow-line);border-radius:17px;background:#fff;box-shadow:none}
 
 #productionOrderFlow .ubee-customer-active-page .ubee-native-group{margin-bottom:12px}
@@ -16030,12 +15909,12 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div id="flowSummaryList"></div>
 <section class="ubee-native-checkout-price"><div><span>正式估價</span><small id="flowRouteMeta">正在計算路線與費用</small></div><strong id="flowConfirmPrice">—</strong></section>
 
-<label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務、現金付款與服務規則</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間及最終顯示費用，同意以現金付款。按下建立任務後將開始媒合小U；我也同意 UBee 服務條款與隱私權政策。</small></span></label>
+<label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>我已確認任務資訊與付款方式</strong><small>同意以現金付款，並接受 UBee 服務條款與隱私權政策。</small></span></label>
 
 <div class="flow-status" id="flowConfirmStatus"></div>
 <button class="flow-map-retry hidden" id="flowRetryQuote" type="button">重新估價</button>
 </div>
-<div class="ubee-native-checkout-actionbar"><div class="ubee-native-checkout-action-price"><span>預估費用</span><strong id="flowConfirmActionPrice">—</strong></div><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立現金任務</button></div>
+<div class="ubee-native-checkout-actionbar"><div class="ubee-native-checkout-action-price"><span>預估費用</span><strong id="flowConfirmActionPrice">—</strong></div><button class="flow-primary" id="flowSubmitOrder" type="button">確認下單</button></div>
 </section>
 
 <section class="flow-page" data-page="search" id="flowPageSearch">
@@ -16179,7 +16058,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </section>
 <section class="ubee-native-group">
 <div class="ubee-native-group-title">任務資訊</div>
-<details class="ubee-native-detail-disclosure" id="step5TaskDetailSection"><summary><span>地址、聯絡人與任務內容</span><span>查看完整資訊</span></summary><div class="ubee-native-task-detail-content" id="step5TaskDetailContent">任務明細載入中...</div></details>
+<details class="ubee-native-detail-disclosure" id="step5TaskDetailSection"><summary><span>任務詳情</span><span>查看</span></summary><div class="ubee-native-task-detail-content" id="step5TaskDetailContent">任務明細載入中...</div></details>
 </section>
 <section class="ubee-native-cancel-section" id="step5CancelActionSection">
 <button class="ubee-customer-cancel-primary hidden" id="cancelOrderInlineBtn" onclick="cancelOrder()" type="button">
@@ -18567,7 +18446,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261113-customer-v1-7-0-rc6-3-hf4-4-active-tracking-cleanup';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261113-customer-v1-7-0-rc6-3-hf4-5-checkout-detail-cleanup';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
