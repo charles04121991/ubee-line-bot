@@ -4,7 +4,7 @@
   "short_name": "UBee 跑腿",
   "description": "UBee 跑腿｜免登入直接下單、訂單追蹤與通知",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20261113-customer-v1-7-0-rc6-3-hf4-4-active-tracking-cleanup",
+  "start_url": "/order.html?source=pwa&v=20261113-customer-v1-7-0-rc6-3-hf4-5-checkout-detail-cleanup",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -37,7 +37,7 @@
       "name": "立即下單",
       "short_name": "下單",
       "description": "建立新的 UBee 跑腿任務",
-      "url": "/order.html?action=new&source=shortcut&v=20261113-customer-v1-7-0-rc6-3-hf4-4-active-tracking-cleanup",
+      "url": "/order.html?action=new&source=shortcut&v=20261113-customer-v1-7-0-rc6-3-hf4-5-checkout-detail-cleanup",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -50,7 +50,7 @@
       "name": "我的訂單",
       "short_name": "訂單",
       "description": "查看本裝置已建立的訂單及任務進度",
-      "url": "/order.html?action=tasks&source=shortcut&v=20261113-customer-v1-7-0-rc6-3-hf4-4-active-tracking-cleanup",
+      "url": "/order.html?action=tasks&source=shortcut&v=20261113-customer-v1-7-0-rc6-3-hf4-5-checkout-detail-cleanup",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
