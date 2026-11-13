@@ -12024,7 +12024,11 @@ async function buildSmartStackCurrentPayload(rider = {}, currentOrder = null, id
 // 支援 phone / riderId，並保留 lineUserId 相容；待接單狀態也回傳 riderMapPickup。
 app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
   try {
-    await maintainScheduledOrders();
+    // Operations Stability HF1: 多位小U輪詢不必各自觸發同一輪全域預約維護。
+    // 仍保留原有維護、5 分鐘排程與其他操作端點；此處僅限最近完成後 10 秒內略過重掃。
+    if (Date.now() - scheduledMaintenanceLastCompletedAtMs >= 10 * 1000) {
+      await maintainScheduledOrders();
+    }
 
     const { lineUserId, phone, riderId } = req.query || {};
 
@@ -12557,6 +12561,7 @@ async function releaseScheduledReservation(
 }
 
 let scheduledMaintenanceRunning = false;
+let scheduledMaintenanceLastCompletedAtMs = 0;
 
 async function maintainScheduledOrders() {
   if (scheduledMaintenanceRunning) {
@@ -12745,6 +12750,8 @@ async function maintainScheduledOrders() {
         } catch (_) {}
       }
     }
+    // 僅成功完成整輪維護才記錄時間；失敗時讓下一次請求立即重試。
+    scheduledMaintenanceLastCompletedAtMs = Date.now();
   } catch (error) {
     console.error(
       'UBee 預約任務維護失敗：',
