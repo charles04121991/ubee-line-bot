@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261113-customer-v1-7-0-rc6-3-hf4-5-checkout-detail-cleanup" rel="manifest"/>
+<link href="/manifest-order.json?v=20261116-customer-v1-7-0-rc6-3-hf4-6-ios-keyboard-stability" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18446,7 +18446,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261113-customer-v1-7-0-rc6-3-hf4-5-checkout-detail-cleanup';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261116-customer-v1-7-0-rc6-3-hf4-6-ios-keyboard-stability';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -20690,10 +20690,10 @@ button,
 
 
 <style id="ubee-native-experience-v2-keyboard-style">
+/* HF4.6: one viewport owner. iOS keyboard does not add a second keyboard-sized scroll inset. */
 :root{
   --ubee-visual-viewport-height:100dvh;
   --ubee-visual-viewport-offset-top:0px;
-  --ubee-keyboard-height:0px;
 }
 body.ubee-keyboard-open > #ubeePersistentBottomNav{
   opacity:0!important;
@@ -20701,20 +20701,33 @@ body.ubee-keyboard-open > #ubeePersistentBottomNav{
   pointer-events:none!important;
   transform:translateY(100%)!important;
 }
-body.ubee-keyboard-open #productionOrderFlow .flow-page,
-body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
-  inset-bottom:0!important;
-}
-body.ubee-keyboard-open #productionOrderFlow .flow-shell,
-body.ubee-keyboard-open #ubeeCustomerAuthRoot .uca-shell{
+/* Resize the *outer fixed flow* together with its shell (rather than shrinking
+   only the shell inside a still-full-height viewport). */
+body.flow-active.ubee-keyboard-open #productionOrderFlow{
+  top:var(--ubee-visual-viewport-offset-top)!important;
+  bottom:auto!important;
   height:var(--ubee-visual-viewport-height)!important;
+  min-height:0!important;
+}
+body.ubee-keyboard-open #productionOrderFlow .flow-shell{
+  height:100%!important;
+  max-height:100%!important;
+  min-height:0!important;
+}
+body.ubee-keyboard-open #ubeeCustomerAuthRoot .uca-shell{
   max-height:var(--ubee-visual-viewport-height)!important;
 }
+/* The scroll container has already shrunk above the keyboard: no keyboard-height
+   padding here; doing both creates the giant blank band above iOS keyboard. */
 body.ubee-keyboard-open #productionOrderFlow .flow-scroll,
 body.ubee-keyboard-open #productionOrderFlow .flow-home-scroll,
 body.ubee-keyboard-open #productionOrderFlow .ubee-my-scroll,
 body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
-  scroll-padding-bottom:calc(var(--ubee-keyboard-height) + 24px)!important;
+  scroll-padding-bottom:16px!important;
+}
+/* Home otherwise reserves 116px for the bottom navigation even when it is hidden. */
+body.ubee-keyboard-open #productionOrderFlow #flowPageHome .flow-home-scroll{
+  padding-bottom:18px!important;
 }
 </style>
 <script id="ubee-customer-navigation-stack-v3">
@@ -20802,54 +20815,87 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 <script id="ubee-customer-visual-viewport-v2">
 (()=>{
   'use strict';
-  if(window.__UBEE_CUSTOMER_VISUAL_VIEWPORT_V2__) return;
+  if(window.__UBEE_CUSTOMER_VISUAL_VIEWPORT_V2__)return;
   window.__UBEE_CUSTOMER_VISUAL_VIEWPORT_V2__=true;
 
   const root=document.documentElement;
   const vv=window.visualViewport;
-  let lastKeyboardOpen=false;
+  let fullHeight=0;
+  let keyboardOpen=false;
   let focusTimer=0;
+  const inputSelector='input,textarea,select,[contenteditable="true"]';
+  const focusedInput=()=>{
+    const el=document.activeElement;
+    return el?.matches?.(inputSelector)?el:null;
+  };
+
+  function revealOnlyIfCovered(){
+    const input=focusedInput();
+    if(!input||!input.isConnected||!keyboardOpen)return;
+    const top=Math.max(0,vv?.offsetTop||0);
+    const visibleBottom=top+(vv?.height||window.innerHeight)-12;
+    const rect=input.getBoundingClientRect();
+    // Never force center alignment: Safari already scrolls focused inputs natively.
+    const delta=rect.bottom-visibleBottom;
+    if(delta<=4)return;
+    let scrollParent=input.parentElement;
+    while(scrollParent&&scrollParent!==document.body){
+      const overflow=getComputedStyle(scrollParent).overflowY;
+      if(/auto|scroll/.test(overflow)&&scrollParent.scrollHeight>scrollParent.clientHeight+2){
+        scrollParent.scrollTop+=delta+4;
+        return;
+      }
+      scrollParent=scrollParent.parentElement;
+    }
+    try{input.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});}catch(_){}
+  }
+
+  function scheduleReveal(delay=180){
+    clearTimeout(focusTimer);
+    focusTimer=setTimeout(revealOnlyIfCovered,delay);
+  }
 
   function syncViewport(){
-    const height=vv?.height||window.innerHeight||0;
-    const offsetTop=vv?.offsetTop||0;
-    const layoutHeight=window.innerHeight||height;
-    const keyboardHeight=Math.max(0,Math.round(layoutHeight-height-offsetTop));
-    const keyboardOpen=keyboardHeight>120;
-
+    const height=Math.max(1,vv?.height||window.innerHeight||1);
+    const offsetTop=Math.max(0,vv?.offsetTop||0);
+    if(!focusedInput()&&!keyboardOpen){
+      fullHeight=Math.max(fullHeight,height,window.innerHeight||0);
+    }
+    if(!fullHeight)fullHeight=Math.max(height,window.innerHeight||0);
+    // In standalone iOS Web Clips, innerHeight may shrink together with visualViewport.
+    // Remember the pre-focus height so that the keyboard is still detected.
+    const obstruction=Math.max(0,
+      Math.max(fullHeight,window.innerHeight||0)-height-offsetTop);
+    const nextOpen=obstruction>=140&&Boolean(focusedInput()||keyboardOpen);
     root.style.setProperty('--ubee-visual-viewport-height',`${Math.round(height)}px`);
     root.style.setProperty('--ubee-visual-viewport-offset-top',`${Math.round(offsetTop)}px`);
-    root.style.setProperty('--ubee-keyboard-height',`${keyboardHeight}px`);
-    document.body?.classList.toggle('ubee-keyboard-open',keyboardOpen);
-
-    if(keyboardOpen&&!lastKeyboardOpen){
-      const active=document.activeElement;
-      if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)){
-        clearTimeout(focusTimer);
-        focusTimer=setTimeout(()=>{
-          try{active.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'});}catch(_){}
-        },90);
-      }
+    document.body?.classList.toggle('ubee-keyboard-open',nextOpen);
+    if(nextOpen&&!keyboardOpen)scheduleReveal(160);
+    if(!nextOpen){
+      clearTimeout(focusTimer);
+      if(!focusedInput())fullHeight=Math.max(height,window.innerHeight||0);
     }
-    lastKeyboardOpen=keyboardOpen;
+    keyboardOpen=nextOpen;
   }
 
   vv?.addEventListener('resize',syncViewport,{passive:true});
   vv?.addEventListener('scroll',syncViewport,{passive:true});
   window.addEventListener('resize',syncViewport,{passive:true});
-  window.addEventListener('orientationchange',()=>setTimeout(syncViewport,120),{passive:true});
+  window.addEventListener('orientationchange',()=>{
+    fullHeight=0;
+    setTimeout(syncViewport,200);
+  },{passive:true});
   window.addEventListener('pageshow',syncViewport,{passive:true});
   document.addEventListener('focusin',event=>{
-    if(!/^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName||'')) return;
-    clearTimeout(focusTimer);
-    focusTimer=setTimeout(()=>{
-      syncViewport();
-      try{event.target.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'});}catch(_){}
-    },120);
+    if(!event.target?.matches?.(inputSelector))return;
+    syncViewport();
+    scheduleReveal(280);
   });
-  document.addEventListener('focusout',()=>setTimeout(syncViewport,120));
-
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',syncViewport,{once:true});
+  document.addEventListener('focusout',()=>{
+    clearTimeout(focusTimer);
+    setTimeout(syncViewport,180);
+  });
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncViewport,{once:true});
   else syncViewport();
 })();
 </script>
