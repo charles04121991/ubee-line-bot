@@ -17503,14 +17503,24 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
     const completedOrderMap =
       new Map();
 
-    for (const [field, value] of queryPairs) {
-      try {
-        const snap = await db
-          .collection('orders')
-          .where(field, '==', value)
-          .limit(500)
-          .get();
-
+    // Completed History Performance HF1：維持全部舊身分欄位、每組 500 筆上限、
+    // 原本逐組處理順序與騎士歸屬驗證，不新增索引，也不更動財務計算。
+    // 只將 Firestore 讀取改為每批最多 3 組併行，減少序列網路等待。
+    const completedQueryBatchSize = 3;
+    for(let offset=0; offset<queryPairs.length; offset+=completedQueryBatchSize){
+      const batchPairs=queryPairs.slice(offset,offset+completedQueryBatchSize);
+      const batchSnapshots=await Promise.all(batchPairs.map(async ([field,value])=>{
+        try{
+          const snap=await db.collection('orders').where(field,'==',value).limit(500).get();
+          return snap;
+        }catch(queryErr){
+          console.warn(`⚠️ 完成訂單查詢失敗 field=${field}:`,queryErr.message);
+          return null;
+        }
+      }));
+      // 按原 queryPairs 順序合併結果；不同 alias 的相同訂單依 doc.id 去重。
+      for(const snap of batchSnapshots){
+        if(!snap)continue;
         snap.docs.forEach(doc => {
           const order = {
             id: doc.id,
@@ -17577,12 +17587,6 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
             order
           );
         });
-
-      } catch (queryErr) {
-        console.warn(
-          `⚠️ 完成訂單查詢失敗 field=${field}:`,
-          queryErr.message
-        );
       }
     }
 
