@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261116-customer-v1-7-0-rc6-3-hf4-6-ios-keyboard-stability" rel="manifest"/>
+<link href="/manifest-order.json?v=20261116-customer-v1-7-0-rc6-3-hf4-6-1-ios-keyboard-gap-hotfix" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18446,7 +18446,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261116-customer-v1-7-0-rc6-3-hf4-6-ios-keyboard-stability';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261116-customer-v1-7-0-rc6-3-hf4-6-1-ios-keyboard-gap-hotfix';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -20251,6 +20251,9 @@ body{
 #productionOrderFlow{
   --flow-nav-height:var(--ubee-nav-content-height);
   --flow-nav-total-height:var(--ubee-nav-total-height);
+  /* Shared layout budget: one owner for the bottom nav and keyboard inset. */
+  --ubee-flow-page-bottom:var(--ubee-nav-total-height);
+  --ubee-flow-home-bottom-space:calc(116px + env(safe-area-inset-bottom));
   padding:0!important;
 }
 #productionOrderFlow .flow-shell{
@@ -20265,7 +20268,7 @@ body{
 }
 #productionOrderFlow .flow-page{
   position:absolute!important;
-  inset:0 0 var(--ubee-nav-total-height) 0!important;
+  inset:0 0 var(--ubee-flow-page-bottom) 0!important;
   min-height:0!important;
   padding:0!important;
   overflow:hidden!important;
@@ -20280,7 +20283,7 @@ body{
 }
 #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
   position:absolute!important;
-  inset:0 0 var(--ubee-nav-total-height) 0!important;
+  inset:0 0 var(--ubee-flow-page-bottom) 0!important;
   height:auto!important;
   min-height:0!important;
   padding-bottom:16px!important;
@@ -20690,7 +20693,9 @@ button,
 
 
 <style id="ubee-native-experience-v2-keyboard-style">
-/* HF4.6: one viewport owner. iOS keyboard does not add a second keyboard-sized scroll inset. */
+/* HF4.6.1 | One keyboard layout budget. Keep the original viewport controller.
+   The previous version hid the bottom nav visually but still reserved its full height
+   inside every .flow-page, leaving a blank band above the iOS keyboard. */
 :root{
   --ubee-visual-viewport-height:100dvh;
   --ubee-visual-viewport-offset-top:0px;
@@ -20701,8 +20706,13 @@ body.ubee-keyboard-open > #ubeePersistentBottomNav{
   pointer-events:none!important;
   transform:translateY(100%)!important;
 }
-/* Resize the *outer fixed flow* together with its shell (rather than shrinking
-   only the shell inside a still-full-height viewport). */
+/* Once the keyboard is open, neither the page nor the Home form reserves
+   the invisible bottom nav or its 116px scroll buffer. All normal values
+   resume automatically when the keyboard closes. */
+body.ubee-keyboard-open #productionOrderFlow{
+  --ubee-flow-page-bottom:0px;
+  --ubee-flow-home-bottom-space:18px;
+}
 body.flow-active.ubee-keyboard-open #productionOrderFlow{
   top:var(--ubee-visual-viewport-offset-top)!important;
   bottom:auto!important;
@@ -20717,17 +20727,10 @@ body.ubee-keyboard-open #productionOrderFlow .flow-shell{
 body.ubee-keyboard-open #ubeeCustomerAuthRoot .uca-shell{
   max-height:var(--ubee-visual-viewport-height)!important;
 }
-/* The scroll container has already shrunk above the keyboard: no keyboard-height
-   padding here; doing both creates the giant blank band above iOS keyboard. */
 body.ubee-keyboard-open #productionOrderFlow .flow-scroll,
-body.ubee-keyboard-open #productionOrderFlow .flow-home-scroll,
 body.ubee-keyboard-open #productionOrderFlow .ubee-my-scroll,
 body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   scroll-padding-bottom:16px!important;
-}
-/* Home otherwise reserves 116px for the bottom navigation even when it is hidden. */
-body.ubee-keyboard-open #productionOrderFlow #flowPageHome .flow-home-scroll{
-  padding-bottom:18px!important;
 }
 </style>
 <script id="ubee-customer-navigation-stack-v3">
@@ -22521,7 +22524,7 @@ body:not(.flow-active) .app select,
 /* RC3.2. One visible service selector, one checkout, one state machine. */
 #productionOrderFlow #flowPageHome{background:#f7f8fa!important}
 #productionOrderFlow #flowPageHome .flow-header.home{background:white!important;border-bottom:1px solid #f0f0f2!important}
-#productionOrderFlow #flowPageHome .flow-home-scroll{display:block!important;padding:13px 14px calc(116px + env(safe-area-inset-bottom))!important;scroll-behavior:auto!important}
+#productionOrderFlow #flowPageHome .flow-home-scroll{display:block!important;padding:13px 14px var(--ubee-flow-home-bottom-space)!important;scroll-behavior:auto!important}
 #productionOrderFlow #flowPageHome .ubee-rc32-discovery{display:block!important}
 #productionOrderFlow #flowPageHome .flow-card#ubeeRC32Form{display:none!important}
 #productionOrderFlow #flowPageHome.ubee-rc32-form-open .ubee-rc32-discovery{display:none!important}
