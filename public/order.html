@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261116-customer-v1-7-0-rc6-3-hf4-7-home-header-cleanup" rel="manifest"/>
+<link href="/manifest-order.json?v=20261116-customer-v1-7-0-rc6-3-hf4-7-1-location-recovery" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -4172,7 +4172,7 @@ body{background:#eef0f2;}
 .service-city-modal{
   position:fixed;
   inset:0;
-  z-index:9999;
+  z-index:2147483000;
   display:flex;
   align-items:flex-end;
   justify-content:center;
@@ -4223,6 +4223,9 @@ body{background:#eef0f2;}
   font-size:25px !important;
   line-height:1;
 }
+.service-city-location-tools{margin:0 0 15px;padding:12px;border:1px solid #e6e7e9;border-radius:15px;background:#f8f9fa;}
+.service-city-location-action{display:block;width:100%;min-height:44px;border:1px solid #d6d9dc;border-radius:12px;background:#fff;color:#111;font-size:15px!important;font-weight:800;}
+.service-city-location-status{margin:8px 1px 0;color:#62676c;font-size:13px;line-height:1.5;overflow-wrap:anywhere;}
 .service-city-grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
@@ -6130,6 +6133,10 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 </div>
 <button aria-label="關閉" class="service-city-close" onclick="closeServiceCitySelector()" type="button">×</button>
 </div>
+<div class="service-city-location-tools">
+  <button id="serviceCityUseLocation" class="service-city-location-action" type="button">📍 取得裝置目前位置</button>
+  <p id="serviceCityLocationStatus" class="service-city-location-status" role="status" aria-live="polite">尚未取得目前位置。</p>
+</div>
 <div class="service-city-grid" id="serviceCityGrid"></div>
 </div>
 </div>
@@ -6678,9 +6685,14 @@ function renderServiceCitySelector(){
 }
 
 function openServiceCitySelector(){
+  const modal=document.getElementById('serviceCityModal');
+  if(!modal)return;
+  // 舊 .app 已不顯示，原視窗留在其中會造成右上角按鈕點了卻看不到內容。
+  if(modal.parentElement!==document.body)document.body.appendChild(modal);
   renderServiceCitySelector();
-  document.getElementById('serviceCityModal')?.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
+  updateCustomerLocationControls();
+  modal.classList.remove('hidden');
+  document.body.style.overflow='hidden';
 }
 
 function closeServiceCitySelector(){
@@ -6961,104 +6973,48 @@ function clearMapObject(object){
   return null;
 }
 
+// HF4.7.1: 唯一 GPS 取得入口。GPS 只更新頂部「目前位置」，不得修改訂單服務城市。
 async function requestCurrentLocationForMap(){
+  const epoch=++customerLocationEpoch;
+  if(!customerAutoLocationEnabled()){
+    setHomeLocationUiState('選擇服務地區');
+    setCustomerLocationStatus('自動定位已關閉，可在「我的」設定開啟。');
+    return null;
+  }
+  if(!navigator.geolocation){
+    setHomeLocationUiState('選擇服務地區');
+    setCustomerLocationStatus('此裝置不支援定位，請手動選擇服務城市。');
+    return null;
+  }
   try{
     setHomeLocationUiState('定位中…');
-
-    const position = await getCurrentPosition();
-    const lat = Number(position?.coords?.latitude);
-    const lng = Number(position?.coords?.longitude);
-
-    if(!hasValidLatLng(lat, lng)){
-      throw new Error('目前位置座標無效');
-    }
-
-    currentLocationLat = lat;
-    currentLocationLng = lng;
-    currentLocationResolvedAt = Date.now();
-
-    // 座標一拿到就先解除「定位中」狀態，定位狀態可立即更新；
-    // 縣市／行政區名稱在背景同步，避免位置判斷延遲拖住首頁。
-    setHomeLocationUiState('目前位置');
-    syncCurrentLocationHomeUi(lat, lng).catch(error => {
-      console.warn('首頁服務地區背景同步失敗：', error);
-    });
-
+    setCustomerLocationStatus('正在取得裝置位置…');
+    const position=await getCurrentPosition();
+    if(epoch!==customerLocationEpoch || !customerAutoLocationEnabled()) return null;
+    const lat=Number(position?.coords?.latitude);
+    const lng=Number(position?.coords?.longitude);
+    if(!hasValidLatLng(lat,lng)) throw new Error('目前位置座標無效');
+    currentLocationLat=lat;
+    currentLocationLng=lng;
+    currentLocationResolvedAt=Date.now();
+    setHomeLocationUiState('辨識地區中…');
+    setCustomerLocationStatus('已取得 GPS，正在辨識縣市與行政區…');
+    // 等待後端地理編碼完成，避免「已取得 GPS」被誤認為地址已辨識。
+    await syncCurrentLocationHomeUi(lat,lng,epoch);
     return position;
   }catch(err){
-    console.warn('目前位置取得失敗:', err);
-
-    const denied = Number(err?.code) === 1;
+    if(epoch!==customerLocationEpoch || !customerAutoLocationEnabled()) return null;
+    console.warn('目前位置取得失敗:',err);
     setHomeLocationUiState('選擇服務地區');
-
+    const denied=Number(err?.code)===1;
+    const unavailable=Number(err?.code)===2;
+    setCustomerLocationStatus(denied
+      ? '定位權限已被拒絕，請於 iPhone 設定允許 UBee 使用位置。'
+      : unavailable ? '裝置暫時無法取得位置，請檢查定位服務或稍後重試。'
+      : '定位失敗或逾時，可重新定位或手動選擇服務城市。');
     return null;
   }
 }
-
-// 依客戶裝置定位，自動判斷目前所在縣市。
-// 定位或反向地理編碼失敗時，保留使用者原本選擇，不阻斷下單。
-function normalizeTaiwanCityName(value){
-  const raw = String(value || '').trim().replace(/^台/, '臺');
-  if(!raw) return '';
-
-  const exact = UBEE_SERVICE_CITIES.find((city) => city.name === raw);
-  if(exact) return exact.name;
-
-  const partial = UBEE_SERVICE_CITIES.find((city) =>
-    raw.includes(city.name) || city.name.includes(raw)
-  );
-
-  return partial ? partial.name : '';
-}
-
-function getNearestServiceCityByCoordinates(lat, lng){
-  if(!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return '';
-
-  let nearest = null;
-  let nearestDistance = Infinity;
-  const latitude = Number(lat);
-  const longitude = Number(lng);
-
-  UBEE_SERVICE_CITIES.forEach((city) => {
-    const latDiff = latitude - city.lat;
-    const lngDiff = (longitude - city.lng) * Math.cos(latitude * Math.PI / 180);
-    const distance = (latDiff * latDiff) + (lngDiff * lngDiff);
-
-    if(distance < nearestDistance){
-      nearestDistance = distance;
-      nearest = city;
-    }
-  });
-
-  return nearest ? nearest.name : '';
-}
-
-async function detectServiceCityFromCurrentLocation(){
-  try{
-    const position = await getCurrentPosition();
-    const lat = Number(position?.coords?.latitude);
-    const lng = Number(position?.coords?.longitude);
-
-    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return '';
-
-    currentLocationLat = lat;
-    currentLocationLng = lng;
-
-    // Device position remains available without loading a map SDK.
-    const detectedCity = getNearestServiceCityByCoordinates(lat, lng);
-
-    if(detectedCity){
-      selectServiceCity(detectedCity);
-      return detectedCity;
-    }
-
-    return '';
-  }catch(err){
-    console.warn('自動偵測服務城市失敗，保留原本城市：', err);
-    return '';
-  }
-}
-
 
   function getRouteOriginLocation(data){
   const lat = toNullableNumber(
@@ -9523,151 +9479,155 @@ function clearNearbyAutoFill(clearFields){
 
 }
 
-function setHomeLocationUiState(buttonText){
-  const cityButton = qs('flowCityButton');
-  if(!cityButton || !buttonText) return;
-  const label = qs('flowCityLabel');
-  if(label) label.textContent = buttonText;
-  else cityButton.textContent = buttonText;
-  const isRegionFallback = buttonText === '選擇服務地區';
-  cityButton.setAttribute('aria-label', isRegionFallback
-    ? '選擇服務地區'
-    : buttonText === '定位中…'
-      ? '定位中，點選可選擇服務地區'
-      : `目前位置：${buttonText}，點選可選擇服務地區`);
+// HF4.7.1: 唯一定位顯示／設定控制器；不建立第二套地理編碼 API。
+const CUSTOMER_AUTO_LOCATION_KEY='ubee_setting_auto_location';
+let customerLocationEpoch=0;
+let currentLocationUiSyncEpoch=-1;
+let customerLocationStatusMessage='尚未取得目前位置。';
+function customerAutoLocationEnabled(){
+  try{return localStorage.getItem(CUSTOMER_AUTO_LOCATION_KEY)==='true';}
+  catch(_){return false;}
 }
-
+function updateCustomerLocationControls(){
+  const enabled=customerAutoLocationEnabled();
+  const toggle=qs('ubeeV17AutoLocation');
+  if(toggle && toggle.checked!==enabled)toggle.checked=enabled;
+  for(const id of ['ubeeV17LocationStatus','serviceCityLocationStatus']){
+    const status=qs(id);if(status)status.textContent=customerLocationStatusMessage;
+  }
+}
+function setCustomerLocationStatus(message){
+  customerLocationStatusMessage=String(message||'尚未取得目前位置。');
+  updateCustomerLocationControls();
+}
+function setHomeLocationUiState(buttonText){
+  const cityButton=qs('flowCityButton');
+  if(!cityButton||!buttonText)return;
+  const label=qs('flowCityLabel');
+  if(label)label.textContent=buttonText;
+  else cityButton.textContent=buttonText;
+  const fallback=buttonText==='選擇服務地區';
+  cityButton.setAttribute('aria-label',fallback?'選擇服務地區'
+    : buttonText==='定位中…'||buttonText==='辨識地區中…'
+      ? '定位處理中，點選可選擇服務城市'
+      : `裝置位置：${buttonText}，點選可選擇服務城市`);
+}
 async function shouldAutoLocateCustomer(){
-  if(!navigator.geolocation){
-    return false;
-  }
-
-  const preferenceKey = 'ubee_setting_auto_location';
-  const storedPreference = localStorage.getItem(preferenceKey);
-
-  // Native Settings V2：位置使用採 App 內明確 opt-in。
-  // 未曾開啟或已關閉時，即使作業系統仍保留定位權限，UBee 也不主動讀取位置。
-  if(storedPreference !== 'true'){
-    return false;
-  }
-
+  if(!customerAutoLocationEnabled()||!navigator.geolocation)return false;
   try{
     if(navigator.permissions?.query){
-      const permission = await navigator.permissions.query({name:'geolocation'});
-      if(permission.state === 'denied') return false;
+      const p=await navigator.permissions.query({name:'geolocation'});
+      if(p.state==='denied'){
+        setCustomerLocationStatus('定位權限已被封鎖，請至 iPhone 設定允許後重新定位。');
+        return false;
+      }
     }
-  }catch(_){
-    // Safari / 部分 PWA 不支援 Permissions API；此時仍以 App 內已開啟偏好為準。
-  }
-
+  }catch(_){/* Safari 可能不支援 Permissions API，實際結果仍以 GPS 回呼為準。 */}
   return true;
 }
-
 function getCurrentPosition(){
-  if(currentLocationPromise){
-    return currentLocationPromise;
-  }
-
-  currentLocationPromise = new Promise((resolve, reject) => {
-    if(!navigator.geolocation){
-      reject(new Error('這個瀏覽器不支援定位功能。'));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy:true,
-      timeout:15000,
-      maximumAge:0
+  if(currentLocationPromise)return currentLocationPromise;
+  currentLocationPromise=new Promise((resolve,reject)=>{
+    if(!navigator.geolocation){reject(new Error('此瀏覽器不支援定位。'));return;}
+    navigator.geolocation.getCurrentPosition(resolve,reject,{
+      enableHighAccuracy:true,timeout:15000,maximumAge:0
     });
-  }).finally(() => {
-    currentLocationPromise = null;
-  });
-
+  }).finally(()=>{currentLocationPromise=null;});
   return currentLocationPromise;
 }
-
 async function ensureCustomerInitialLocationGate(){
-  if(customerInitialLocationGatePromise){
-    return customerInitialLocationGatePromise;
-  }
-
-  customerInitialLocationGateStartedAt = Date.now();
-  customerInitialLocationGateSettled = false;
-
-  customerInitialLocationGatePromise = (async () => {
-    const enabled = await shouldAutoLocateCustomer();
-
-    if(!enabled){
+  if(customerInitialLocationGatePromise)return customerInitialLocationGatePromise;
+  customerInitialLocationGateStartedAt=Date.now();
+  customerInitialLocationGateSettled=false;
+  customerInitialLocationGatePromise=(async()=>{
+    const allowed=await shouldAutoLocateCustomer();
+    if(!allowed){
       setHomeLocationUiState('選擇服務地區');
+      if(!customerAutoLocationEnabled())setCustomerLocationStatus('自動定位已關閉，可在「我的」設定開啟。');
+      else if(!navigator.geolocation)setCustomerLocationStatus('此裝置無法定位，請手動選擇服務城市。');
       return null;
     }
-
-    return await requestCurrentLocationForMap();
-  })().finally(() => {
-    customerInitialLocationGateSettled = true;
-  });
-
+    return requestCurrentLocationForMap();
+  })().finally(()=>{customerInitialLocationGateSettled=true;});
   return customerInitialLocationGatePromise;
 }
-
-async function syncCurrentLocationHomeUi(lat, lng){
-  const latitude = Number(lat);
-  const longitude = Number(lng);
-
-  if(!hasValidLatLng(latitude, longitude)){
+async function refreshCustomerCurrentLocation(){
+  // 使用者重試不得沿用先前已完成／失敗的初始化 Promise。
+  customerInitialLocationGatePromise=null;
+  const allowed=await shouldAutoLocateCustomer();
+  if(!allowed){
+    setHomeLocationUiState('選擇服務地區');
+    if(!customerAutoLocationEnabled())setCustomerLocationStatus('請先開啟自動取得目前位置。');
     return false;
   }
-
-  const syncKey = `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-  if(currentLocationUiSyncPromise && currentLocationUiSyncKey === syncKey){
+  return Boolean(await requestCurrentLocationForMap());
+}
+async function setCustomerAutoLocationEnabled(enabled){
+  const next=Boolean(enabled);
+  try{localStorage.setItem(CUSTOMER_AUTO_LOCATION_KEY,next?'true':'false');}
+  catch(error){
+    setCustomerLocationStatus('無法儲存定位偏好，請檢查瀏覽器儲存權限。');
+    return false;
+  }
+  customerInitialLocationGatePromise=null;
+  if(!next){
+    // 令在途 GPS / 反查結果失效，防止關閉後再突然顯示位置。
+    customerLocationEpoch++;
+    currentLocationLat=null;currentLocationLng=null;
+    currentLocationUiSyncKey='';currentLocationUiSyncPromise=null;
+    setHomeLocationUiState('選擇服務地區');
+    setCustomerLocationStatus('自動定位已關閉。服務城市仍可手動選擇。');
+    return true;
+  }
+  updateCustomerLocationControls();
+  return refreshCustomerCurrentLocation();
+}
+async function syncCurrentLocationHomeUi(lat,lng,epoch=customerLocationEpoch){
+  const latitude=Number(lat),longitude=Number(lng);
+  if(!hasValidLatLng(latitude,longitude))return false;
+  if(!customerAutoLocationEnabled()||epoch!==customerLocationEpoch)return false;
+  const key=`${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+  if(currentLocationUiSyncPromise&&currentLocationUiSyncKey===key&&currentLocationUiSyncEpoch===epoch){
     return currentLocationUiSyncPromise;
   }
-
-  currentLocationUiSyncKey = syncKey;
-  currentLocationUiSyncPromise = (async () => {
+  currentLocationUiSyncKey=key;
+  currentLocationUiSyncEpoch=epoch;
+  const task=(async()=>{
     try{
-      const response = await fetch('/api/customer/current-location',{
-        method:'POST',
-        credentials:'include',
-        headers:{'Content-Type':'application/json'},
-        cache:'no-store',
+      const response=await fetch('/api/customer/current-location',{
+        method:'POST',credentials:'include',
+        headers:{'Content-Type':'application/json'},cache:'no-store',
         body:JSON.stringify({lat:latitude,lng:longitude})
       });
-
-      const data = await response.json().catch(() => ({}));
-      if(!response.ok || !data.success){
-        throw new Error(data.message || '位置辨識失敗');
-      }
-
-      const loc = data.location || {};
-      // Header 只取行政區；完整地址仍由後端保留給地址搜尋與下單流程。
-      const city = String(loc.city || '').trim().replace(/^臺/,'台');
-      const district = String(loc.district || '').trim();
-      const display = city
-        ? `${city}${district && district !== city ? '・' + district : ''}`
-        : '目前位置';
-
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.success)throw new Error(data.message||'地址辨識失敗');
+      if(epoch!==customerLocationEpoch||!customerAutoLocationEnabled())return false;
+      const loc=data.location||{};
+      // 僅顯示縣市／行政區，不能以 GPS 自動覆蓋客人手動選的「訂單服務城市」。
+      const city=String(loc.city||'').trim().replace(/^臺/,'台');
+      const district=String(loc.district||'').trim();
+      const display=city?`${city}${district&&district!==city?'・'+district:''}`:'目前位置';
       setHomeLocationUiState(display);
-
-      if(city && typeof selectServiceCity === 'function'){
-        try{
-          selectServiceCity(city.replace(/^台/,'臺'));
-        }catch(_){ }
-      }
-
+      setCustomerLocationStatus(city?`GPS 位置：${display}。訂單服務城市可另外選擇。`:'GPS 已取得，但無法辨識行政區。');
       return true;
     }catch(error){
-      console.warn('目前位置服務地區同步失敗：', error);
-      // 座標已取得時不要把 UI 留在「正在取得位置」。
+      if(epoch!==customerLocationEpoch||!customerAutoLocationEnabled())return false;
+      console.warn('目前位置地區辨識失敗:',error);
       setHomeLocationUiState('目前位置');
+      setCustomerLocationStatus('已取得 GPS，但地址辨識暫時失敗；可重新定位或手動選擇服務城市。');
       return false;
-    }finally{
-      currentLocationUiSyncPromise = null;
     }
   })();
-
-  return currentLocationUiSyncPromise;
+  currentLocationUiSyncPromise=task;
+  try{return await task;}
+  finally{if(currentLocationUiSyncPromise===task)currentLocationUiSyncPromise=null;}
 }
+window.UBeeCustomerLocation=Object.freeze({
+  enabled:customerAutoLocationEnabled,
+  setEnabled:setCustomerAutoLocationEnabled,
+  refresh:refreshCustomerCurrentLocation,
+  syncControls:updateCustomerLocationControls
+});
 
 function updateTaskPathText(){
   if(qs('taskPathText')){
@@ -14648,7 +14608,7 @@ updateStickyEstimate();
 // 因此第一個真正顯示的地圖中心只能是目前位置，或定位明確失敗後的手動服務區。
 function bootstrapCustomerLocationImmediately(){
   try{
-    setHomeLocationUiState('定位中…');
+    setHomeLocationUiState(customerAutoLocationEnabled()?'定位中…':'選擇服務地區');
     ensureCustomerInitialLocationGate().catch(error => {
       console.warn('首頁預先定位失敗：', error);
     });
@@ -16160,6 +16120,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="flow-page ubee-v17-page ubee-v17-native-page" data-page="v17Settings" id="flowPageSettingsV17" aria-label="使用設定">
   <header class="ubee-v17-native-subhead"><button type="button" class="ubee-v17-native-back" data-v17-action="back-my" aria-label="返回我的"><svg class="ubee-v17-native-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>我的</span></button><strong>使用設定</strong><span aria-hidden="true"></span></header>
   <div class="flow-scroll ubee-v17-scroll ubee-v17-native-scroll">
+    <h2 class="ubee-v17-native-group-title">定位與服務地區</h2>
+    <div class="ubee-v17-native-group ubee-v17-native-simple">
+      <label class="ubee-v17-native-switch-row" for="ubeeV17AutoLocation"><span class="ubee-v17-native-item-content"><strong>自動取得目前位置</strong><small>開啟後才使用裝置 GPS；不會修改下單服務城市</small></span><input id="ubeeV17AutoLocation" type="checkbox" role="switch" aria-label="自動取得目前位置"></label>
+      <div class="ubee-v17-native-info-row"><strong>目前位置狀態</strong><p id="ubeeV17LocationStatus" role="status" aria-live="polite">尚未取得目前位置。</p></div>
+      <button class="ubee-v17-native-item" type="button" data-v17-action="location-refresh"><span class="ubee-v17-native-item-content"><strong>重新取得目前位置</strong><small>重新要求 GPS 位置及行政區辨識</small></span><span class="ubee-v17-native-chevron">›</span></button>
+      <button class="ubee-v17-native-item" type="button" data-v17-action="select-city"><span class="ubee-v17-native-item-content"><strong>手動選擇服務城市</strong><small>僅設定任務所在地，與 GPS 位置分開</small></span><span class="ubee-v17-native-chevron">›</span></button>
+    </div>
     <h2 class="ubee-v17-native-group-title">顯示與操作</h2>
     <div class="ubee-v17-native-group ubee-v17-native-simple">
       <label class="ubee-v17-native-switch-row" for="ubeeV17ReduceMotion"><span class="ubee-v17-native-item-content"><strong>減少動態效果</strong><small>降低畫面切換時的動畫</small></span><input id="ubeeV17ReduceMotion" type="checkbox" role="switch" aria-label="減少動態效果"></label>
@@ -18012,26 +17979,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   async function detectLocation(){
-    if(!navigator.geolocation){
-      setHomeLocationUiState('選擇服務地區');
-      return false;
-    }
-
-    // 已經拿到座標就先顯示，不把右上角重新改回「定位中」。
-    if(hasValidLatLng(currentLocationLat,currentLocationLng)){
-      setHomeLocationUiState('目前位置');
-      await syncCurrentLocationHomeUi(currentLocationLat,currentLocationLng);
-      return true;
-    }
-
-    setHomeLocationUiState('定位中…');
-
-    const position = await ensureCustomerInitialLocationGate();
-    if(!position){
-      return false;
-    }
-
-    return true;
+    // 不另建定位程序，與首頁 Bootstrap 共用唯一初始化閘門。
+    return Boolean(await ensureCustomerInitialLocationGate());
   }
 
   function showFlow(options={}){
@@ -18206,6 +18155,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
     $('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;try{showOnlyStep(5)}catch(_){ }});
     $('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
+    document.getElementById('serviceCityUseLocation')?.addEventListener('click',()=>{window.UBeeCustomerLocation?.setEnabled(true)?.catch?.(error=>console.warn('手動定位失敗',error));});
   }
 
   buildProgress();bind();wrapPayload();resetNewTask(false);ensureTimeDefaults();
@@ -18436,7 +18386,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261116-customer-v1-7-0-rc6-3-hf4-7-home-header-cleanup';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261116-customer-v1-7-0-rc6-3-hf4-7-1-location-recovery';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -20881,7 +20831,7 @@ async function open(target,options={}){
 function openMySection(section,{fromHistory=false}={}){
  const names={faq:'v17Faq',support:'v17Support',service:'v17Service',guide:'v17Guide',pricing:'v17Pricing',cancellation:'v17Cancellation',feedback:'v17Feedback',notifysettings:'v17Notifysettings',addresses:'v17Addresses',settings:'v17Settings',install:'v17Install',privacydata:'v17Privacydata',legal:'v17Legal',about:'v17About',helpguide:'v17HelpGuide',orderrules:'v17OrderRules',infohub:'v17InfoHub'};if(!names[section])return false;
  if(!fromHistory)window.UBeeCustomerNavigation?.pushMySection?.(section);
- showLocal(names[section]);setActive('my');if(section==='notifysettings')updateRC4NotificationPermission();if(section==='addresses')updateRC4SavedAddresses();return true;
+ showLocal(names[section]);setActive('my');if(section==='notifysettings')updateRC4NotificationPermission();if(section==='addresses')updateRC4SavedAddresses();if(section==='settings')window.UBeeCustomerLocation?.syncControls?.();return true;
 }
 window.openUBeeMySection=openMySection;
 window.UBeePrimaryNavigation=Object.freeze({open,activate:setActive,getCurrent:()=>active,hasUserNavigated:()=>userNavigated});
@@ -20903,6 +20853,7 @@ function onShortcut(event){const b=event.target.closest('[data-v17-action]');if(
  if(a==='city'){openMySection('service');return;}
   if(a==='select-city'){jumpToCity();return;}
   if(a==='go-orders'){open('orders',{source:'my-support'});return;}
+ if(a==='location-refresh'){window.UBeeCustomerLocation?.refresh?.().catch?.(error=>console.warn('重新定位失敗',error));return;}
  if(a==='copy-feedback'){copyRC4Feedback();return;}
  if(a==='check-update'){checkRC4Update();return;}
  if(a==='reset-display'){resetRC4Display();return;}
@@ -20967,6 +20918,17 @@ function init(){
  document.getElementById('ubeeV17NotificationBack')?.addEventListener('click',()=>open('orders',{source:'back'}));
  document.getElementById('ubeeV17OrderFilters')?.addEventListener('click',e=>{const b=e.target.closest('[data-v17-filter]');if(b)applyFilter(b.dataset.v17Filter)});
  const list=document.getElementById('flowProfileTasksList');if(list)new MutationObserver(()=>applyFilter(filter)).observe(list,{childList:true,subtree:false});
+  // HF4.7.1：沿用唯一定位控制器，沒有第二套 GPS 監聽。
+  const autoLocation=document.getElementById('ubeeV17AutoLocation');
+  if(autoLocation){
+    window.UBeeCustomerLocation?.syncControls?.();
+    autoLocation.addEventListener('change',()=>{
+      window.UBeeCustomerLocation?.setEnabled?.(autoLocation.checked).catch?.(error=>{
+        console.warn('定位開關操作失敗:',error);
+        window.UBeeCustomerLocation?.syncControls?.();
+      });
+    });
+  }
  const reduce=document.getElementById('ubeeV17ReduceMotion');
   if(reduce){
     try{reduce.checked=localStorage.getItem('ubee-customer-reduce-motion')==='1';}catch(_){}
