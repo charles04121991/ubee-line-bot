@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261116-customer-v1-7-0-rc6-3-hf4-6-1-ios-keyboard-gap-hotfix" rel="manifest"/>
+<link href="/manifest-order.json?v=20261116-customer-v1-7-0-rc6-3-hf4-7-home-header-cleanup" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6963,7 +6963,7 @@ function clearMapObject(object){
 
 async function requestCurrentLocationForMap(){
   try{
-    setHomeLocationUiState('定位中…','正在確認目前位置與服務地區');
+    setHomeLocationUiState('定位中…');
 
     const position = await getCurrentPosition();
     const lat = Number(position?.coords?.latitude);
@@ -6979,7 +6979,7 @@ async function requestCurrentLocationForMap(){
 
     // 座標一拿到就先解除「定位中」狀態，定位狀態可立即更新；
     // 縣市／行政區名稱在背景同步，避免位置判斷延遲拖住首頁。
-    setHomeLocationUiState('目前位置','已取得目前位置，正在辨識服務地區');
+    setHomeLocationUiState('目前位置');
     syncCurrentLocationHomeUi(lat, lng).catch(error => {
       console.warn('首頁服務地區背景同步失敗：', error);
     });
@@ -6989,12 +6989,7 @@ async function requestCurrentLocationForMap(){
     console.warn('目前位置取得失敗:', err);
 
     const denied = Number(err?.code) === 1;
-    setHomeLocationUiState(
-      '選擇服務地區',
-      denied
-        ? '定位權限未允許，請在瀏覽器或手機設定開啟定位'
-        : '目前無法自動取得位置，仍可手動選擇服務地區'
-    );
+    setHomeLocationUiState('選擇服務地區');
 
     return null;
   }
@@ -9530,9 +9525,16 @@ function clearNearbyAutoFill(clearFields){
 
 function setHomeLocationUiState(buttonText){
   const cityButton = qs('flowCityButton');
-  if(cityButton && buttonText){
-    cityButton.textContent = buttonText;
-  }
+  if(!cityButton || !buttonText) return;
+  const label = qs('flowCityLabel');
+  if(label) label.textContent = buttonText;
+  else cityButton.textContent = buttonText;
+  const isRegionFallback = buttonText === '選擇服務地區';
+  cityButton.setAttribute('aria-label', isRegionFallback
+    ? '選擇服務地區'
+    : buttonText === '定位中…'
+      ? '定位中，點選可選擇服務地區'
+      : `目前位置：${buttonText}，點選可選擇服務地區`);
 }
 
 async function shouldAutoLocateCustomer(){
@@ -9596,10 +9598,7 @@ async function ensureCustomerInitialLocationGate(){
     const enabled = await shouldAutoLocateCustomer();
 
     if(!enabled){
-      setHomeLocationUiState(
-        '選擇服務地區',
-        '目前位置功能未開啟，可手動選擇服務地區或在設定中開啟定位'
-      );
+      setHomeLocationUiState('選擇服務地區');
       return null;
     }
 
@@ -9641,18 +9640,14 @@ async function syncCurrentLocationHomeUi(lat, lng){
       }
 
       const loc = data.location || {};
-      const city = String(loc.city || '').replace(/^臺/,'台');
-      const district = String(loc.district || '');
-      const display = String(
-        loc.displayLocation || `${city}${district}` || '目前位置'
-      ).replace(/^臺/,'台');
+      // Header 只取行政區；完整地址仍由後端保留給地址搜尋與下單流程。
+      const city = String(loc.city || '').trim().replace(/^臺/,'台');
+      const district = String(loc.district || '').trim();
+      const display = city
+        ? `${city}${district && district !== city ? '・' + district : ''}`
+        : '目前位置';
 
-      setHomeLocationUiState(
-        display || '目前位置',
-        loc.formattedAddress
-          ? `目前位置：${loc.formattedAddress}`
-          : `目前服務地區：${display || '目前位置'}`
-      );
+      setHomeLocationUiState(display);
 
       if(city && typeof selectServiceCity === 'function'){
         try{
@@ -9664,10 +9659,7 @@ async function syncCurrentLocationHomeUi(lat, lng){
     }catch(error){
       console.warn('目前位置服務地區同步失敗：', error);
       // 座標已取得時不要把 UI 留在「正在取得位置」。
-      setHomeLocationUiState(
-        '目前位置',
-        '目前座標已取得，服務地區名稱暫時無法辨識'
-      );
+      setHomeLocationUiState('目前位置');
       return false;
     }finally{
       currentLocationUiSyncPromise = null;
@@ -14656,7 +14648,7 @@ updateStickyEstimate();
 // 因此第一個真正顯示的地圖中心只能是目前位置，或定位明確失敗後的手動服務區。
 function bootstrapCustomerLocationImmediately(){
   try{
-    setHomeLocationUiState('定位中…','正在確認目前位置與服務地區');
+    setHomeLocationUiState('定位中…');
     ensureCustomerInitialLocationGate().catch(error => {
       console.warn('首頁預先定位失敗：', error);
     });
@@ -15658,10 +15650,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <header class="flow-header home">
 <div class="flow-brand"><span>U</span>Bee 跑腿</div>
 <div class="ubee-home-header-actions">
-<button class="flow-city-btn" id="flowCityButton" type="button">定位中…</button>
-<button class="ubee-customer-notification-bell" id="ubeeCustomerNotificationBell" data-primary-shortcut="notify" type="button" aria-label="通知中心">
-<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
-<span class="ubee-customer-notification-badge" id="ubeeCustomerNotificationBadge" hidden>0</span>
+<button class="flow-city-btn" id="flowCityButton" type="button" aria-label="選擇服務地區" aria-haspopup="dialog" aria-controls="serviceCityModal">
+<svg class="flow-city-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 16 0Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.7" stroke="currentColor" stroke-width="1.8"/></svg>
+<span class="flow-city-label" id="flowCityLabel">定位中…</span>
+<span class="flow-city-chevron" aria-hidden="true">⌄</span>
 </button>
 </div>
 </header>
@@ -18020,10 +18012,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   async function detectLocation(){
-    const cityButton=$('flowCityButton');
-
     if(!navigator.geolocation){
-      if(cityButton)cityButton.textContent='選擇服務地區';
+      setHomeLocationUiState('選擇服務地區');
       return false;
     }
 
@@ -18034,7 +18024,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       return true;
     }
 
-    if(cityButton)cityButton.textContent='定位中…';
+    setHomeLocationUiState('定位中…');
 
     const position = await ensureCustomerInitialLocationGate();
     if(!position){
@@ -18446,7 +18436,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261116-customer-v1-7-0-rc6-3-hf4-6-1-ios-keyboard-gap-hotfix';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261116-customer-v1-7-0-rc6-3-hf4-7-home-header-cleanup';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -19301,14 +19291,49 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     letter-spacing:-1.15px !important;
   }
 
+  #productionOrderFlow .ubee-home-header-actions{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    min-width:0;
+  }
   #productionOrderFlow .flow-city-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    min-width:0;
     min-height:40px !important;
-    max-width:158px !important;
-    padding:0 13px !important;
+    max-width:164px !important;
+    padding:0 10px !important;
     border:1px solid #eceef0 !important;
     background:#f6f7f8 !important;
     color:#2f3337 !important;
     font-size:14px !important;
+    white-space:nowrap;
+    cursor:pointer;
+  }
+  #productionOrderFlow .flow-city-btn .flow-city-icon{
+    display:block;
+    width:16px;
+    height:16px;
+    flex:0 0 16px;
+    color:#60656b;
+    pointer-events:none;
+  }
+  #productionOrderFlow .flow-city-btn .flow-city-label{
+    display:block;
+    overflow:hidden;
+    min-width:0;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  #productionOrderFlow .flow-city-btn .flow-city-chevron{
+    display:block;
+    flex:0 0 auto;
+    color:#777e85;
+    font-size:13px;
+    pointer-events:none;
   }
 
   #productionOrderFlow .flow-home-scroll{
@@ -19372,8 +19397,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       border-radius:21px !important;
     }
     #productionOrderFlow .flow-city-btn{
-      max-width:132px !important;
-      padding:0 10px !important;
+      max-width:138px !important;
+      padding:0 8px !important;
+    }
+    #productionOrderFlow #flowPageHome .flow-city-btn{
+      max-width:138px !important;
     }
   }
 
@@ -19477,67 +19505,6 @@ html,body{
 /* =========================================================
    Customer Native Notification Center V1
    ========================================================= */
-#productionOrderFlow .ubee-home-header-actions{
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  gap:8px;
-  min-width:0;
-}
-#productionOrderFlow .ubee-home-header-actions .flow-city-btn{
-  min-width:0;
-  max-width:132px!important;
-}
-#productionOrderFlow .ubee-customer-notification-bell{
-  position:relative;
-  width:40px;
-  height:40px;
-  flex:0 0 40px;
-  display:grid;
-  place-items:center;
-  padding:0;
-  border:1px solid #eceef0;
-  border-radius:13px;
-  background:#f7f8f9;
-  color:#25282c;
-  cursor:pointer;
-  -webkit-tap-highlight-color:transparent;
-}
-#productionOrderFlow .ubee-customer-notification-bell:active{background:#fff7d3}
-#productionOrderFlow .ubee-customer-notification-bell svg{
-  width:21px;
-  height:21px;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.9;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-  pointer-events:none;
-}
-#productionOrderFlow .ubee-customer-notification-badge{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:18px;
-  height:18px;
-  padding:0 5px;
-  border-radius:999px;
-  background:#e53935;
-  color:#fff;
-  font-size:13px;
-  font-weight:950;
-  line-height:1;
-  font-variant-numeric:tabular-nums;
-}
-#productionOrderFlow .ubee-customer-notification-badge{
-  position:absolute;
-  top:-4px;
-  right:-5px;
-  border:2px solid #fff;
-  min-width:19px;
-  height:19px;
-}
-#productionOrderFlow .ubee-customer-notification-badge[hidden]{display:none!important}
 #productionOrderFlow .ubee-customer-notification-page{
   background:#f6f7f8!important;
 }
@@ -19720,11 +19687,6 @@ html,body{
   text-align:center;
 }
 #productionOrderFlow .ubee-notification-error{color:#a43a32}
-@media(max-width:360px){
-  #productionOrderFlow .ubee-home-header-actions{gap:6px}
-  #productionOrderFlow .ubee-home-header-actions .flow-city-btn{max-width:112px!important}
-  #productionOrderFlow .ubee-customer-notification-bell{width:38px;height:38px;flex-basis:38px}
-}
 </style>
 
 <!-- 2026-10-01｜Customer Notification Card UX Fix：收合摘要與完整展開分離，避免提示文字與內容重疊。 -->
@@ -19771,22 +19733,8 @@ html,body{
     return data;
   }
 
-  function formatCount(value){
-    const count = Math.max(0,Number(value||0));
-    return count > 99 ? '99+' : String(count);
-  }
-
   function setUnreadCount(value){
     unreadCount = Math.max(0,Number(value||0));
-    const display = formatCount(unreadCount);
-    const homeBadge = $('ubeeCustomerNotificationBadge');
-    if(homeBadge){
-      homeBadge.textContent=display;
-      homeBadge.hidden=unreadCount<=0;
-      homeBadge.setAttribute('aria-label',unreadCount>0?`${unreadCount} 則未讀通知`:'沒有未讀通知');
-    }
-    const bell = $('ubeeCustomerNotificationBell');
-    if(bell) bell.setAttribute('aria-label',unreadCount > 0 ? `通知中心，${unreadCount} 則未讀` : '通知中心');
     const readAll = $('ubeeNotificationReadAll');
     if(readAll) readAll.disabled = unreadCount <= 0 || loading;
     const summary = $('ubeeNotificationSummary');
@@ -20002,17 +19950,6 @@ html,body{
   }
 
   document.addEventListener('click',event=>{
-    const shortcut = event.target.closest?.('[data-primary-shortcut="notify"]');
-    if(shortcut){
-      event.preventDefault();
-      event.stopPropagation();
-      if(window.UBeePrimaryNavigation?.open){
-        window.UBeePrimaryNavigation.open('notify',{source:'home-notification-bell'});
-      }else{
-        window.openUBeeNotificationPage?.();
-      }
-      return;
-    }
     const readAll = event.target.closest?.('#ubeeNotificationReadAll');
     if(readAll){
       event.preventDefault();
@@ -21096,7 +21033,7 @@ window.addEventListener('pageshow',()=>setActive(document.body?.dataset.ubeePrim
 }
 
 #productionOrderFlow #flowPageHome .flow-city-btn{
-  max-width:148px!important;
+  max-width:164px!important;
   padding:8px 10px!important;
   background:#f3f4f5!important;
   font-size:14px!important;
