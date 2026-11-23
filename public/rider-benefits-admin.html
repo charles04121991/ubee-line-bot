@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f7f8fa">
 <title>UBee 小U福利管理</title>
-<!-- 2026-10-02｜V1.3 動態分類管理：分類可新增／改名／排序／停用／刪除。 -->
+<!-- UBee Rider Benefits V2.0 RC1 | Production Stability | B01 unchanged -->
 <style>
 :root{
   --bg:#f5f6f8;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;
-  --yellow:#facc15;--yellow-soft:#fff8d7;--green:#16a34a;--green-soft:#dcfce7;
+  --yellow:#f97316;--yellow-soft:#fff7ed;--green:#16a34a;--green-soft:#dcfce7;
   --red:#dc2626;--red-soft:#fee2e2;--blue:#2563eb;--blue-soft:#eff6ff;
   --shadow:0 12px 32px rgba(15,23,42,.07);--radius:22px;
 }
@@ -20,28 +20,28 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .hidden{display:none!important}
 .shell{max-width:1240px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 16px calc(44px + env(safe-area-inset-bottom))}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}
-.brand{display:flex;align-items:center;gap:12px;min-width:0}.brand-mark{width:48px;height:48px;border-radius:16px;background:var(--yellow);display:grid;place-items:center;font-size:26px;box-shadow:0 8px 22px rgba(250,204,21,.24)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}.brand-mark{width:48px;height:48px;border-radius:16px;background:var(--yellow);display:grid;place-items:center;font-size:26px;box-shadow:0 8px 22px rgba(249,115,22,.24)}
 .brand h1{font-size:22px;margin:0;font-weight:950}.brand p{font-size:13px;color:var(--muted);margin:3px 0 0}
 .btn{border:0;border-radius:14px;min-height:46px;padding:11px 16px;font-weight:850;background:#fff;color:var(--text);box-shadow:0 0 0 1px var(--line) inset;transition:.15s}
 .btn:active{transform:scale(.985)}.btn.primary{background:var(--yellow);box-shadow:none}.btn.blue{background:var(--blue);color:#fff;box-shadow:none}.btn.green{background:var(--green);color:#fff;box-shadow:none}.btn.red{background:var(--red-soft);color:#b91c1c;box-shadow:none}.btn.ghost{background:transparent}.btn:disabled{opacity:.5;cursor:not-allowed}
-.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.summary-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px 15px}.summary-card span{display:block;color:var(--muted);font-size:12px;font-weight:750}.summary-card strong{display:block;margin-top:4px;font-size:24px;font-weight:950}.summary-card.active strong{color:var(--green)}.summary-card.draft strong{color:#a16207}.summary-card.inactive strong{color:#4b5563}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.summary-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px 15px}.summary-card span{display:block;color:var(--muted);font-size:12px;font-weight:750}.summary-card strong{display:block;margin-top:4px;font-size:24px;font-weight:950}.summary-card.active strong{color:var(--green)}.summary-card.draft strong{color:#9a3412}.summary-card.inactive strong{color:#4b5563}
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}.toolbar-copy strong{font-size:18px}.toolbar-copy span{display:block;color:var(--muted);font-size:13px;margin-top:4px}
 .workspace{display:grid;grid-template-columns:minmax(320px,.88fr) minmax(500px,1.12fr);gap:16px;align-items:start}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.panel-head strong{font-size:17px}.panel-body{padding:16px}
-.search-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px}.search-input{width:100%;border:1px solid var(--line);border-radius:14px;min-height:44px;padding:10px 13px;background:#fff;outline:none}.search-input:focus{border-color:#eab308;box-shadow:0 0 0 3px rgba(250,204,21,.16)}
+.search-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px}.search-input{width:100%;border:1px solid var(--line);border-radius:14px;min-height:44px;padding:10px 13px;background:#fff;outline:none}.search-input:focus{border-color:#ea580c;box-shadow:0 0 0 3px rgba(249,115,22,.16)}
 .filter-chips{display:flex;gap:7px;overflow:auto;padding:0 0 12px;scrollbar-width:none}.filter-chips::-webkit-scrollbar{display:none}.filter-chip{flex:0 0 auto;min-height:36px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-size:12px;font-weight:850}.filter-chip.active{background:#111827;color:#fff;border-color:#111827}
-.list{display:grid;gap:10px}.item{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff;display:grid;gap:10px}.item.active-edit{border-color:#eab308;box-shadow:0 0 0 3px rgba(250,204,21,.14)}.item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.item-title{font-weight:950;font-size:17px}.item-sub{font-size:12px;color:var(--muted);margin-top:3px}.item-offer{font-weight:800;line-height:1.45}.item-actions{display:flex;flex-wrap:wrap;gap:8px}.item-actions .btn{min-height:38px;padding:8px 11px;font-size:13px}.empty{padding:34px 14px;text-align:center;color:var(--muted);line-height:1.65}.empty strong{display:block;color:var(--text);font-size:16px;margin-bottom:5px}
-.status{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900;white-space:nowrap}.status.active{background:var(--green-soft);color:#166534}.status.draft{background:#fef3c7;color:#92400e}.status.inactive{background:#e5e7eb;color:#4b5563}
+.list{display:grid;gap:10px}.item{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff;display:grid;gap:10px}.item.active-edit{border-color:#ea580c;box-shadow:0 0 0 3px rgba(249,115,22,.14)}.item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.item-title{font-weight:950;font-size:17px}.item-sub{font-size:12px;color:var(--muted);margin-top:3px}.item-offer{font-weight:800;line-height:1.45}.item-actions{display:flex;flex-wrap:wrap;gap:8px}.item-actions .btn{min-height:38px;padding:8px 11px;font-size:13px}.empty{padding:34px 14px;text-align:center;color:var(--muted);line-height:1.65}.empty strong{display:block;color:var(--text);font-size:16px;margin-bottom:5px}
+.status{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900;white-space:nowrap}.status.active{background:var(--green-soft);color:#166534}.status.draft{background:#ffedd5;color:#9a3412}.status.inactive{background:#e5e7eb;color:#4b5563}
 .guide{display:flex;gap:8px;overflow:auto;padding:0 0 14px;scrollbar-width:none}.guide::-webkit-scrollbar{display:none}.guide-step{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:999px;background:#f8fafc;color:var(--muted);font-size:12px;font-weight:800}.guide-step b{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#e5e7eb;color:#374151;font-size:11px}.guide-step.done{background:var(--green-soft);color:#166534}.guide-step.done b{background:var(--green);color:#fff}
-.form-section{border:1px solid var(--line);border-radius:18px;padding:15px;margin-bottom:12px;background:#fff}.form-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px}.form-section-head strong{font-size:15px;font-weight:950}.form-section-head span{display:block;color:var(--muted);font-size:12px;margin-top:3px;line-height:1.45}.required-note{font-size:11px;color:#92400e;background:#fef3c7;padding:5px 8px;border-radius:999px;white-space:nowrap}
-.field{display:grid;gap:7px;margin-bottom:13px}.field:last-child{margin-bottom:0}.field label{font-size:13px;font-weight:850;color:#374151}.input,.select,.textarea{width:100%;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:14px;padding:13px 14px;outline:none;min-height:48px}.textarea{min-height:100px;resize:vertical;line-height:1.55}.input:focus,.select:focus,.textarea:focus{border-color:#eab308;box-shadow:0 0 0 3px rgba(250,204,21,.16)}.input.invalid,.select.invalid,.textarea.invalid{border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.09)}.hint{font-size:12px;color:var(--muted);line-height:1.5}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.form-section{border:1px solid var(--line);border-radius:18px;padding:15px;margin-bottom:12px;background:#fff}.form-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px}.form-section-head strong{font-size:15px;font-weight:950}.form-section-head span{display:block;color:var(--muted);font-size:12px;margin-top:3px;line-height:1.45}.required-note{font-size:11px;color:#9a3412;background:#ffedd5;padding:5px 8px;border-radius:999px;white-space:nowrap}
+.field{display:grid;gap:7px;margin-bottom:13px}.field:last-child{margin-bottom:0}.field label{font-size:13px;font-weight:850;color:#374151}.input,.select,.textarea{width:100%;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:14px;padding:13px 14px;outline:none;min-height:48px}.textarea{min-height:100px;resize:vertical;line-height:1.55}.input:focus,.select:focus,.textarea:focus{border-color:#ea580c;box-shadow:0 0 0 3px rgba(249,115,22,.16)}.input.invalid,.select.invalid,.textarea.invalid{border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.09)}.hint{font-size:12px;color:var(--muted);line-height:1.5}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .price-mode{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}.price-mode button{min-height:38px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-size:12px;font-weight:850}.price-mode button.active{background:#111827;color:#fff;border-color:#111827}.quick-price{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.quick-price button{min-height:34px;padding:7px 10px;border:0;border-radius:10px;background:#f3f4f6;color:#374151;font-size:12px;font-weight:800}
 .file-box{border:1px dashed #cbd5e1;border-radius:16px;padding:14px;background:#f8fafc}.file-box input{width:100%}.image-current{display:flex;align-items:center;gap:12px;margin-top:10px}.image-current img{width:86px;height:66px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
-.publish-options{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.publish-option{position:relative}.publish-option input{position:absolute;opacity:0;pointer-events:none}.publish-option label{min-height:76px;padding:12px;border:1px solid var(--line);border-radius:16px;background:#fff;display:flex;flex-direction:column;justify-content:center;cursor:pointer}.publish-option label strong{font-size:14px}.publish-option label span{margin-top:3px;color:var(--muted);font-size:11px;line-height:1.35}.publish-option input:checked+label{border-color:#111827;box-shadow:0 0 0 2px #111827 inset}.publish-option.active input:checked+label{background:#f0fdf4;border-color:var(--green);box-shadow:0 0 0 2px var(--green) inset}.publish-option.draft input:checked+label{background:#fffbeb;border-color:#eab308;box-shadow:0 0 0 2px #eab308 inset}
+.publish-options{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.publish-option{position:relative}.publish-option input{position:absolute;opacity:0;pointer-events:none}.publish-option label{min-height:76px;padding:12px;border:1px solid var(--line);border-radius:16px;background:#fff;display:flex;flex-direction:column;justify-content:center;cursor:pointer}.publish-option label strong{font-size:14px}.publish-option label span{margin-top:3px;color:var(--muted);font-size:11px;line-height:1.35}.publish-option input:checked+label{border-color:#111827;box-shadow:0 0 0 2px #111827 inset}.publish-option.active input:checked+label{background:#f0fdf4;border-color:var(--green);box-shadow:0 0 0 2px var(--green) inset}.publish-option.draft input:checked+label{background:#fff7ed;border-color:#ea580c;box-shadow:0 0 0 2px #ea580c inset}
 .advanced{border:1px solid var(--line);border-radius:16px;margin-bottom:12px;overflow:hidden}.advanced summary{list-style:none;cursor:pointer;padding:14px 15px;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:space-between}.advanced summary::-webkit-details-marker{display:none}.advanced summary::after{content:'＋';font-size:18px;color:var(--muted)}.advanced[open] summary::after{content:'−'}.advanced-body{padding:0 15px 15px}
 .error{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--red-soft);color:#991b1b;font-weight:750;font-size:13px}.success{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--green-soft);color:#166534;font-weight:750;font-size:13px}
-.preview{margin-top:14px}.preview-toggle{width:100%;border:1px solid var(--line);border-radius:16px;background:#fff;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;font-weight:900}.preview-card{margin-top:10px;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff}.preview-cover{height:150px;background:linear-gradient(135deg,#fff7cc,#fef3c7);display:grid;place-items:center;position:relative;overflow:hidden}.preview-cover img{width:100%;height:100%;object-fit:cover}.preview-cover .initial{width:68px;height:68px;border-radius:22px;background:#111827;color:#fff;display:grid;place-items:center;font-size:30px;font-weight:900}.preview-body{padding:16px}.preview-body small{color:var(--muted);font-weight:700}.preview-body h3{font-size:20px;margin:5px 0 10px}.preview-offer{font-size:18px;font-weight:950;color:#a16207;margin:8px 0}.preview-address{font-size:13px;color:var(--muted);line-height:1.5}
-.sticky-actions{position:sticky;bottom:0;z-index:20;margin:16px -16px -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);border-top:1px solid var(--line);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;gap:9px;flex-wrap:wrap}.sticky-actions .btn.primary{flex:1;min-width:160px}.unsaved{display:none;align-items:center;gap:6px;color:#92400e;font-size:12px;font-weight:800}.unsaved.show{display:flex}
+.preview{margin-top:14px}.preview-toggle{width:100%;border:1px solid var(--line);border-radius:16px;background:#fff;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;font-weight:900}.preview-card{margin-top:10px;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff}.preview-cover{height:150px;background:linear-gradient(135deg,#ffedd5,#ffedd5);display:grid;place-items:center;position:relative;overflow:hidden}.preview-cover img{width:100%;height:100%;object-fit:cover}.preview-cover .initial{width:68px;height:68px;border-radius:22px;background:#111827;color:#fff;display:grid;place-items:center;font-size:30px;font-weight:900}.preview-body{padding:16px}.preview-body small{color:var(--muted);font-weight:700}.preview-body h3{font-size:20px;margin:5px 0 10px}.preview-offer{font-size:18px;font-weight:950;color:#9a3412;margin:8px 0}.preview-address{font-size:13px;color:var(--muted);line-height:1.5}
+.sticky-actions{position:sticky;bottom:0;z-index:20;margin:16px -16px -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);border-top:1px solid var(--line);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;gap:9px;flex-wrap:wrap}.sticky-actions .btn.primary{flex:1;min-width:160px}.unsaved{display:none;align-items:center;gap:6px;color:#9a3412;font-size:12px;font-weight:800}.unsaved.show{display:flex}
 
 .topbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .link-btn{border:0;background:transparent;color:#2563eb;font-weight:850;padding:3px 0;cursor:pointer}
@@ -69,14 +69,21 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:11px 15px;border-radius:999px;font-size:13px;font-weight:800;opacity:0;pointer-events:none;transition:.2s;z-index:99;max-width:90vw;text-align:center}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:900px){.workspace{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr}.grid2,.grid3{grid-template-columns:1fr}.publish-options{grid-template-columns:1fr}.shell{padding-left:12px;padding-right:12px}.panel{border-radius:20px}.topbar{align-items:flex-start}.topbar .btn{min-height:42px;padding:9px 12px}.summary-card strong{font-size:22px}.sticky-actions{margin-left:-16px;margin-right:-16px}.editor-panel{scroll-margin-top:12px}}
 @media(max-width:520px){.brand p{display:none}.brand h1{font-size:19px}.brand-mark{width:43px;height:43px;border-radius:14px}.summary{gap:8px}.summary-card{padding:12px}.toolbar{align-items:flex-start}.toolbar>.btn{white-space:nowrap}.panel-body{padding:14px}.sticky-actions{margin-left:-14px;margin-right:-14px}.sticky-actions .btn{width:100%;flex:auto}}
+/* RC1: stable editor, accessible operation status. */
+.brand-mark{background:#171717;color:#fb923c;font-weight:950;letter-spacing:-.04em;box-shadow:none}
+.btn.primary{color:#171717;background:#fb923c}.toast{z-index:180}.busy-indicator{font-size:13px;font-weight:800;color:#9a3412;margin:0 0 12px}.busy-indicator:empty{display:none}
+.preview-extra{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}.preview-extra strong{display:block;margin-bottom:4px}.item-title,.item-offer{overflow-wrap:anywhere}
+input[readonly]{background:#f3f4f6;color:#374151}.panel-head{flex-wrap:wrap}.preview-cover img{display:block}.field label{line-height:1.4}
+@media(max-width:1050px) and (min-width:901px){.workspace{grid-template-columns:minmax(290px,.9fr) minmax(430px,1.1fr)}}
 </style>
 </head>
 <body>
 <div class="shell">
   <div id="appView">
+    <div id="busyIndicator" class="busy-indicator" role="status" aria-live="polite"></div>
     <div class="topbar">
       <div class="brand">
-        <div class="brand-mark">🐝</div>
+        <div class="brand-mark" aria-hidden="true">U</div>
         <div><h1>UBee 小U福利管理</h1><p>簡單新增、分類、預覽、上架合作福利</p></div>
       </div>
       <div class="topbar-actions">
@@ -146,7 +153,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
             <div id="priceFields" class="grid3 hidden">
               <div class="field"><label>原價</label><input id="originalPrice" class="input" type="number" min="0" value="0" inputmode="numeric"></div>
               <div class="field"><label>現折</label><input id="discountAmount" class="input" type="number" min="0" value="0" inputmode="numeric"></div>
-              <div class="field"><label>小U專屬價</label><input id="memberPrice" class="input" type="number" min="0" value="0" inputmode="numeric"></div>
+              <div class="field"><label>小U專屬價</label><input id="memberPrice" class="input" type="number" readonly min="0" value="0" inputmode="numeric"></div>
             </div>
             <div id="quickPrice" class="quick-price hidden"><button type="button" onclick="applyDiscount(100)">現省 $100</button><button type="button" onclick="applyDiscount(50)">現省 $50</button><button type="button" onclick="calculateMemberPrice()">依原價－現折計算</button></div>
           </div>
@@ -164,7 +171,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
             <div class="form-section-head"><div><strong>4. 店家圖片</strong><span>可選填；有圖片時騎士端會更好辨識</span></div></div>
             <div class="file-box">
               <input id="imageFile" type="file" accept="image/jpeg,image/png,image/webp">
-              <div class="hint" style="margin-top:7px">支援 JPG、PNG、WEBP，單張最多 6 MB。</div>
+              <div class="hint" style="margin-top:7px">支援 JPG、PNG、WEBP，單張最多 6 MB、8192 px／2400 萬像素。</div>
               <div id="currentImageBox" class="image-current hidden"><img id="currentImage" alt="目前合作店家圖片"><button class="btn red" type="button" onclick="removeCurrentImage()">移除圖片</button></div>
             </div>
           </div>
@@ -195,7 +202,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 
           <button id="previewToggle" class="preview-toggle" type="button" onclick="togglePreview()"><span>👀 騎士端預覽</span><span id="previewArrow">展開</span></button>
           <div id="previewWrap" class="preview hidden"><div id="previewCard" class="preview-card"></div></div>
-          <div id="editorMessage"></div>
+          <div id="editorMessage" role="status" aria-live="polite"></div>
 
           <div class="sticky-actions">
             <button id="saveBtn" class="btn primary" type="button" onclick="saveBenefit()">儲存福利</button>
@@ -226,7 +233,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
           <button id="saveCategoryBtn" class="btn primary" type="button" onclick="saveCategory()">儲存分類</button>
           <button id="cancelCategoryEditBtn" class="btn hidden" type="button" onclick="resetCategoryEditor()">取消編輯</button>
         </div>
-        <div id="categoryMessage"></div>
+        <div id="categoryMessage" role="status" aria-live="polite"></div>
       </div>
       <div id="categoryList" class="category-list"></div>
     </div>
@@ -244,15 +251,38 @@ let toastTimer=null;
 let activeFilter='all';
 let dirty=false;
 let booting=true;
+let categoryEditVersion=0, categoryDirty=false;
+let busy=false, listLoaded=false, listError='', categoryLoaded=false, categoryError='';
+let localPreviewUrl='', localPreviewFile=null, uploadedImage=null, draftId='', pendingMutation=null;
+function newId(){return globalThis.crypto?.randomUUID?.().replace(/-/g,'') || Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');}
+function beginBusy(label){if(busy)return false;busy=true;$('busyIndicator').textContent=label;document.body.setAttribute('aria-busy','true');syncBusyControls();return true;}
+function syncBusyControls(){document.querySelectorAll('button,input,select,textarea').forEach(el=>{if(busy){if(!el.disabled){el.dataset.benefitBusy='1';el.disabled=true;}}else if(el.dataset.benefitBusy==='1'){delete el.dataset.benefitBusy;el.disabled=false;}});}
+function endBusy(){busy=false;document.body.removeAttribute('aria-busy');$('busyIndicator').textContent='';syncBusyControls();}
+function releasePreview(){if(localPreviewUrl)URL.revokeObjectURL(localPreviewUrl);localPreviewUrl='';localPreviewFile=null;}
+function chosenPreview(){const file=$('imageFile').files?.[0]||null;if(file!==localPreviewFile){releasePreview();if(file){localPreviewFile=file;localPreviewUrl=URL.createObjectURL(file);}}return localPreviewUrl||(/^https?:\/\//i.test(formValue('imageUrl'))?formValue('imageUrl'):'');}
+function validateImage(file){if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type)||!file.size||file.size>6*1024*1024)throw new Error('請選擇 6 MB 以下 JPG、PNG 或 WEBP 圖片。');}
+function versionOf(item){return Number(item?.updatedAtMs||0);}
+function bodyJSON(data){return {headers:{'Content-Type':'application/json'},body:JSON.stringify(data)};}
+function updateCategoryNames(){benefits=benefits.map(item=>({...item,category:categoryById(item.categoryId)?.name||item.category}));}
+
 const $=id=>document.getElementById(id);
 
 function escapeHtml(value=''){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function showToast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);}
 function setMessage(target,message,type='error'){const el=$(target);if(!el)return;el.innerHTML=message?`<div class="${type==='success'?'success':'error'}">${escapeHtml(message)}</div>`:'';}
-async function api(path,options={}){const response=await fetch(`${API_BASE}${path}`,{cache:'no-store',...options});const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false){const error=new Error(data.message||`HTTP ${response.status}`);error.status=response.status;throw error;}return data;}
+async function api(path,options={}){
+  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),30000);
+  try{
+    const response=await fetch(`${API_BASE}${path}`,{cache:'no-store',...options,signal:controller.signal});
+    const data=await response.json().catch(()=>null);
+    if(!response.ok||!data||data.success!==true){const error=new Error(data?.message||(!data?'伺服器回傳格式不正確。':`HTTP ${response.status}`));error.status=response.status;error.code=data?.code;throw error;}
+    return data;
+  }catch(error){if(error.name==='AbortError')throw new Error('連線逾時，操作結果可能尚未確認；請重新整理或重試。');if(error instanceof TypeError)throw new Error('網路連線失敗，請檢查連線後再試。');throw error;}
+  finally{clearTimeout(timeout);}
+}
 function statusLabel(status){return status==='active'?'已上架':status==='inactive'?'已下架':'草稿';}
 function categoryStatusLabel(status){return status==='inactive'?'已停用':'啟用中';}
-function markDirty(value=true){if(booting)return;dirty=value;$('unsavedState').classList.toggle('show',dirty);}
+function markDirty(value=true){if(booting)return;if(value)pendingMutation=null;dirty=value;$('unsavedState').classList.toggle('show',dirty);}
 function updateEditorStatus(){const status=$('status').value||'draft';const el=$('editorStatus');el.className=`status ${status}`;el.textContent=statusLabel(status);document.querySelectorAll('input[name="statusRadio"]').forEach(r=>r.checked=r.value===status);updateGuide();}
 function syncStatusFromRadio(){const checked=document.querySelector('input[name="statusRadio"]:checked');if(!checked)return;$('status').value=checked.value;updateEditorStatus();renderPreview();markDirty();}
 
@@ -265,9 +295,9 @@ function normalizeCategoryItems(raw=[]){
       }
       const id=String(item?.id||item?.categoryId||'').trim();
       const name=String(item?.name||'').trim();
-      if(!id||!name)return null;
+      if(!/^[a-z0-9_-]{1,80}$/.test(id)||!name)return null;
       return{
-        id,name,
+        id,name,updatedAtMs:Number(item.updatedAtMs||0),
         sortOrder:Math.max(0,Number(item?.sortOrder||0)),
         status:String(item?.status||'active').toLowerCase()==='inactive'?'inactive':'active',
         benefitCount:Math.max(0,Number(item?.benefitCount||0)),
@@ -283,46 +313,34 @@ function selectedCategory(){
   const id=$('category')?.value||'';
   return categoryById(id)||null;
 }
-function populateCategories(preferredId=''){
-  const select=$('category');
-  if(!select)return;
-  const currentId=preferredId||select.value||currentBenefit?.categoryId||'';
-  const currentItem=categoryById(currentId)||categoryByName(currentBenefit?.category||'');
-  const choices=categoryItems.filter(item=>item.status==='active'||item.id===currentItem?.id);
-  if(!choices.length){
-    select.innerHTML='<option value="">請先建立福利分類</option>';
-    select.value='';
-    return;
-  }
-  select.innerHTML=choices.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}${item.status==='inactive'?'（已停用）':''}</option>`).join('');
-  if(currentItem&&choices.some(item=>item.id===currentItem.id))select.value=currentItem.id;
-  else select.value=choices[0].id;
+function populateCategories(preferredId){
+  const select=$('category');const id=preferredId===undefined?select.value:preferredId;
+  const current=categoryById(id);
+  const choices=categoryItems.filter(item=>item.status==='active'||item.id===id);
+  const placeholder=id&&!current?'<option value="">原分類不存在，請重新選擇</option>':'<option value="">請選擇福利分類</option>';
+  select.innerHTML=placeholder+choices.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}${item.status==='inactive'?'（已停用）':''}</option>`).join('');
+  select.value=current?id:'';
 }
-
-async function loadBenefits(showNotice=false){
+async function loadBenefits(showNotice=false,internal=false){
+  if(!internal&&!beginBusy('正在讀取福利與分類…'))return false;
+  $('countText').textContent='正在讀取…';listError='';
   try{
     const data=await api('/api/admin/rider-benefits');
-    benefits=Array.isArray(data.benefits)?data.benefits:[];
-    categoryItems=normalizeCategoryItems(data.categoryItems?.length?data.categoryItems:data.categories);
-    populateCategories(currentBenefit?.categoryId||'');
-    renderList();
-    updateStats();
-    renderCategoryManager();
-    if(showNotice)showToast('福利與分類已更新');
-  }catch(error){
-    showToast(error.message||'讀取失敗');
-  }
+    if(!Array.isArray(data.benefits)||!Array.isArray(data.categoryItems))throw new Error('福利清單回傳格式不正確。');
+    benefits=data.benefits.filter(item=>/^[a-zA-Z0-9_-]{1,80}$/.test(item.id)).map(item=>({...item,status:['active','inactive','draft'].includes(item.status)?item.status:'draft'}));
+    categoryItems=normalizeCategoryItems(data.categoryItems);listLoaded=true;categoryLoaded=true;categoryError='';
+    populateCategories();updateCategoryNames();renderList();updateStats();renderCategoryManager();syncBusyControls();
+    if(showNotice){if(currentBenefit&&!dirty){const fresh=benefits.find(x=>x.id===currentBenefit.id);if(fresh)displayBenefit(fresh);else {resetNewForm();showToast('原福利已不存在');return true;}}showToast('福利與分類已更新');}
+    return true;
+  }catch(error){listError=error.message||'讀取失敗';renderList();showToast(listError);return false;}
+  finally{if(!internal)endBusy();}
 }
-async function loadCategories(showNotice=false){
-  try{
-    const data=await api('/api/admin/rider-benefit-categories');
-    categoryItems=normalizeCategoryItems(data.categories);
-    populateCategories(currentBenefit?.categoryId||'');
-    renderCategoryManager();
-    if(showNotice)showToast('分類已更新');
-  }catch(error){
-    setMessage('categoryMessage',error.message||'讀取分類失敗');
-  }
+async function loadCategories(showNotice=false,internal=false){
+  if(!internal&&!beginBusy('正在讀取分類…'))return false;
+  categoryError='';
+  try{const data=await api('/api/admin/rider-benefit-categories');if(!Array.isArray(data.categories))throw new Error('分類回傳格式不正確。');categoryItems=normalizeCategoryItems(data.categories);categoryLoaded=true;populateCategories();updateCategoryNames();renderList();renderCategoryManager();syncBusyControls();if(showNotice)showToast('分類已更新');return true;}
+  catch(error){categoryError=error.message||'讀取分類失敗';renderCategoryManager();setMessage('categoryMessage',categoryError);return false;}
+  finally{if(!internal)endBusy();}
 }
 
 function updateStats(){$('statAll').textContent=benefits.length;$('statActive').textContent=benefits.filter(x=>x.status==='active').length;$('statDraft').textContent=benefits.filter(x=>x.status==='draft').length;$('statInactive').textContent=benefits.filter(x=>x.status==='inactive').length;}
@@ -331,8 +349,9 @@ function clearSearch(){$('searchInput').value='';renderList();}
 function renderList(){
   const query=$('searchInput')?.value.trim().toLowerCase()||'';
   const visible=benefits.filter(item=>(activeFilter==='all'||item.status===activeFilter)&&(!query||[item.name,item.offer,item.category,item.address].some(v=>String(v||'').toLowerCase().includes(query))));
-  $('countText').textContent=`共 ${benefits.length} 筆｜目前顯示 ${visible.length} 筆`;
+  $('countText').textContent=listError?`讀取失敗｜${listLoaded?'顯示上次資料':'請重新整理'}`:listLoaded?`共 ${benefits.length} 筆｜目前顯示 ${visible.length} 筆`:'正在讀取…';
   const el=$('benefitList');
+  if(!listLoaded){el.innerHTML=`<div class="empty"><strong>${listError?'讀取失敗':'正在讀取福利…'}</strong>${escapeHtml(listError||'')}</div>`;return;}
   if(!visible.length){
     el.innerHTML=`<div class="empty"><strong>${benefits.length?'找不到符合的福利':'還沒有福利資料'}</strong>${benefits.length?'換個關鍵字或篩選條件看看。':'按右上角「＋ 新增福利」建立第一筆。'}</div>`;
     return;
@@ -370,6 +389,7 @@ function readForm(){
     imageStoragePath:formValue('imageStoragePath'),
     imageStorageBucket:formValue('imageStorageBucket'),
     sortOrder:numberValue('sortOrder'),
+    priceMode:$('priceModePrice').classList.contains('active')?'price':'none',
     status:formValue('status')||'draft'
   };
 }
@@ -381,13 +401,14 @@ function writeForm(item={}){
   $('badge').value=item.badge||'正式小U專屬';
   $('offer').value=item.offer||'';
   $('description').value=item.description||'';
-  $('city').value=item.city||'台中市';
+  $('city').value=item.city??'台中市';
   $('district').value=item.district||'';
   $('address').value=item.address||'';
-  $('mapQuery').value=item.mapQuery||'';
+  const automatic=[item.name,item.address].filter(Boolean).join(' ');
+  $('mapQuery').value=item.mapQuery&&item.mapQuery!==automatic?item.mapQuery:'';
   $('validity').value=item.validity||'長期合作';
   $('notice').value=item.notice||'';
-  $('usageSteps').value=(item.usageSteps?.length?item.usageSteps:DEFAULT_STEPS).join('\n');
+  $('usageSteps').value=(Array.isArray(item.usageSteps)?item.usageSteps:DEFAULT_STEPS).join('\n');
   $('originalPrice').value=Number(item.originalPrice||0);
   $('discountAmount').value=Number(item.discountAmount||0);
   $('memberPrice').value=Number(item.memberPrice||0);
@@ -396,48 +417,37 @@ function writeForm(item={}){
   $('imageStorageBucket').value=item.imageStorageBucket||'';
   $('sortOrder').value=Number(item.sortOrder??100);
   $('status').value=item.status||'draft';
-  $('imageFile').value='';
-  setPriceMode((item.originalPrice||item.memberPrice||item.discountAmount)?'price':'none',false);
+  $('imageFile').value='';releasePreview();uploadedImage=null;pendingMutation=null;draftId=item.id||item.benefitId||'';
+  setPriceMode((item.priceMode==='price'||item.originalPrice||item.memberPrice||item.discountAmount)?'price':'none',false);
   updateCurrentImage();updateEditorStatus();renderPreview();clearValidation();
   dirty=false;$('unsavedState').classList.remove('show');
 }
 function confirmDiscard(){return !dirty||confirm('目前有尚未儲存的變更。\n\n確定要離開這筆編輯嗎？');}
-function newBenefit(scroll=false){
-  if(!confirmDiscard())return;
-  currentBenefit=null;
-  $('editorTitle').textContent='新增福利';
-  $('deleteBtn').classList.add('hidden');
-  setMessage('editorMessage','');
-  writeForm({status:'draft',sortOrder:100,city:'台中市',badge:'正式小U專屬',validity:'長期合作',usageSteps:DEFAULT_STEPS});
-  renderList();
-  if(scroll&&innerWidth<901)document.querySelector('.editor-panel')?.scrollIntoView({behavior:'smooth',block:'start'});
-}
-function editBenefit(id){
-  if(currentBenefit?.id!==id&&!confirmDiscard())return;
-  const item=benefits.find(x=>x.id===id);if(!item)return;
-  currentBenefit=item;
-  $('editorTitle').textContent=`編輯｜${item.name}`;
-  $('deleteBtn').classList.remove('hidden');
-  setMessage('editorMessage','');
-  writeForm(item);renderList();
-  if(innerWidth<901)document.querySelector('.editor-panel')?.scrollIntoView({behavior:'smooth',block:'start'});
-}
+function resetNewForm(){currentBenefit=null;$('editorTitle').textContent='新增福利';$('deleteBtn').classList.add('hidden');setMessage('editorMessage','');writeForm({status:'draft',sortOrder:100,city:'台中市',badge:'正式小U專屬',validity:'長期合作',usageSteps:DEFAULT_STEPS});renderList();syncBusyControls();}
+function newBenefit(scroll=false){if(busy||!confirmDiscard())return;resetNewForm();if(scroll&&innerWidth<901)document.querySelector('.editor-panel')?.scrollIntoView({behavior:'smooth',block:'start'});}
+function displayBenefit(item){currentBenefit=item;$('editorTitle').textContent=`編輯｜${item.name}`;$('deleteBtn').classList.remove('hidden');setMessage('editorMessage','');writeForm(item);renderList();syncBusyControls();}
+function editBenefit(id){if(busy||(currentBenefit?.id===id&&!dirty)||!confirmDiscard())return;const item=benefits.find(x=>x.id===id);if(!item)return;displayBenefit(item);if(innerWidth<901)document.querySelector('.editor-panel')?.scrollIntoView({behavior:'smooth',block:'start'});}
+
 function updateCurrentImage(){const url=formValue('imageUrl');$('currentImageBox').classList.toggle('hidden',!url);if(url)$('currentImage').src=url;else $('currentImage').removeAttribute('src');}
-function removeCurrentImage(){$('imageUrl').value='';$('imageStoragePath').value='';$('imageStorageBucket').value='';$('imageFile').value='';updateCurrentImage();renderPreview();markDirty();}
+function removeCurrentImage(){$('imageUrl').value='';$('imageStoragePath').value='';$('imageStorageBucket').value='';$('imageFile').value='';releasePreview();uploadedImage=null;updateCurrentImage();renderPreview();markDirty();}
 function setPriceMode(mode,mark=true){const enabled=mode==='price';$('priceFields').classList.toggle('hidden',!enabled);$('quickPrice').classList.toggle('hidden',!enabled);$('priceModePrice').classList.toggle('active',enabled);$('priceModeNone').classList.toggle('active',!enabled);if(!enabled){$('originalPrice').value=0;$('discountAmount').value=0;$('memberPrice').value=0;}if(mark)markDirty();renderPreview();}
 function applyDiscount(amount){$('discountAmount').value=amount;calculateMemberPrice();markDirty();}
-function calculateMemberPrice(){const original=numberValue('originalPrice');const discount=numberValue('discountAmount');if(original>0)$('memberPrice').value=Math.max(0,original-discount);renderPreview();markDirty();}
+function calculateMemberPrice(){const original=numberValue('originalPrice');const discount=numberValue('discountAmount');$('memberPrice').value=Math.max(0,original-discount);renderPreview();markDirty();}
 function renderPreview(){
-  const item=readForm();
-  const imageFile=$('imageFile').files?.[0];
-  const localImage=imageFile?URL.createObjectURL(imageFile):item.imageUrl;
-  const initial=escapeHtml((item.name||'U').slice(0,1));
-  $('previewCard').innerHTML=`<div class="preview-cover">${localImage?`<img src="${escapeHtml(localImage)}" alt="">`:`<div class="initial">${initial}</div>`}</div><div class="preview-body"><small>${escapeHtml(item.category||'福利分類')} · UBee 合作店家</small><h3>${escapeHtml(item.name||'合作店家名稱')}</h3><div class="status ${escapeHtml(item.status)}">${statusLabel(item.status)}</div><div class="preview-offer">${escapeHtml(item.offer||'小U優惠內容')}</div><div class="preview-address">${escapeHtml(`${item.city}${item.district}`)}<br>${escapeHtml(item.address||'店家地址')}</div></div>`;
-  updateGuide();
+  updateGuide();if($('previewWrap').classList.contains('hidden'))return;
+  const item=readForm(),localImage=chosenPreview(),initial=escapeHtml((item.name||'U').slice(0,1));
+  let cover=$('previewCard').querySelector('.preview-cover');
+  if(!cover){$('previewCard').innerHTML='<div class="preview-cover"></div><div class="preview-body"></div>';cover=$('previewCard').querySelector('.preview-cover');}
+  if(localImage){let img=cover.querySelector('img');if(!img){cover.innerHTML='<img alt="福利圖片">';img=cover.querySelector('img');}if(img.getAttribute('src')!==localImage)img.setAttribute('src',localImage);}
+  else{cover.innerHTML=`<div class="initial">${initial}</div>`;}
+  const price=item.priceMode==='price'?`<div class="preview-extra"><strong>價格</strong>原價 NT$${item.originalPrice.toLocaleString()}　現折 NT$${item.discountAmount.toLocaleString()}<br>小U專屬價 NT$${item.memberPrice.toLocaleString()}</div>`:'';
+  $('previewCard').querySelector('.preview-body').innerHTML=`<small>${escapeHtml(item.category||'福利分類')} · ${escapeHtml(item.badge)}</small><h3>${escapeHtml(item.name||'合作店家名稱')}</h3><div class="status ${escapeHtml(item.status)}">${statusLabel(item.status)}</div><div class="preview-offer">${escapeHtml(item.offer||'小U優惠內容')}</div><div class="preview-address">${escapeHtml(item.address||'店家地址')}</div>${price}<div class="preview-extra"><strong>優惠期限</strong>${escapeHtml(item.validity)}
+${escapeHtml(item.description)}</div><div class="preview-extra"><strong>使用方式</strong>${item.usageSteps.map((x,i)=>`${i+1}. ${escapeHtml(x)}`).join('\n')}</div>${item.notice?`<div class="preview-extra"><strong>注意事項</strong>${escapeHtml(item.notice)}</div>`:''}`;
 }
+
 function togglePreview(){const wrap=$('previewWrap');const opening=wrap.classList.contains('hidden');wrap.classList.toggle('hidden',!opening);$('previewArrow').textContent=opening?'收合':'展開';if(opening)renderPreview();}
 function updateGuide(){const data=readForm();$('guide1').classList.toggle('done',!!(data.name&&data.categoryId));$('guide2').classList.toggle('done',!!data.offer);$('guide3').classList.toggle('done',!!data.address);$('guide4').classList.toggle('done',!!data.status);}
-function clearValidation(){['name','category','offer','address'].forEach(id=>$(id).classList.remove('invalid'));}
+function clearValidation(){['name','category','offer','address','originalPrice','discountAmount','memberPrice','sortOrder'].forEach(id=>$(id).classList.remove('invalid'));}
 function validateForm(){
   clearValidation();
   const data=readForm();
@@ -452,6 +462,9 @@ function validateForm(){
     setMessage('editorMessage',`還差 ${missing.map(x=>x[1]).join('、')}，填完就可以儲存。`);
     return false;
   }
+  const validNumber=(id,max)=>$(id).value.trim()!==''&&Number.isSafeInteger(Number($(id).value))&&Number($(id).value)>=0&&Number($(id).value)<=max;
+  if(!validNumber('sortOrder',99999)||['originalPrice','discountAmount','memberPrice'].some(id=>!validNumber(id,99999999))||data.discountAmount>data.originalPrice||data.memberPrice!==data.originalPrice-data.discountAmount){setMessage('editorMessage','請確認金額為非負整數、現折不超過原價、小U價等於原價減現折，且排序在 0～99999。可按「依原價－現折計算」修正舊資料。');return false;}
+  try{validateImage($('imageFile').files?.[0]);}catch(e){setMessage('editorMessage',e.message);return false;}
   const category=selectedCategory();
   if(data.status==='active'&&category?.status!=='active'){
     $('category').classList.add('invalid');
@@ -460,55 +473,59 @@ function validateForm(){
   }
   return true;
 }
-async function uploadSelectedImage(benefitId=''){
-  const file=$('imageFile').files?.[0];if(!file)return null;
-  const form=new FormData();form.append('file',file);if(benefitId)form.append('benefitId',benefitId);
-  const response=await fetch(`${API_BASE}/api/admin/rider-benefits/image`,{method:'POST',body:form});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||data.success===false)throw new Error(data.message||'圖片上傳失敗。');
-  return data;
+async function uploadSelectedImage(benefitId){
+  const file=$('imageFile').files?.[0];if(!file)return null;validateImage(file);
+  if(uploadedImage?.file===file&&uploadedImage.benefitId===benefitId)return uploadedImage.data;
+  $('busyIndicator').textContent='正在上傳合作店家圖片…';
+  const form=new FormData();form.append('benefitId',benefitId);form.append('file',file);
+  const data=await new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();xhr.open('POST',`${API_BASE}/api/admin/rider-benefits/image`);xhr.timeout=60000;
+    xhr.upload.onprogress=e=>{if(e.lengthComputable)$('busyIndicator').textContent=`正在上傳合作店家圖片… ${Math.min(100,Math.round(e.loaded/e.total*100))}%`;};
+    xhr.onload=()=>{let data;try{data=JSON.parse(xhr.responseText);}catch{}if(xhr.status>=200&&xhr.status<300&&data?.success===true)resolve(data);else{const error=new Error(data?.message||'圖片上傳失敗或回傳格式不正確。');error.code=data?.code;error.status=xhr.status;reject(error);}};
+    xhr.onerror=()=>reject(new Error('圖片上傳網路連線失敗。'));xhr.ontimeout=()=>reject(new Error('圖片上傳逾時，請重試。'));xhr.onabort=()=>reject(new Error('圖片上傳已取消。'));xhr.send(form);
+  });
+  if(data.benefitId!==benefitId||!data.imageUrl||!data.imageStoragePath||!data.imageStorageBucket)throw new Error('圖片上傳回傳資料不完整。');
+  uploadedImage={file,benefitId,data};return data;
 }
 async function saveBenefit(){
-  if(!validateForm())return;
-  const payload=readForm();
-  $('saveBtn').disabled=true;$('saveBtn').textContent='正在儲存…';setMessage('editorMessage','');
+  if(busy||!validateForm()||!beginBusy('正在儲存福利…'))return;
+  const payload=readForm();draftId=draftId||newId();payload.benefitId=payload.benefitId||draftId;payload.expectedUpdatedAtMs=versionOf(currentBenefit);
+  pendingMutation=pendingMutation||newId();payload.mutationId=pendingMutation;
+  $('saveBtn').textContent='正在儲存…';setMessage('editorMessage','');
   try{
     const uploaded=await uploadSelectedImage(payload.benefitId);
-    if(uploaded){
-      payload.benefitId=payload.benefitId||uploaded.benefitId;
-      payload.imageUrl=uploaded.imageUrl;
-      payload.imageStoragePath=uploaded.imageStoragePath;
-      payload.imageStorageBucket=uploaded.imageStorageBucket;
-    }
-    const data=await api('/api/admin/rider-benefits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    dirty=false;$('unsavedState').classList.remove('show');
-    setMessage('editorMessage',data.message||'福利已儲存。','success');
-    await loadBenefits(false);
-    const savedId=data.benefit?.id;
-    if(savedId)editBenefit(savedId);
-    showToast(payload.status==='active'?'福利已儲存並上架':'福利已儲存');
-  }catch(error){setMessage('editorMessage',error.message||'儲存失敗。');}
-  finally{$('saveBtn').disabled=false;$('saveBtn').textContent='儲存福利';}
+    if(uploaded)Object.assign(payload,{imageUrl:uploaded.imageUrl,imageStoragePath:uploaded.imageStoragePath,imageStorageBucket:uploaded.imageStorageBucket});
+    $('busyIndicator').textContent='正在儲存福利…';
+    const data=await api('/api/admin/rider-benefits',{method:'POST',...bodyJSON(payload)});
+    if(!data.benefit?.id)throw new Error('伺服器未回傳福利資料，請重新整理確認。');
+    const saved=data.benefit;benefits=[...benefits.filter(x=>x.id!==saved.id),saved];listLoaded=true;updateStats();displayBenefit(saved);
+    const ok=await loadBenefits(false,true);
+    setMessage('editorMessage',ok?'福利已儲存。':'福利已儲存，但清單同步失敗，請重新整理。',ok?'success':'error');
+    showToast(ok?'福利已儲存':'儲存成功，清單待同步');
+  }catch(error){if(error.code==='BENEFIT_IMAGE_EXPIRED')uploadedImage=null;setMessage('editorMessage',error.message||'儲存失敗。');}
+  finally{$('saveBtn').textContent='儲存福利';endBusy();}
 }
 async function quickStatus(id,status){
-  try{
-    await api(`/api/admin/rider-benefits/${encodeURIComponent(id)}/status`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
-    await loadBenefits(false);
-    if(currentBenefit?.id===id){currentBenefit=benefits.find(x=>x.id===id)||null;if(currentBenefit)writeForm(currentBenefit);}
-    showToast(status==='active'?'福利已上架':'福利已下架');
-  }catch(error){showToast(error.message||'狀態更新失敗');}
+  if(busy)return;const item=benefits.find(x=>x.id===id);if(!item)return;
+  if(currentBenefit?.id===id&&dirty&&!confirm('這筆福利有未儲存變更。確定放棄變更，直接更新已儲存的福利狀態？'))return;
+  if(!beginBusy('正在更新福利狀態…'))return;
+  try{const data=await api(`/api/admin/rider-benefits/${encodeURIComponent(id)}/status`,{method:'POST',...bodyJSON({status,expectedUpdatedAtMs:versionOf(item)})});
+    if(!data.benefit?.id)throw new Error('伺服器未回傳福利資料。');benefits=benefits.map(x=>x.id===id?data.benefit:x);updateStats();if(currentBenefit?.id===id)displayBenefit(data.benefit);
+    const ok=await loadBenefits(false,true);showToast(ok?(status==='active'?'福利已上架':'福利已下架'):'狀態已更新，清單同步失敗');
+  }catch(error){showToast(error.message||'狀態更新失敗');}finally{endBusy();}
 }
 async function deleteCurrentBenefit(){
-  const id=formValue('benefitId');const name=formValue('name');if(!id)return;
-  if(!confirm(`確定要永久刪除「${name||id}」嗎？\n\n如果只是暫停合作，建議改成「下架」保留資料。`))return;
-  try{await api(`/api/admin/rider-benefits/${encodeURIComponent(id)}`,{method:'DELETE'});dirty=false;await loadBenefits(false);newBenefit(false);showToast('福利已永久刪除');}
-  catch(error){setMessage('editorMessage',error.message||'刪除失敗。');}
+  if(busy)return;const id=formValue('benefitId'),name=formValue('name');if(!id)return;
+  if(!confirm(`確定要永久刪除「${name||id}」嗎？\n\n如果只是暫停合作，建議改成「下架」保留資料。${dirty?'\n尚未儲存的變更也會放棄。':''}`)||!beginBusy('正在刪除福利…'))return;
+  try{await api(`/api/admin/rider-benefits/${encodeURIComponent(id)}`,{method:'DELETE',...bodyJSON({expectedUpdatedAtMs:versionOf(currentBenefit)})});benefits=benefits.filter(x=>x.id!==id);resetNewForm();updateStats();const ok=await loadBenefits(false,true);showToast(ok?'福利已永久刪除':'福利已刪除，清單同步失敗');}
+  catch(error){setMessage('editorMessage',error.message||'刪除失敗。');}finally{endBusy();}
 }
 
 // =========================================================
 // V1.3｜福利分類管理
 // =========================================================
 function openCategoryManager(){
+  if(busy)return;
   $('categoryManager').classList.add('show');
   $('categoryManager').setAttribute('aria-hidden','false');
   document.body.style.overflow='hidden';
@@ -516,15 +533,17 @@ function openCategoryManager(){
   loadCategories(false);
 }
 function closeCategoryManager(){
+  if(busy||(categoryDirty&&!confirm('分類尚未儲存，確定放棄變更？')))return;
+  categoryDirty=false;
   $('categoryManager').classList.remove('show');
   $('categoryManager').setAttribute('aria-hidden','true');
   document.body.style.overflow='';
-  populateCategories(currentBenefit?.categoryId||$('category').value||'');
+  populateCategories();
   renderPreview();
 }
 function categoryOverlayClick(event){if(event.target===$('categoryManager'))closeCategoryManager();}
 function resetCategoryEditor(){
-  $('categoryId').value='';
+  categoryDirty=false;categoryEditVersion=0;$('categoryId').value='';
   $('categoryName').value='';
   $('categorySortOrder').value=100;
   $('categoryStatus').value='active';
@@ -534,6 +553,7 @@ function resetCategoryEditor(){
 }
 function renderCategoryManager(){
   const el=$('categoryList');if(!el)return;
+  if(!categoryLoaded){el.innerHTML=`<div class="category-empty">${escapeHtml(categoryError||'正在讀取分類…')}</div>`;return;}
   if(!categoryItems.length){
     el.innerHTML='<div class="category-empty">目前沒有福利分類，先建立第一個分類。</div>';
     return;
@@ -551,8 +571,8 @@ function renderCategoryManager(){
   </div>`).join('');
 }
 function editCategory(id){
-  const item=categoryById(id);if(!item)return;
-  $('categoryId').value=item.id;
+  if(busy||(categoryDirty&&!confirm('分類尚未儲存，確定放棄變更？')))return;const item=categoryById(id);if(!item)return;
+  categoryDirty=false;categoryEditVersion=versionOf(item);$('categoryId').value=item.id;
   $('categoryName').value=item.name;
   $('categorySortOrder').value=Number(item.sortOrder||0);
   $('categoryStatus').value=item.status;
@@ -562,59 +582,45 @@ function editCategory(id){
   $('categoryName').focus();
 }
 async function saveCategory(){
-  const categoryId=formValue('categoryId');
-  const name=formValue('categoryName');
-  const sortOrder=numberValue('categorySortOrder');
-  const status=formValue('categoryStatus')||'active';
-  if(!name){$('categoryName').focus();setMessage('categoryMessage','請輸入福利分類名稱。');return;}
-  $('saveCategoryBtn').disabled=true;$('saveCategoryBtn').textContent='正在儲存…';setMessage('categoryMessage','');
-  try{
-    const data=await api('/api/admin/rider-benefit-categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({categoryId,name,sortOrder,status})});
-    categoryItems=normalizeCategoryItems(data.categories||[]);
-    renderCategoryManager();populateCategories(currentBenefit?.categoryId||'');
-    resetCategoryEditor();
-    await loadBenefits(false);
-    showToast(data.message||'福利分類已儲存');
-  }catch(error){setMessage('categoryMessage',error.message||'儲存分類失敗。');}
-  finally{$('saveCategoryBtn').disabled=false;$('saveCategoryBtn').textContent='儲存分類';}
+  if(busy)return;const categoryId=formValue('categoryId'),name=formValue('categoryName'),sortOrder=Number($('categorySortOrder').value),status=formValue('categoryStatus');
+  if(!name||name==='全部'||!$('categorySortOrder').value.trim()||!Number.isSafeInteger(sortOrder)||sortOrder<0||sortOrder>99999){setMessage('categoryMessage','請輸入有效的分類名稱及 0～99999 整數排序。');return;}
+  if(!beginBusy('正在儲存分類…'))return;
+  $('saveCategoryBtn').textContent='正在儲存…';setMessage('categoryMessage','');
+  try{const data=await api('/api/admin/rider-benefit-categories',{method:'POST',...bodyJSON({categoryId,name,sortOrder,status,expectedUpdatedAtMs:categoryId?categoryEditVersion:0})});
+    if(!Array.isArray(data.categories))throw new Error('分類回傳格式不正確。');categoryItems=normalizeCategoryItems(data.categories);categoryLoaded=true;populateCategories();updateCategoryNames();renderCategoryManager();renderList();resetCategoryEditor();const ok=await loadBenefits(false,true);setMessage('categoryMessage',ok?'分類已儲存。':'分類已儲存，清單同步失敗。',ok?'success':'error');showToast(ok?'分類已儲存':'分類已儲存，清單待同步');}
+  catch(error){setMessage('categoryMessage',error.message||'儲存分類失敗。');}finally{$('saveCategoryBtn').textContent='儲存分類';endBusy();}
 }
 async function toggleCategoryStatus(id,status){
-  const item=categoryById(id);if(!item)return;
-  try{
-    const data=await api('/api/admin/rider-benefit-categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({categoryId:item.id,name:item.name,sortOrder:item.sortOrder,status})});
-    categoryItems=normalizeCategoryItems(data.categories||[]);
-    renderCategoryManager();populateCategories(currentBenefit?.categoryId||'');
-    await loadBenefits(false);
-    showToast(status==='active'?'分類已啟用':'分類已停用');
-  }catch(error){setMessage('categoryMessage',error.message||'更新分類失敗。');}
+  if(busy)return;const item=categoryById(id);if(!item||!beginBusy('正在更新分類…'))return;
+  try{const data=await api('/api/admin/rider-benefit-categories',{method:'POST',...bodyJSON({categoryId:item.id,name:item.name,sortOrder:item.sortOrder,status,expectedUpdatedAtMs:versionOf(item)})});if(!Array.isArray(data.categories))throw new Error('分類回傳格式不正確。');categoryItems=normalizeCategoryItems(data.categories);populateCategories();updateCategoryNames();renderCategoryManager();renderList();const ok=await loadBenefits(false,true);showToast(ok?(status==='active'?'分類已啟用':'分類已停用'):'分類已更新，清單同步失敗');}
+  catch(error){setMessage('categoryMessage',error.message||'更新分類失敗。');}finally{endBusy();}
 }
 async function deleteCategory(id){
-  const item=categoryById(id);if(!item)return;
-  if(Number(item.benefitCount||0)>0){setMessage('categoryMessage','這個分類仍有福利使用中，請先把福利移到其他分類。');return;}
-  if(!confirm(`確定要刪除分類「${item.name}」嗎？`))return;
-  try{
-    const data=await api(`/api/admin/rider-benefit-categories/${encodeURIComponent(id)}`,{method:'DELETE'});
-    await loadCategories(false);await loadBenefits(false);
-    resetCategoryEditor();
-    showToast(data.message||'福利分類已刪除');
-  }catch(error){setMessage('categoryMessage',error.message||'刪除分類失敗。');}
+  if(busy)return;const item=categoryById(id);if(!item)return;
+  if(Number(item.benefitCount||0)>0){setMessage('categoryMessage','這個分類仍有福利使用中，請先移到其他分類。');return;}
+  if(!confirm(`確定要刪除分類「${item.name}」嗎？`)||!beginBusy('正在刪除分類…'))return;
+  try{await api(`/api/admin/rider-benefit-categories/${encodeURIComponent(id)}`,{method:'DELETE',...bodyJSON({expectedUpdatedAtMs:versionOf(item)})});categoryItems=categoryItems.filter(x=>x.id!==id);populateCategories();renderCategoryManager();if(formValue('categoryId')===id)resetCategoryEditor();const ok=await loadBenefits(false,true);showToast(ok?'福利分類已刪除':'分類已刪除，清單同步失敗');}
+  catch(error){setMessage('categoryMessage',error.message||'刪除分類失敗。');}finally{endBusy();}
 }
 
+
+['categoryName','categorySortOrder','categoryStatus'].forEach(id=>$(id).addEventListener('input',()=>{categoryDirty=true;}));
 $('searchInput').addEventListener('input',renderList);
 $('status').addEventListener('change',()=>{updateEditorStatus();renderPreview();markDirty();});
 document.querySelectorAll('input[name="statusRadio"]').forEach(r=>r.addEventListener('change',syncStatusFromRadio));
 ['name','category','offer','description','city','district','address','badge','sortOrder','validity','usageSteps','notice','mapQuery','originalPrice','discountAmount','memberPrice'].forEach(id=>{
   const el=$(id);
-  el.addEventListener('input',()=>{el.classList.remove('invalid');renderPreview();markDirty();});
+  el.addEventListener('input',()=>{el.classList.remove('invalid');if(id==='originalPrice'||id==='discountAmount')calculateMemberPrice();else{renderPreview();markDirty();}});
   el.addEventListener('change',()=>{el.classList.remove('invalid');renderPreview();markDirty();});
 });
-$('imageFile').addEventListener('change',()=>{renderPreview();markDirty();});
-window.addEventListener('beforeunload',event=>{if(!dirty)return;event.preventDefault();event.returnValue='';});
+$('imageFile').addEventListener('change',()=>{uploadedImage=null;releasePreview();try{validateImage($('imageFile').files?.[0]);setMessage('editorMessage','');}catch(e){$('imageFile').value='';setMessage('editorMessage',e.message);}renderPreview();markDirty();});
+window.addEventListener('pagehide',releasePreview);
+window.addEventListener('beforeunload',event=>{if(!dirty&&!busy&&!categoryDirty)return;event.preventDefault();event.returnValue='';});
 window.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('categoryManager').classList.contains('show'))closeCategoryManager();});
 
 (async function boot(){
   await loadBenefits(false);
-  newBenefit(false);
+  resetNewForm();
   booting=false;
 })();
 </script>
