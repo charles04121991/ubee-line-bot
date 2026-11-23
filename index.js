@@ -1,3 +1,4 @@
+// UBee Rider Benefits V2.0 RC1 — Production Stability candidate; B01 unchanged.
 // UBee Customer V1.7.0 RC6.2 — Multistop V2 + Rider Minimum NT$58 — TEST CANDIDATE (NOT DEPLOYED)
 // UBee Customer V1.7.0 RC6 — LEGACY CUSTOMER RETIREMENT CANDIDATE, NOT DEPLOYED.
 // UBee Customer RC2 — customer membership growth & new customer referrals retired (候選，尚未正式部署)
@@ -9225,6 +9226,56 @@ const RIDER_BENEFITS_STORAGE_BUCKET = String(
   `${process.env.FIREBASE_PROJECT_ID || ''}.appspot.com`
 ).trim();
 const RIDER_BENEFITS_IMAGE_MAX_BYTES = 6 * 1024 * 1024;
+const RIDER_BENEFIT_UPLOADS = 'riderBenefitImageUploads';
+const RIDER_BENEFIT_UPLOAD_TTL = 24 * 60 * 60 * 1000;
+const RIDER_BENEFIT_CLEANUP_DELAY = 60 * 60 * 1000;
+const riderBenefitInitFlights = new Map();
+function riderBenefitOnce(key, fn) {
+  if (!riderBenefitInitFlights.has(key)) {
+    const task = Promise.resolve().then(fn).catch(error => { riderBenefitInitFlights.delete(key); throw error; });
+    riderBenefitInitFlights.set(key, task);
+  }
+  return riderBenefitInitFlights.get(key);
+}
+async function riderBenefitAll(query) {
+  const docs = [];
+  let after;
+  for (;;) {
+    let page = query.orderBy(admin.firestore.FieldPath.documentId()).limit(200);
+    if (after) page = page.startAfter(after);
+    const snapshot = await page.get();
+    docs.push(...snapshot.docs);
+    if (snapshot.size < 200) return docs;
+    after = snapshot.docs[snapshot.size - 1];
+  }
+}
+function riderBenefitError(status, code, message) { return Object.assign(new Error(message), {benefitStatus:status, benefitCode:code}); }
+function riderBenefitFail(res, error, fallback) {
+  if (error?.benefitStatus) return res.status(error.benefitStatus).json({success:false,code:error.benefitCode,message:error.message});
+  console.error('Rider Benefits:', error);
+  return res.status(500).json({success:false,code:'BENEFIT_INTERNAL_ERROR',message:fallback});
+}
+function riderBenefitInteger(value, max, label) {
+  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '' || !Number.isSafeInteger(Number(value)) || Number(value)<0 || Number(value)>max) throw riderBenefitError(400,'BENEFIT_INVALID_NUMBER',`${label}必須是 0～${max} 的整數。`);
+  return Number(value);
+}
+function riderBenefitStrictId(value, category=false) {
+  const raw=String(value ?? '').trim();
+  if (!raw || /^__.*__$/.test(raw) || raw !== (category?riderBenefitCategorySafeId(raw):riderBenefitSafeId(raw))) throw riderBenefitError(400,'BENEFIT_INVALID_ID','資料編號不正確。');
+  return raw;
+}
+function riderBenefitVersion(existing, payload) {
+  if (payload.expectedUpdatedAtMs !== undefined && riderBenefitInteger(payload.expectedUpdatedAtMs,Number.MAX_SAFE_INTEGER,'資料版本') !== Number(existing.updatedAtMs || 0)) throw riderBenefitError(409,'BENEFIT_CONFLICT','資料已被其他操作更新，請重新整理後再編輯。');
+}
+function riderBenefitNow(existing={}) { return Math.max(Date.now(),Number(existing.updatedAtMs||0)+1); }
+function riderBenefitPrices(payload={}, existing={}) {
+  const originalPrice=riderBenefitInteger(payload.originalPrice ?? existing.originalPrice ?? 0,99999999,'原價');
+  const discountAmount=riderBenefitInteger(payload.discountAmount ?? existing.discountAmount ?? 0,99999999,'現折');
+  const memberPrice=originalPrice-discountAmount;
+  if (memberPrice<0) throw riderBenefitError(400,'BENEFIT_INVALID_PRICE','現折不可大於原價。');
+  if (payload.memberPrice !== undefined && riderBenefitInteger(payload.memberPrice,99999999,'小U專屬價') !== memberPrice) throw riderBenefitError(400,'BENEFIT_INVALID_PRICE','小U專屬價必須等於原價減現折。');
+  return {originalPrice,discountAmount,memberPrice};
+}
 
 const riderBenefitImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -9302,7 +9353,8 @@ function riderBenefitCategoryPayload(doc, usage={}) {
   };
 }
 
-async function ensureRiderBenefitCategoriesSeeded() {
+function ensureRiderBenefitCategoriesSeeded() { return riderBenefitOnce('ensureRiderBenefitCategoriesSeeded', ensureRiderBenefitCategoriesSeededWork); }
+async function ensureRiderBenefitCategoriesSeededWork() {
   const migrationRef = db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFIT_CATEGORIES_SEED_ID);
   const categoryCollection = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION);
   const categoryRefs = RIDER_BENEFIT_DEFAULT_CATEGORIES.map(item => categoryCollection.doc(item.id));
@@ -9339,16 +9391,16 @@ async function ensureRiderBenefitCategoriesSeeded() {
   });
 }
 
-async function listRiderBenefitCategories({ includeInactive=true, includeUsage=false }={}) {
+async function listRiderBenefitCategories({ includeInactive=true, includeUsage=false, benefitDocs:providedBenefitDocs=null }={}) {
   await ensureRiderBenefitCategoriesSeeded();
-  const categorySnapshot = await db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).limit(300).get();
-  const categories = categorySnapshot.docs.map(doc => riderBenefitCategoryPayload(doc));
+  const categoryDocs = await riderBenefitAll(db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION));
+  const categories = categoryDocs.map(doc => riderBenefitCategoryPayload(doc));
 
   let usageMap = new Map();
   if (includeUsage) {
-    const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
+    const benefitDocs = providedBenefitDocs ?? await riderBenefitAll(db.collection(RIDER_BENEFITS_COLLECTION));
     usageMap = new Map(categories.map(item => [item.id, { benefitCount:0, activeBenefitCount:0 }]));
-    for (const doc of benefitsSnapshot.docs) {
+    for (const doc of benefitDocs) {
       const data = doc.data() || {};
       const categoryId = riderBenefitCategorySafeId(data.categoryId || RIDER_BENEFIT_LEGACY_CATEGORY_MAP[riderBenefitCategoryName(data.category)] || '');
       if (!categoryId || !usageMap.has(categoryId)) continue;
@@ -9364,41 +9416,14 @@ async function listRiderBenefitCategories({ includeInactive=true, includeUsage=f
     .sort((a,b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'zh-Hant'));
 }
 
-async function resolveRiderBenefitCategory(categoryId='', categoryName='', { allowInactive=false }={}) {
-  await ensureRiderBenefitCategoriesSeeded();
-  const safeId = riderBenefitCategorySafeId(categoryId);
-  const safeName = riderBenefitCategoryName(categoryName);
 
-  let doc = null;
-  if (safeId) {
-    const candidate = await db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).doc(safeId).get();
-    if (candidate.exists) doc = candidate;
-  }
-
-  if (!doc && safeName) {
-    const snapshot = await db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION)
-      .where('name', '==', safeName)
-      .limit(1)
-      .get();
-    if (!snapshot.empty) doc = snapshot.docs[0];
-  }
-
-  if (!doc) return null;
-  const category = riderBenefitCategoryPayload(doc);
-  if (!allowInactive && category.status !== 'active') return null;
-  return category;
-}
 
 function normalizeRiderBenefitInput(payload={}, existing={}, resolvedCategory=null) {
+  for(const key of ['name','badge','offer','description','city','district','address','mapQuery','validity','notice'])if(payload[key]!==undefined&&typeof payload[key]!=='string')throw riderBenefitError(400,'BENEFIT_INVALID_FIELD',`欄位 ${key} 格式不正確。`);
+  if(payload.usageSteps!==undefined&&!(typeof payload.usageSteps==='string'||(Array.isArray(payload.usageSteps)&&payload.usageSteps.every(v=>typeof v==='string'))))throw riderBenefitError(400,'BENEFIT_INVALID_FIELD','使用方式格式不正確。');
   const name = cleanText(payload.name ?? existing.name ?? '', 120);
   const status = riderBenefitStatus(payload.status ?? existing.status ?? 'draft');
-  const originalPrice = riderBenefitNumber(payload.originalPrice ?? existing.originalPrice ?? 0);
-  const memberPrice = riderBenefitNumber(payload.memberPrice ?? existing.memberPrice ?? 0);
-  const discountAmountInput = riderBenefitNumber(payload.discountAmount ?? existing.discountAmount ?? 0);
-  const discountAmount =
-    discountAmountInput > 0
-      ? discountAmountInput
-      : (originalPrice > 0 && memberPrice > 0 ? Math.max(0, originalPrice - memberPrice) : 0);
+  const {originalPrice,discountAmount,memberPrice} = riderBenefitPrices(payload, existing);
 
   return {
     name,
@@ -9426,8 +9451,9 @@ function normalizeRiderBenefitInput(payload={}, existing={}, resolvedCategory=nu
     imageUrl: cleanText(payload.imageUrl ?? existing.imageUrl ?? '', 1500),
     imageStoragePath: cleanText(payload.imageStoragePath ?? existing.imageStoragePath ?? '', 700),
     imageStorageBucket: cleanText(payload.imageStorageBucket ?? existing.imageStorageBucket ?? '', 300),
-    sortOrder: riderBenefitNumber(payload.sortOrder ?? existing.sortOrder ?? 100, {min:0,max:99999}),
+    sortOrder: riderBenefitInteger(payload.sortOrder ?? existing.sortOrder ?? 100,99999,'排序'),
     status,
+    priceMode: payload.priceMode === 'price' || (payload.priceMode !== 'none' && (originalPrice || discountAmount || memberPrice || existing.priceMode==='price')) ? 'price' : 'none',
   };
 }
 
@@ -9449,11 +9475,12 @@ function riderBenefitPublicPayload(doc) {
     validity: cleanText(data.validity || '長期合作', 120) || '長期合作',
     notice: cleanLongText(data.notice || '', 1000),
     usageSteps: riderBenefitUsageSteps(data.usageSteps || []),
+    priceMode: data.priceMode === 'price' || (data.priceMode !== 'none' && (data.originalPrice || data.discountAmount || data.memberPrice)) ? 'price' : 'none',
     originalPrice: riderBenefitNumber(data.originalPrice || 0),
     discountAmount: riderBenefitNumber(data.discountAmount || 0),
     memberPrice: riderBenefitNumber(data.memberPrice || 0),
     imageUrl: cleanText(data.imageUrl || '', 1500),
-    sortOrder: riderBenefitNumber(data.sortOrder || 100, {min:0,max:99999}),
+    sortOrder: riderBenefitNumber(data.sortOrder ?? 100, {min:0,max:99999}),
     status: riderBenefitStatus(data.status || 'draft'),
     updatedAtMs: Math.max(0, Number(data.updatedAtMs || 0)),
   };
@@ -9470,27 +9497,82 @@ function riderBenefitAdminPayload(doc) {
   };
 }
 
-function riderBenefitImageExtension(mimeType='', originalName='') {
-  const ext = String(originalName || '').toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1] || '';
-  if (['jpg','jpeg','png','webp'].includes(ext)) return ext === 'jpeg' ? 'jpg' : ext;
-  const map = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp' };
-  return map[String(mimeType || '').toLowerCase()] || 'jpg';
-}
-
-async function deleteRiderBenefitStorageObject(storageBucket='', storagePath='') {
-  const safePath = String(storagePath || '').trim();
-  const safeBucket = String(storageBucket || RIDER_BENEFITS_STORAGE_BUCKET || '').trim();
-  if (!safeBucket || !safePath || !safePath.startsWith('rider-benefits/')) return false;
-  try {
-    await admin.storage().bucket(safeBucket).file(safePath).delete({ ignoreNotFound:true });
-    return true;
-  } catch (error) {
-    console.warn('⚠️ 刪除舊小U福利圖片失敗：', safePath, error?.message || error);
-    return false;
+// Validate container header and dimensions, without introducing a deployment dependency.
+function riderBenefitImageInfo(buffer, mime) {
+  let width=0,height=0,extension='';
+  if (!Buffer.isBuffer(buffer) || buffer.length<24) throw riderBenefitError(415,'BENEFIT_IMAGE_INVALID','圖片內容不正確。');
+  if (mime==='image/png' && buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) && buffer.readUInt32BE(8)===13 && buffer.toString('ascii',12,16)==='IHDR' && buffer.subarray(-12).equals(Buffer.from([0,0,0,0,73,69,78,68,174,66,96,130]))) {
+    extension='png';width=buffer.readUInt32BE(16);height=buffer.readUInt32BE(20);
+  } else if (mime==='image/jpeg' && buffer[0]===255 && buffer[1]===216 && buffer[buffer.length-2]===255 && buffer[buffer.length-1]===217) {
+    extension='jpg';let i=2;
+    while(i+3<buffer.length && buffer[i]===255){while(buffer[i]===255)i++;const marker=buffer[i++];if(marker===218||marker===217)break;if(i+2>buffer.length)break;const n=buffer.readUInt16BE(i);if(n<2||i+n>buffer.length)break;if([192,193,194,195,197,198,199,201,202,203,205,206,207].includes(marker)&&n>=8){height=buffer.readUInt16BE(i+3);width=buffer.readUInt16BE(i+5);break;}i+=n;}
+  } else if(mime==='image/webp' && buffer.toString('ascii',0,4)==='RIFF' && buffer.toString('ascii',8,12)==='WEBP' && buffer.readUInt32LE(4)+8===buffer.length){
+    extension='webp';let pos=12;
+    while(pos+8<=buffer.length){const type=buffer.toString('ascii',pos,pos+4),len=buffer.readUInt32LE(pos+4),i=pos+8;if(i+len>buffer.length)break;
+      if(type==='VP8X'&&len>=10){width=1+buffer.readUIntLE(i+4,3);height=1+buffer.readUIntLE(i+7,3);}
+      if(type==='VP8L'&&len>=5&&buffer[i]===47){const bits=buffer.readUInt32LE(i+1);width=(bits&16383)+1;height=((bits>>>14)&16383)+1;}
+      if(type==='VP8 '&&len>=10&&buffer[i+3]===157&&buffer[i+4]===1&&buffer[i+5]===42){width=buffer.readUInt16LE(i+6)&16383;height=buffer.readUInt16LE(i+8)&16383;}
+      if(width&&height)break;pos=i+len+(len%2);}
   }
+  if(!extension||!width||!height||width>8192||height>8192||width*height>24000000) throw riderBenefitError(415,'BENEFIT_IMAGE_INVALID','圖片格式不正確，或尺寸超過 8192 px／2400 萬像素。');
+  return {extension,width,height};
+}
+function riderBenefitOwnedPath(bucket,path,benefitId){
+  return Boolean(bucket===RIDER_BENEFITS_STORAGE_BUCKET && typeof path==='string' && path.startsWith(`rider-benefits/${benefitId}/`) && /^[a-zA-Z0-9_-]+\.(jpg|png|webp)$/.test(path.slice(`rider-benefits/${benefitId}/`.length)));
+}
+function riderBenefitUploadRef(path){return db.collection(RIDER_BENEFIT_UPLOADS).doc(crypto.createHash('sha256').update(path).digest('hex'));}
+async function riderBenefitPrepareImage(tx,payload,existing,benefitId){
+  const oldPath=String(existing.imageStoragePath||'');
+  const requested=String(payload.imageStoragePath ?? oldPath);
+  if(requested===oldPath){
+    // Preserve existing legacy URLs; do not accept arbitrary new URLs or bucket overrides.
+    if ((payload.imageUrl!==undefined && String(payload.imageUrl)!==String(existing.imageUrl||'')) || (payload.imageStorageBucket!==undefined && String(payload.imageStorageBucket)!==String(existing.imageStorageBucket||''))) {
+      if(!requested && !payload.imageUrl && !payload.imageStorageBucket)return {imageUrl:'',imageStoragePath:'',imageStorageBucket:''};
+      throw riderBenefitError(400,'BENEFIT_IMAGE_UNTRUSTED','圖片必須使用本系統上傳。');
+    }
+    return {imageUrl:existing.imageUrl||'',imageStoragePath:oldPath,imageStorageBucket:existing.imageStorageBucket||''};
+  }
+  let uploadRef=null,upload=null,oldRef=null,oldUpload=null;
+  if(requested){
+    if(!riderBenefitOwnedPath(String(payload.imageStorageBucket||''),requested,benefitId))throw riderBenefitError(400,'BENEFIT_IMAGE_UNTRUSTED','圖片不屬於這筆福利。');
+    uploadRef=riderBenefitUploadRef(requested);const doc=await tx.get(uploadRef);upload=doc.data();
+    if(!doc.exists||upload.state!=='pending'||upload.benefitId!==benefitId||upload.storagePath!==requested||upload.expiresAtMs<=Date.now()||upload.imageUrl!==payload.imageUrl)throw riderBenefitError(409,'BENEFIT_IMAGE_EXPIRED','圖片已失效，請重新上傳。');
+  }
+  if(oldPath && riderBenefitOwnedPath(existing.imageStorageBucket,oldPath,benefitId)){
+    oldRef=riderBenefitUploadRef(oldPath);const doc=await tx.get(oldRef);oldUpload=doc.data();
+  }
+  // A legacy image is eligible for delayed cleanup only after path, bucket, references and object metadata match.
+  if(oldRef && oldUpload?.state==='attached' && oldUpload.benefitId===benefitId)tx.update(oldRef,{state:'retired',expiresAtMs:Date.now()+RIDER_BENEFIT_CLEANUP_DELAY});
+  else if(oldRef && !oldUpload)tx.create(oldRef,{benefitId,storagePath:oldPath,storageBucket:existing.imageStorageBucket,state:'retired',expiresAtMs:Date.now()+RIDER_BENEFIT_CLEANUP_DELAY});
+  if(uploadRef)tx.update(uploadRef,{state:'attached',expiresAtMs:admin.firestore.FieldValue.delete()});
+  return upload?{imageUrl:upload.imageUrl,imageStoragePath:upload.storagePath,imageStorageBucket:upload.storageBucket}:{imageUrl:'',imageStoragePath:'',imageStorageBucket:''};
+}
+let riderBenefitCleanupRunning=false, riderBenefitCleanupLast=0;
+function scheduleRiderBenefitCleanup(){
+  if(riderBenefitCleanupRunning||Date.now()-riderBenefitCleanupLast<60000)return;
+  riderBenefitCleanupRunning=true;riderBenefitCleanupLast=Date.now();
+  Promise.resolve().then(async()=>{
+    const expired=await db.collection(RIDER_BENEFIT_UPLOADS).where('expiresAtMs','<=',Date.now()).limit(30).get();
+    for(const entry of expired.docs){
+      try{
+        const claimed=await db.runTransaction(async tx=>{
+          const snap=await tx.get(entry.ref);const d=snap.data();
+          if(!d||!['pending','retired','deleting','uploading'].includes(d.state)||d.expiresAtMs>Date.now()||!riderBenefitOwnedPath(d.storageBucket,d.storagePath,d.benefitId))return null;
+          const related=await tx.get(db.collection(RIDER_BENEFITS_COLLECTION).where('imageStoragePath','==',d.storagePath).limit(1));
+          if(!related.empty){tx.update(entry.ref,{state:'attached',expiresAtMs:admin.firestore.FieldValue.delete()});return null;}
+          tx.update(entry.ref,{state:'deleting',expiresAtMs:Date.now()+RIDER_BENEFIT_CLEANUP_DELAY});return d;
+        });
+        if(!claimed)continue;
+        const file=admin.storage().bucket(claimed.storageBucket).file(claimed.storagePath);
+        try{const [meta]=await file.getMetadata();if(meta.metadata?.benefitId!==claimed.benefitId||meta.metadata?.purpose!=='rider_partner_benefit'){await entry.ref.update({state:'manual_review',expiresAtMs:admin.firestore.FieldValue.delete()});continue;}await file.delete({ignoreNotFound:true,ifGenerationMatch:meta.generation});}catch(e){if(Number(e.code)!==404)throw e;}
+        await entry.ref.delete();
+      }catch(e){console.warn('Rider Benefits cleanup:',e?.message||e);}
+    }
+  }).catch(e=>console.warn('Rider Benefits cleanup:',e?.message||e)).finally(()=>{riderBenefitCleanupRunning=false;});
 }
 
-async function ensureRiderBenefitsSeeded() {
+function ensureRiderBenefitsSeeded() { return riderBenefitOnce('ensureRiderBenefitsSeeded', ensureRiderBenefitsSeededWork); }
+async function ensureRiderBenefitsSeededWork() {
   await ensureRiderBenefitCategoriesSeeded();
   const migrationRef = db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFITS_MIGRATION_ID);
   const manmanqiRef = db.collection(RIDER_BENEFITS_COLLECTION).doc('manmanqi');
@@ -9575,87 +9657,50 @@ async function ensureRiderBenefitsSeeded() {
   });
 }
 
-async function ensureRiderBenefitCategoryMigration() {
-  await ensureRiderBenefitCategoriesSeeded();
+function ensureRiderBenefitCategoryMigration() { return riderBenefitOnce('ensureRiderBenefitCategoryMigration', ensureRiderBenefitCategoryMigrationWork); }
+async function ensureRiderBenefitCategoryMigrationWork() {
   await ensureRiderBenefitsSeeded();
-
-  const migrationRef = db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFIT_CATEGORIES_MIGRATION_ID);
-  const migrationDoc = await migrationRef.get();
-  if (migrationDoc.exists) return;
-
-  const categoryCollection = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION);
-  const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
-  const nowMs = Date.now();
-
-  for (const benefitDoc of benefitsSnapshot.docs) {
-    const data = benefitDoc.data() || {};
-    const oldName = riderBenefitCategoryName(data.category || '') || '其他';
-    let categoryId = riderBenefitCategorySafeId(data.categoryId || RIDER_BENEFIT_LEGACY_CATEGORY_MAP[oldName] || '');
-    let categoryName = oldName;
-
-    if (!categoryId) {
-      categoryId = riderBenefitCategoryGeneratedId(oldName) || 'other';
-      const customRef = categoryCollection.doc(categoryId);
-      const customDoc = await customRef.get();
-      if (!customDoc.exists) {
-        await customRef.set({
-          categoryId,
-          name:oldName,
-          sortOrder:500,
-          status:'active',
-          createdAtMs:nowMs,
-          createdAt:admin.firestore.FieldValue.serverTimestamp(),
-          updatedAtMs:nowMs,
-          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    const categoryDoc = await categoryCollection.doc(categoryId).get();
-    if (categoryDoc.exists) {
-      categoryName = riderBenefitCategoryPayload(categoryDoc).name || categoryName;
-    }
-
-    if (data.categoryId !== categoryId || data.category !== categoryName) {
-      await benefitDoc.ref.set({
-        categoryId,
-        category:categoryName,
-        updatedAtMs:nowMs,
-        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge:true });
-    }
+  const migrationRef=db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc('riderBenefitCategories_v3_reconcile_20261123');
+  if((await migrationRef.get()).exists)return;
+  const categoryCollection=db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION);
+  const docs=await riderBenefitAll(db.collection(RIDER_BENEFITS_COLLECTION));
+  for(const item of docs){
+    await db.runTransaction(async tx=>{
+      const fresh=await tx.get(item.ref);if(!fresh.exists)return;
+      const data=fresh.data()||{};const oldName=riderBenefitCategoryName(data.category)||'其他';
+      if(data.categoryId)return; // Preserve existing canonical IDs and intentional renames.
+      const id=RIDER_BENEFIT_LEGACY_CATEGORY_MAP[oldName]||riderBenefitCategoryGeneratedId(oldName);
+      const categoryRef=categoryCollection.doc(id),categoryDoc=await tx.get(categoryRef);
+      if(!categoryDoc.exists)tx.set(categoryRef,{categoryId:id,name:oldName,status:'active',sortOrder:500,createdAtMs:Date.now(),updatedAtMs:Date.now(),createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+      tx.update(item.ref,{categoryId:id,category:categoryDoc.data()?.name||oldName,updatedAtMs:riderBenefitNow(data),updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    });
   }
-
-  await migrationRef.set({
-    migrationId:RIDER_BENEFIT_CATEGORIES_MIGRATION_ID,
-    source:'rider-benefits-v49-fixed-categories',
-    completed:true,
-    completedAtMs:nowMs,
-    completedAt:admin.firestore.FieldValue.serverTimestamp(),
-  });
+  const batch=db.batch();
+  batch.set(migrationRef,{migrationId:migrationRef.id,completed:true,completedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+  batch.set(db.collection(RIDER_BENEFITS_MIGRATION_COLLECTION).doc(RIDER_BENEFIT_CATEGORIES_MIGRATION_ID),{migrationId:RIDER_BENEFIT_CATEGORIES_MIGRATION_ID,completed:true,completedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+  await batch.commit();
 }
-
-async function listRiderBenefitsForAdmin() {
-  await ensureRiderBenefitCategoryMigration();
-  const snapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(300).get();
-  return snapshot.docs
-    .map(riderBenefitAdminPayload)
-    .sort((a,b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'zh-Hant'));
+function listRiderBenefitsForAdmin(categories,docs) {
+  const names=new Map(categories.map(c=>[c.id,c.name]));
+  return docs.map(riderBenefitAdminPayload).map(item=>({...item,category:names.get(item.categoryId)||item.category})).sort((a,b)=>(a.sortOrder-b.sortOrder)||a.name.localeCompare(b.name,'zh-Hant'));
 }
 
 // 騎士端：只回傳正式上架福利；分類由 Firestore 動態產生。
 app.get('/api/rider/benefits', riderAuthMiddleware, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
+    if (!req.riderAuth?.riderDocId) return res.status(401).json({success:false,code:'RIDER_TOKEN_REQUIRED',message:'請重新登入以讀取正式小U福利。'});
+    const resolved=await resolveRiderNotificationRequest(req);
+    if(!resolved.ok || !canRiderAcceptOrdersV4(resolved.rider))return res.status(resolved.ok?403:resolved.statusCode||403).json({success:false,code:'RIDER_BENEFIT_INELIGIBLE',message:resolved.ok?'僅正式小U可使用合作福利。':resolved.message});
     await ensureRiderBenefitCategoryMigration();
-    const [benefitSnapshot, activeCategories] = await Promise.all([
-      db.collection(RIDER_BENEFITS_COLLECTION).where('status', '==', 'active').limit(200).get(),
+    const [benefitDocs, activeCategories] = await Promise.all([
+      riderBenefitAll(db.collection(RIDER_BENEFITS_COLLECTION).where('status','==','active')),
       listRiderBenefitCategories({ includeInactive:false, includeUsage:false }),
     ]);
 
     const activeCategoryIds = new Set(activeCategories.map(item => item.id));
     const categoryById = new Map(activeCategories.map(item => [item.id, item]));
-    const benefits = benefitSnapshot.docs
+    const benefits = benefitDocs
       .map(riderBenefitPublicPayload)
       .filter(item => item.id && item.name && item.offer && activeCategoryIds.has(item.categoryId))
       .map(item => ({
@@ -9685,10 +9730,11 @@ app.get('/api/rider/benefits', riderAuthMiddleware, async (req, res) => {
 app.get('/api/admin/rider-benefits', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const [benefits, categoryItems] = await Promise.all([
-      listRiderBenefitsForAdmin(),
-      listRiderBenefitCategories({ includeInactive:true, includeUsage:true }),
-    ]);
+    await ensureRiderBenefitCategoryMigration();
+    scheduleRiderBenefitCleanup();
+    const docs=await riderBenefitAll(db.collection(RIDER_BENEFITS_COLLECTION));
+    const categoryItems=await listRiderBenefitCategories({includeInactive:true,includeUsage:true,benefitDocs:docs});
+    const benefits=listRiderBenefitsForAdmin(categoryItems,docs);
     return res.json({
       success:true,
       version:'rider-benefits-admin-v2-dynamic-categories',
@@ -9722,127 +9768,49 @@ app.get('/api/admin/rider-benefit-categories', async (req, res) => {
 });
 
 // 管理端：新增／修改／排序／啟用／停用分類。
-app.post('/api/admin/rider-benefit-categories', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    await ensureRiderBenefitCategoryMigration();
-
-    const requestedId = riderBenefitCategorySafeId(req.body?.categoryId || '');
-    const name = riderBenefitCategoryName(req.body?.name || '');
-    const status = riderBenefitCategoryStatus(req.body?.status || 'active');
-    const sortOrder = riderBenefitNumber(req.body?.sortOrder ?? 100, {min:0,max:99999});
-
-    if (!name) return res.status(400).json({ success:false, message:'請輸入福利分類名稱。' });
-    if (name === '全部') return res.status(400).json({ success:false, message:'「全部」是系統篩選名稱，不能建立為福利分類。' });
-
-    const categoryCollection = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION);
-    const categoryId = requestedId || riderBenefitCategoryGeneratedId(name);
-    if (!categoryId) return res.status(400).json({ success:false, message:'福利分類資料不正確。' });
-
-    const ref = categoryCollection.doc(categoryId);
-    const existingDoc = await ref.get();
-    const existing = existingDoc.exists ? (existingDoc.data() || {}) : {};
-
-    const sameNameSnapshot = await categoryCollection.where('name', '==', name).limit(2).get();
-    const duplicate = sameNameSnapshot.docs.find(doc => doc.id !== categoryId);
-    if (duplicate) {
-      return res.status(409).json({ success:false, message:'已經有相同名稱的福利分類。' });
-    }
-
-    if (status === 'inactive') {
-      const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
-      const activeUsage = benefitsSnapshot.docs.filter(doc => {
-        const data = doc.data() || {};
-        return riderBenefitStatus(data.status) === 'active' &&
-          riderBenefitCategorySafeId(data.categoryId || '') === categoryId;
-      });
-      if (activeUsage.length) {
-        return res.status(409).json({
-          success:false,
-          message:`這個分類目前有 ${activeUsage.length} 筆已上架福利，請先將福利改到其他分類或下架，再停用分類。`,
-        });
+app.post('/api/admin/rider-benefit-categories', async (req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    await ensureRiderBenefitCategoryMigration();const payload=req.body||{};
+    if(typeof payload.name!=='string')throw riderBenefitError(400,'BENEFIT_INVALID_CATEGORY','請輸入有效的分類名稱。');
+    const name=riderBenefitCategoryName(payload.name),status=String(payload.status??'active');
+    if(!name||name==='全部'||!['active','inactive'].includes(status))throw riderBenefitError(400,'BENEFIT_INVALID_CATEGORY','分類名稱或狀態不正確。');
+    const sortOrder=riderBenefitInteger(payload.sortOrder??100,99999,'排序');
+    const categoryId=payload.categoryId?riderBenefitStrictId(payload.categoryId,true):riderBenefitCategoryGeneratedId(name);
+    const collection=db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION),ref=collection.doc(categoryId);
+    await db.runTransaction(async tx=>{
+      const doc=await tx.get(ref),existing=doc.data()||{};
+      if(payload.categoryId&&!doc.exists)throw riderBenefitError(404,'BENEFIT_NOT_FOUND','找不到這個福利分類。');
+      if(!payload.categoryId&&doc.exists){if(existing.name===name&&existing.status===status&&Number(existing.sortOrder??100)===sortOrder)return;throw riderBenefitError(409,'BENEFIT_DUPLICATE_CATEGORY','分類已存在，請使用編輯功能。');}
+      riderBenefitVersion(existing,payload);
+      const same=await tx.get(collection.where('name','==',name));
+      if(same.docs.some(d=>d.id!==categoryId))throw riderBenefitError(409,'BENEFIT_DUPLICATE_CATEGORY','已有相同名稱的福利分類。');
+      if(status==='inactive'){
+        const usage=await tx.get(db.collection(RIDER_BENEFITS_COLLECTION).where('categoryId','==',categoryId));
+        if(usage.docs.some(d=>riderBenefitStatus(d.data().status)==='active'))throw riderBenefitError(409,'BENEFIT_CATEGORY_IN_USE','請先將此分類的已上架福利下架或移至其他分類。');
       }
-    }
-
-    const nowMs = Date.now();
-    await ref.set({
-      categoryId,
-      name,
-      sortOrder,
-      status,
-      createdAtMs:existingDoc.exists ? Math.max(1, Number(existing.createdAtMs || nowMs)) : nowMs,
-      updatedAtMs:nowMs,
-      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      ...(existingDoc.exists ? {} : { createdAt:admin.firestore.FieldValue.serverTimestamp() }),
-    }, { merge:true });
-
-    const oldName = riderBenefitCategoryName(existing.name || '');
-    if (existingDoc.exists && oldName && oldName !== name) {
-      const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
-      const affected = benefitsSnapshot.docs.filter(doc => {
-        const data = doc.data() || {};
-        return riderBenefitCategorySafeId(data.categoryId || '') === categoryId || riderBenefitCategoryName(data.category || '') === oldName;
-      });
-      for (let i=0; i<affected.length; i+=400) {
-        const batch = db.batch();
-        affected.slice(i, i+400).forEach(doc => {
-          batch.set(doc.ref, {
-            categoryId,
-            category:name,
-            updatedAtMs:nowMs,
-            updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-          }, { merge:true });
-        });
-        await batch.commit();
-      }
-    }
-
-    const fresh = await ref.get();
-    const categories = await listRiderBenefitCategories({ includeInactive:true, includeUsage:true });
-    return res.json({
-      success:true,
-      category:categories.find(item => item.id === fresh.id) || riderBenefitCategoryPayload(fresh),
-      categories,
-      message:existingDoc.exists ? '福利分類已更新。' : '福利分類已新增。',
+      const now=riderBenefitNow(existing);
+      tx.set(ref,{categoryId,name,status,sortOrder,createdAtMs:existing.createdAtMs||now,updatedAtMs:now,updatedAt:admin.firestore.FieldValue.serverTimestamp(),...(doc.exists?{}:{createdAt:admin.firestore.FieldValue.serverTimestamp()})},{merge:true});
     });
-  } catch (error) {
-    console.error('❌ 儲存小U福利分類失敗：', error);
-    return res.status(500).json({ success:false, message:'儲存福利分類失敗，請稍後再試。' });
-  }
+    // Category name is derived from categoryId on both read APIs; no partial fan-out writes.
+    const categories=await listRiderBenefitCategories({includeUsage:true});
+    return res.json({success:true,category:categories.find(c=>c.id===categoryId),categories,message:'福利分類已儲存。'});
+  }catch(e){return riderBenefitFail(res,e,'儲存福利分類失敗，請稍後再試。');}
 });
-
-// 管理端：刪除未被任何福利使用的分類。
-app.delete('/api/admin/rider-benefit-categories/:categoryId', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    await ensureRiderBenefitCategoryMigration();
-    const categoryId = riderBenefitCategorySafeId(req.params.categoryId || '');
-    if (!categoryId) return res.status(400).json({ success:false, message:'福利分類編號不正確。' });
-
-    const ref = db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).doc(categoryId);
-    const doc = await ref.get();
-    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這個福利分類。' });
-    const category = riderBenefitCategoryPayload(doc);
-
-    const benefitsSnapshot = await db.collection(RIDER_BENEFITS_COLLECTION).limit(500).get();
-    const usage = benefitsSnapshot.docs.filter(benefitDoc => {
-      const data = benefitDoc.data() || {};
-      return riderBenefitCategorySafeId(data.categoryId || '') === categoryId ||
-        riderBenefitCategoryName(data.category || '') === category.name;
+app.delete('/api/admin/rider-benefit-categories/:categoryId',async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    await ensureRiderBenefitCategoryMigration();const categoryId=riderBenefitStrictId(req.params.categoryId,true);
+    const ref=db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).doc(categoryId);
+    await db.runTransaction(async tx=>{
+      const doc=await tx.get(ref);if(!doc.exists)throw riderBenefitError(404,'BENEFIT_NOT_FOUND','找不到這個福利分類。');
+      riderBenefitVersion(doc.data(),req.body||{});
+      const usage=await tx.get(db.collection(RIDER_BENEFITS_COLLECTION).where('categoryId','==',categoryId).limit(1));
+      if(!usage.empty)throw riderBenefitError(409,'BENEFIT_CATEGORY_IN_USE','這個分類仍有福利使用中，請先移至其他分類。');
+      tx.delete(ref);
     });
-    if (usage.length) {
-      return res.status(409).json({
-        success:false,
-        message:`這個分類仍有 ${usage.length} 筆福利使用中，請先把這些福利改到其他分類後再刪除。`,
-      });
-    }
-
-    await ref.delete();
-    return res.json({ success:true, categoryId, message:'福利分類已刪除。' });
-  } catch (error) {
-    console.error('❌ 刪除小U福利分類失敗：', error);
-    return res.status(500).json({ success:false, message:'刪除福利分類失敗。' });
-  }
+    return res.json({success:true,categoryId,message:'福利分類已刪除。'});
+  }catch(e){return riderBenefitFail(res,e,'刪除福利分類失敗。');}
 });
 
 // 管理端：上傳合作店家圖片。
@@ -9867,14 +9835,18 @@ app.post('/api/admin/rider-benefits/image', (req, res) => {
         return res.status(503).json({ success:false, message:'小U福利圖片儲存空間尚未設定。' });
       }
 
-      const benefitId = riderBenefitSafeId(req.body?.benefitId || '') || crypto.randomUUID().replace(/-/g, '').slice(0, 20);
+      const benefitId = req.body?.benefitId ? riderBenefitStrictId(req.body.benefitId) : crypto.randomUUID().replace(/-/g, '');
+      const info=riderBenefitImageInfo(req.file.buffer,req.file.mimetype);
+      scheduleRiderBenefitCleanup();
       const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
-      const extension = riderBenefitImageExtension(req.file.mimetype, req.file.originalname);
-      const storagePath = `rider-benefits/${benefitId}/${Date.now()}-${sha256.slice(0,16)}.${extension}`;
+      const extension = info.extension;
+      const storagePath = `rider-benefits/${benefitId}/${crypto.randomUUID()}-${sha256.slice(0,16)}.${extension}`;
       const downloadToken = crypto.randomUUID();
       const bucket = admin.storage().bucket(RIDER_BENEFITS_STORAGE_BUCKET);
       const file = bucket.file(storagePath);
 
+      const uploadRef=riderBenefitUploadRef(storagePath);
+      await uploadRef.create({benefitId,storagePath,storageBucket:bucket.name,state:'uploading',expiresAtMs:Date.now()+RIDER_BENEFIT_UPLOAD_TTL});
       await file.save(req.file.buffer, {
         resumable:false,
         validation:'md5',
@@ -9894,6 +9866,7 @@ app.post('/api/admin/rider-benefits/image', (req, res) => {
         `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/` +
         `${encodeURIComponent(storagePath)}?alt=media&token=${encodeURIComponent(downloadToken)}`;
 
+      await uploadRef.update({state:'pending',imageUrl,expiresAtMs:Date.now()+RIDER_BENEFIT_UPLOAD_TTL});
       return res.json({
         success:true,
         benefitId,
@@ -9903,143 +9876,76 @@ app.post('/api/admin/rider-benefits/image', (req, res) => {
       });
     } catch (uploadError) {
       console.error('❌ 上傳小U福利圖片失敗：', uploadError);
-      return res.status(500).json({ success:false, message:'合作店家圖片上傳失敗，請稍後再試。' });
+      return riderBenefitFail(res,uploadError,'合作店家圖片上傳失敗，請稍後再試。');
     }
   });
 });
 
 // 管理端：新增／編輯福利。分類必須存在；停用分類不可新增上架福利。
-app.post('/api/admin/rider-benefits', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    await ensureRiderBenefitCategoryMigration();
-
-    let benefitId = riderBenefitSafeId(req.body?.benefitId || '');
-    const collection = db.collection(RIDER_BENEFITS_COLLECTION);
-    const ref = benefitId ? collection.doc(benefitId) : collection.doc();
-    benefitId = riderBenefitSafeId(ref.id);
-
-    const existingDoc = await ref.get();
-    const existing = existingDoc.exists ? (existingDoc.data() || {}) : {};
-    const requestedCategoryId = riderBenefitCategorySafeId(req.body?.categoryId || existing.categoryId || '');
-    const requestedCategoryName = riderBenefitCategoryName(req.body?.category || existing.category || '');
-    const sameExistingCategory = existingDoc.exists &&
-      requestedCategoryId &&
-      requestedCategoryId === riderBenefitCategorySafeId(existing.categoryId || '');
-
-    const resolvedCategory = await resolveRiderBenefitCategory(
-      requestedCategoryId,
-      requestedCategoryName,
-      { allowInactive:sameExistingCategory }
-    );
-
-    if (!resolvedCategory) {
-      return res.status(400).json({ success:false, message:'請選擇目前有效的福利分類。' });
-    }
-
-    const normalized = normalizeRiderBenefitInput(req.body || {}, existing, resolvedCategory);
-
-    if (!normalized.name) {
-      return res.status(400).json({ success:false, message:'請輸入合作店家名稱。' });
-    }
-    if (!normalized.offer) {
-      return res.status(400).json({ success:false, message:'請輸入小U優惠內容。' });
-    }
-    if (!normalized.address) {
-      return res.status(400).json({ success:false, message:'請輸入合作店家地址。' });
-    }
-    if (normalized.status === 'active' && resolvedCategory.status !== 'active') {
-      return res.status(409).json({ success:false, message:'這個福利分類目前已停用，請先啟用分類或改選其他分類後再上架。' });
-    }
-
-    const nowMs = Date.now();
-    const data = {
-      ...normalized,
-      benefitId,
-      createdAtMs: existingDoc.exists ? Math.max(1, Number(existing.createdAtMs || nowMs)) : nowMs,
-      updatedAtMs: nowMs,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-    if (!existingDoc.exists) data.createdAt = admin.firestore.FieldValue.serverTimestamp();
-
-    await ref.set(data, { merge:true });
-
-    const oldStoragePath = String(existing.imageStoragePath || '').trim();
-    const newStoragePath = String(normalized.imageStoragePath || '').trim();
-    if (oldStoragePath && oldStoragePath !== newStoragePath) {
-      await deleteRiderBenefitStorageObject(existing.imageStorageBucket, oldStoragePath);
-    }
-
-    const fresh = await ref.get();
-    return res.json({
-      success:true,
-      benefit:riderBenefitAdminPayload(fresh),
-      message:normalized.status === 'active'
-        ? '福利已正式上架，小U重新開啟福利中心即可看到。'
-        : normalized.status === 'inactive'
-          ? '福利已下架並保留資料。'
-          : '福利已儲存為草稿。',
+app.post('/api/admin/rider-benefits', async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    await ensureRiderBenefitCategoryMigration();const payload=req.body||{};
+    const collection=db.collection(RIDER_BENEFITS_COLLECTION);
+    const ref=payload.benefitId?collection.doc(riderBenefitStrictId(payload.benefitId)):collection.doc();const benefitId=ref.id;
+    const mutationId=payload.mutationId?riderBenefitStrictId(payload.mutationId):'';
+    await db.runTransaction(async tx=>{
+      const doc=await tx.get(ref),existing=doc.data()||{};
+      if(mutationId && existing.lastBenefitMutationId===mutationId)return;
+      if(!doc.exists && payload.expectedUpdatedAtMs>0)throw riderBenefitError(404,'BENEFIT_NOT_FOUND','福利已被刪除。');
+      riderBenefitVersion(existing,payload);
+      const categoryId=riderBenefitStrictId(payload.categoryId??existing.categoryId,true);
+      const cat=await tx.get(db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).doc(categoryId));
+      if(!cat.exists)throw riderBenefitError(400,'BENEFIT_INVALID_CATEGORY','請選擇有效的福利分類。');
+      const category=riderBenefitCategoryPayload(cat);
+      const status=String(payload.status??existing.status??'draft');
+      if(!['active','draft','inactive'].includes(status))throw riderBenefitError(400,'BENEFIT_INVALID_STATUS','福利狀態不正確。');
+      if(category.status!=='active'&&(status==='active'||categoryId!==existing.categoryId))throw riderBenefitError(409,'BENEFIT_CATEGORY_INACTIVE','分類已停用，請改選啟用的分類。');
+      if(payload.priceMode!==undefined&&!['price','none'].includes(payload.priceMode))throw riderBenefitError(400,'BENEFIT_INVALID_PRICE','價格模式不正確。');
+      const normalized=normalizeRiderBenefitInput(payload,existing,category);
+      if(!normalized.name||!normalized.offer||!normalized.address)throw riderBenefitError(400,'BENEFIT_REQUIRED','請填寫合作店家名稱、優惠內容與地址。');
+      if(normalized.priceMode==='none'&&(normalized.originalPrice||normalized.discountAmount||normalized.memberPrice))throw riderBenefitError(400,'BENEFIT_INVALID_PRICE','未設定固定價格時金額須為零。');
+      const image=await riderBenefitPrepareImage(tx,payload,existing,benefitId);
+      const now=riderBenefitNow(existing);
+      tx.set(ref,{...normalized,...image,benefitId,lastBenefitMutationId:mutationId,createdAtMs:existing.createdAtMs||now,updatedAtMs:now,updatedAt:admin.firestore.FieldValue.serverTimestamp(),...(doc.exists?{}:{createdAt:admin.firestore.FieldValue.serverTimestamp()})},{merge:true});
     });
-  } catch (error) {
-    console.error('❌ 儲存小U福利失敗：', error);
-    return res.status(500).json({ success:false, message:'儲存小U福利失敗，請稍後再試。' });
-  }
+    scheduleRiderBenefitCleanup();const fresh=await ref.get();
+    return res.json({success:true,benefit:riderBenefitAdminPayload(fresh),message:'福利已儲存。'});
+  }catch(e){return riderBenefitFail(res,e,'儲存小U福利失敗，請稍後再試。');}
 });
-
-// 管理端：快速切換草稿／上架／下架。
-app.post('/api/admin/rider-benefits/:benefitId/status', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    await ensureRiderBenefitCategoryMigration();
-    const benefitId = riderBenefitSafeId(req.params.benefitId || '');
-    const rawStatus = String(req.body?.status || '').trim().toLowerCase();
-    if (!benefitId) return res.status(400).json({ success:false, message:'福利編號不正確。' });
-    if (!['draft','active','inactive'].includes(rawStatus)) {
-      return res.status(400).json({ success:false, message:'福利狀態不正確。' });
-    }
-    const status = rawStatus;
-    const ref = db.collection(RIDER_BENEFITS_COLLECTION).doc(benefitId);
-    const doc = await ref.get();
-    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這筆福利。' });
-
-    if (status === 'active') {
-      const data = doc.data() || {};
-      const category = await resolveRiderBenefitCategory(data.categoryId || '', data.category || '', { allowInactive:true });
-      if (!category || category.status !== 'active') {
-        return res.status(409).json({ success:false, message:'這筆福利的分類目前已停用，請先啟用分類或改選其他分類。' });
+app.post('/api/admin/rider-benefits/:benefitId/status',async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    await ensureRiderBenefitCategoryMigration();const benefitId=riderBenefitStrictId(req.params.benefitId),status=String(req.body?.status||'');
+    if(!['active','draft','inactive'].includes(status))throw riderBenefitError(400,'BENEFIT_INVALID_STATUS','福利狀態不正確。');
+    const ref=db.collection(RIDER_BENEFITS_COLLECTION).doc(benefitId);
+    await db.runTransaction(async tx=>{
+      const doc=await tx.get(ref);if(!doc.exists)throw riderBenefitError(404,'BENEFIT_NOT_FOUND','找不到這筆福利。');
+      const existing=doc.data();riderBenefitVersion(existing,req.body||{});
+      if(status==='active'){
+        const cat=await tx.get(db.collection(RIDER_BENEFIT_CATEGORIES_COLLECTION).doc(riderBenefitStrictId(existing.categoryId,true)));
+        if(!cat.exists||cat.data().status!=='active')throw riderBenefitError(409,'BENEFIT_CATEGORY_INACTIVE','福利分類已停用或不存在。');
+        if(!existing.name||!existing.offer||!existing.address)throw riderBenefitError(400,'BENEFIT_REQUIRED','請先補齊福利必填資料。');
+        riderBenefitPrices({memberPrice:existing.memberPrice??0},existing);
       }
-    }
-
-    await ref.set({
-      status,
-      updatedAtMs:Date.now(),
-      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge:true });
-    const fresh = await ref.get();
-    return res.json({ success:true, benefit:riderBenefitAdminPayload(fresh) });
-  } catch (error) {
-    console.error('❌ 更新小U福利狀態失敗：', error);
-    return res.status(500).json({ success:false, message:'更新福利狀態失敗。' });
-  }
+      if(existing.status===status)return;
+      tx.update(ref,{status,updatedAtMs:riderBenefitNow(existing),updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    });
+    return res.json({success:true,benefit:riderBenefitAdminPayload(await ref.get())});
+  }catch(e){return riderBenefitFail(res,e,'更新福利狀態失敗。');}
 });
-
-// 管理端：永久刪除福利與該筆目前使用的圖片。
-app.delete('/api/admin/rider-benefits/:benefitId', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const benefitId = riderBenefitSafeId(req.params.benefitId || '');
-    if (!benefitId) return res.status(400).json({ success:false, message:'福利編號不正確。' });
-    const ref = db.collection(RIDER_BENEFITS_COLLECTION).doc(benefitId);
-    const doc = await ref.get();
-    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到這筆福利。' });
-    const data = doc.data() || {};
-    await ref.delete();
-    await deleteRiderBenefitStorageObject(data.imageStorageBucket, data.imageStoragePath);
-    return res.json({ success:true, benefitId, message:'福利已永久刪除。' });
-  } catch (error) {
-    console.error('❌ 刪除小U福利失敗：', error);
-    return res.status(500).json({ success:false, message:'刪除福利失敗。' });
-  }
+app.delete('/api/admin/rider-benefits/:benefitId',async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    const benefitId=riderBenefitStrictId(req.params.benefitId),ref=db.collection(RIDER_BENEFITS_COLLECTION).doc(benefitId);
+    await db.runTransaction(async tx=>{
+      const doc=await tx.get(ref);if(!doc.exists)throw riderBenefitError(404,'BENEFIT_NOT_FOUND','找不到這筆福利。');
+      const existing=doc.data();riderBenefitVersion(existing,req.body||{});
+      await riderBenefitPrepareImage(tx,{imageStoragePath:'',imageStorageBucket:'',imageUrl:''},existing,benefitId);
+      tx.delete(ref);
+    });
+    scheduleRiderBenefitCleanup();return res.json({success:true,benefitId,message:'福利已永久刪除。'});
+  }catch(e){return riderBenefitFail(res,e,'刪除福利失敗。');}
 });
 
 // Notification Center HF1: singleflight announcement reconciliation; do not block Inbox reads.
