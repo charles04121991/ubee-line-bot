@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage2" rel="manifest"/>
+<link href="/manifest-order.json?v=20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -22,7 +22,7 @@
 <meta content="UBee 跑腿" name="apple-mobile-web-app-title"/>
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
-<title>UBee 跑腿｜HF4.8.5 Lifecycle RC1 Stage 2 (TEST)</title>
+<title>UBee 跑腿｜HF4.8.5 Lifecycle RC1 Stage 3 (TEST)</title>
 <!-- UBee 用戶端 V2.12 + Password Reset V3：2026-08-14｜LINE Messaging API Bot 全自動核對；不使用 LIFF／不需客服 -->
 <!-- UBee 客戶端：文字化地址、後端計價、訂單進度及 ETA；不載入可視地圖 SDK。 -->
 <style>
@@ -17733,7 +17733,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     return `<section class="ubee-native-detail-group ubee-cancellation-payment" aria-live="polite">
       <div class="ubee-native-detail-group-title">取件後取消申請｜${escapeHtml(label)}</div>
       <div class="ubee-native-detail-list">
-        <div class="ubee-native-detail-row"><span>物品交接</span><strong>${escapeHtml(({pending_handover:"等待平台安排",handover_assigned:"平台已安排交接",handover_confirmed:"交接已核實"})[order.postPickupCancellationStatus]||"等待平台確認")}</strong></div>
+        <div class="ubee-native-detail-row"><span>物品交接</span><strong>${escapeHtml(({pending_handover:"等待平台安排",handover_assigned:"平台已安排交接",handover_submitted:"小U已提交交接，等待核實",handover_disputed:"交接異常，平台協調中",handover_confirmed:"交接已核實"})[order.postPickupCancellationStatus]||"等待平台確認")}</strong></div>
         <div class="ubee-native-detail-row"><span>取消費</span><strong>NT$${fee}</strong></div>
         <div class="ubee-native-detail-row"><span>小U補償（85%）</span><strong>NT$${Math.max(0,Number(order.cancellationRiderShare||0))}</strong></div>
         <div class="ubee-native-detail-row"><span>平台分潤（15%）</span><strong>NT$${Math.max(0,Number(order.cancellationPlatformShare||0))}</strong></div>
@@ -18464,7 +18464,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage3';
     const CUSTOMER_SW_SCOPE = '/order.html';
 
     if (!('serviceWorker' in navigator)) {
@@ -18906,8 +18906,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   async function customerScopedRegistration(){
-    const registration=window.__ubeeCustomerServiceWorkerRegistration||await navigator.serviceWorker.getRegistration('/order.html');
-    if(!registration||new URL(registration.scope).pathname!=='/order.html'||!registration.active)throw new Error('用戶端通知服務尚未準備完成，請重新開啟 App。');
+    let registration=window.__ubeeCustomerServiceWorkerRegistration||await navigator.serviceWorker.getRegistration('/order.html');
+    if(!registration||new URL(registration.scope).pathname!=='/order.html'){registration=await navigator.serviceWorker.register('/ubee-customer-sw.js?v=20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage3',{scope:'/order.html',updateViaCache:'none'});window.__ubeeCustomerServiceWorkerRegistration=registration;}
+    for(let i=0;i<80&&!registration.active;i++)await new Promise(resolve=>setTimeout(resolve,100));
+    if(new URL(registration.scope).pathname!=='/order.html'||!registration.active||new URL(registration.active.scriptURL).pathname!=='/ubee-customer-sw.js')throw new Error('用戶端通知服務尚未準備完成，請重新開啟 App。');
     return registration;
   }
   async function currentPushSubscription(){
@@ -18954,7 +18956,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       }
       await savePushSubscription(subscription);
       try{
-        const legacy=(await navigator.serviceWorker.getRegistrations()).find(reg=>new URL(reg.scope).pathname==='/'&&reg.active&&new URL(reg.active.scriptURL).pathname==='/ubee-customer-sw.js');
+        const legacy=(await navigator.serviceWorker.getRegistrations()).find(reg=>new URL(reg.scope).pathname==='/'&&reg.active&&['/ubee-customer-sw.js','/ubee-web-push-sw.js'].includes(new URL(reg.active.scriptURL).pathname));
         const old=await legacy?.pushManager.getSubscription();
         if(old&&old.endpoint!==subscription.endpoint){
           const result=await fetch(PUSH_ENDPOINT,{method:'DELETE',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:old.endpoint})});
@@ -18977,13 +18979,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     pushBusy = true;
     try{
       const subscription = await currentPushSubscription();
-      if(subscription){
-        await fetch(PUSH_ENDPOINT,{
-          method:'DELETE',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({endpoint:subscription.endpoint})
-        }).catch(() => null);
-        await subscription.unsubscribe().catch(() => false);
-      }
+      const legacy=(await navigator.serviceWorker.getRegistrations()).find(reg=>new URL(reg.scope).pathname==='/'&&reg.active&&['/ubee-customer-sw.js','/ubee-web-push-sw.js'].includes(new URL(reg.active.scriptURL).pathname));
+      const old=await legacy?.pushManager.getSubscription();
+      for(const endpoint of new Set([subscription?.endpoint,old?.endpoint].filter(Boolean))){const response=await fetch(PUSH_ENDPOINT,{method:'DELETE',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint})});if(!response.ok)throw Error('通知設定尚未由後端確認關閉。');}
+      if(subscription&&!await subscription.unsubscribe())throw Error('本裝置通知訂閱尚未完成解除。');
       window.__UBEE_REFRESH_PUSH_SETTING__?.();
       return true;
     }catch(error){
