@@ -11,7 +11,7 @@
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee 跑腿｜財務結算中心 V4 Lifecycle RC1</title>
+<title>UBee 跑腿｜財務結算中心 V4 Lifecycle RC1 Stage 3 (TEST)</title>
 <style>
 :root{
   --bg:#f4f5f7;
@@ -285,6 +285,7 @@ summary::-webkit-details-marker{display:none}
             <div class="finance-summary-card"><span>平台累計已收</span><strong id="financePlatformCollected">$0</strong></div>
             <div class="finance-summary-card"><span>平台累計待收</span><strong id="financePlatformOutstanding">$0</strong></div>
           </div>
+          <div class="section-note"><strong>取件後取消費（本次查詢範圍，獨立於一般完單營收）</strong><div class="finance-mini-grid"><div class="finance-mini"><span>取消費應收</span><strong id="cancelFeeDue">—</strong></div><div class="finance-mini"><span>已核實收款</span><strong id="cancelFeeReceived">—</strong></div><div class="finance-mini"><span>待收款</span><strong id="cancelFeeOutstanding">—</strong></div><div class="finance-mini"><span>待撥補償</span><strong id="cancelPayoutPending">—</strong></div><div class="finance-mini"><span>已確認撥款</span><strong id="cancelPayoutSettled">—</strong></div></div></div>
           <div id="financeLedgerList" class="finance-ledger-list"><div class="empty">正在讀取訂單財務總帳...</div></div>
         </div>
       </div>
@@ -474,9 +475,10 @@ function renderFinanceKpis(){
   set('financePlatformAccrued',money(s.totalPlatformAccruedIncome));
   set('financePlatformCollected',money(s.totalPlatformCollectedIncome));
   set('financePlatformOutstanding',money(s.totalPlatformOutstandingIncome));
+  for(const [id,key] of [['cancelFeeDue','cancellationFeeDue'],['cancelFeeReceived','cancellationFeeReceived'],['cancelFeeOutstanding','cancellationFeeOutstanding'],['cancelPayoutPending','cancellationRiderPayoutPending'],['cancelPayoutSettled','cancellationRiderPayoutSettled']])set(id,s[key]===undefined?'—':money(s[key]));
 }
-function cancellationFinanceLabel(v){return ({pending_handover:'等待安排',handover_assigned:'已安排交接',handover_confirmed:'交接已核實',pending:'等待付款',reported:'已回報待核對',overdue:'逾期未核對',overdue_unverified:'逾期已回報',paid_confirmed:'已核實付款',pending_payment_and_handover:'待付款／交接',pending_payout:'待撥款',settled:'已結算'})[v]||String(v||'未提供');}
-function cancellationFinanceView(c){return `<div class="section-note"><strong>取件後取消費（獨立核對／唯讀）</strong><div class="finance-mini-grid"><div class="finance-mini"><span>取消費應收</span><strong>${money(c.fee)}</strong></div><div class="finance-mini"><span>小U補償</span><strong>${money(c.riderShare)}</strong></div><div class="finance-mini"><span>平台應得</span><strong>${money(c.platformShare)}</strong></div></div><p>付款：${esc(cancellationFinanceLabel(c.paymentStatus))} ｜ 交接：${esc(cancellationFinanceLabel(c.handoverStatus))} ｜ 結算：${esc(cancellationFinanceLabel(c.payoutStatus))}</p>一般付款、調整與強制對帳不適用本案件。不得將付款回報視為收款，不會自動撥款。</div>`;}
+function cancellationFinanceLabel(v){return ({pending_handover:'等待安排',handover_assigned:'已安排交接',handover_submitted:'小U已提交交接',handover_disputed:'交接異常',handover_confirmed:'交接已核實',pending:'等待付款',reported:'已回報待核對',overdue:'逾期未核對',overdue_unverified:'逾期已回報',paid_confirmed:'已核實付款',pending_payment_and_handover:'待付款／交接',pending_payout:'待撥款',manual_financial_review:'原財務待核對',settled:'已結算'})[v]||String(v||'未提供');}
+function cancellationFinanceView(c){return `<div class="section-note"><strong>取件後取消費（獨立核對／唯讀）</strong><div class="finance-mini-grid"><div class="finance-mini"><span>取消費應收</span><strong>${money(c.fee)}</strong></div><div class="finance-mini"><span>小U補償</span><strong>${money(c.riderShare)}</strong></div><div class="finance-mini"><span>平台應得</span><strong>${money(c.platformShare)}</strong></div></div><p>付款：${esc(cancellationFinanceLabel(c.paymentStatus))} ｜ 交接：${esc(cancellationFinanceLabel(c.handoverStatus))} ｜ 結算：${esc(cancellationFinanceLabel(c.payoutStatus))}</p>已核實收款：${money(c.paidAmount||0)}；已確認撥款：${money(c.payoutAmount||0)}。一般付款、調整與強制對帳不適用本案件。收款及撥款由有既有 Firebase 管理權限的營運人員使用獨立稽核工具核實，不會自動轉帳。</div>`;}
 function renderFinanceLedger(){
   const el=document.getElementById('financeLedgerList');if(!el)return;
   const q=normalizeSearch(document.getElementById('financeSearch')?.value);
@@ -486,7 +488,7 @@ function renderFinanceLedger(){
   el.innerHTML=orders.map(o=>{
     const variance=Math.abs(Number(o.customerVariance||0))+Math.abs(Number(o.platformVariance||0))+Math.abs(Number(o.settlementVariance||0));
     const who=o.merchantName||o.customerName||'一般客戶';
-    if(o.cancellationCase)return `<article class="finance-order-card review"><div class="finance-order-id">${esc(o.orderNo||o.orderId)}</div>${cancellationFinanceView(o.cancellationCase)}<button class="btn small primary" onclick="openFinanceOrder('${esc(o.orderId)}')">查看取消案件</button></article>`;
+    if(o.cancellationCase)return `<article class="finance-order-card review"><div class="finance-order-id">${esc(o.orderNo||o.orderId)}</div>${o.cancellationOriginalQuote?`<p>原始報價：${money(o.cancellationOriginalQuote.customerPayableTotal)}（歷史紀錄）</p>`:''}${cancellationFinanceView(o.cancellationCase)}<button class="btn small primary" onclick="openFinanceOrder('${esc(o.orderId)}')">查看取消案件</button></article>`;
     return `<article class="finance-order-card ${financeStatusClass(o.reconciliationStatus)}">
       <div class="finance-order-head"><div><div class="finance-order-id">${esc(o.orderNo||o.orderId)}</div><div class="finance-order-meta">${esc(who)}・${esc(o.serviceType||'-')}<br>${esc(o.rider?.riderName||'尚未指派小U')}・${esc(formatTime(o.completedAtMs||o.createdAtMs))}</div></div><div><div class="finance-amount">${money(o.finalCustomerTotal)}</div><span class="tag ${o.reconciliationStatus==='reconciled'?'done':o.reconciliationStatus==='needs_review'?'cash':'jko'}">${esc(financeStatusLabel(o.reconciliationStatus))}</span></div></div>
       <div class="finance-mini-grid"><div class="finance-mini"><span>初始估價</span><strong>${money(o.initialEstimatedTotal)}</strong></div><div class="finance-mini"><span>客戶實收</span><strong>${money(o.actualPaidAmount)}</strong></div><div class="finance-mini"><span>小U應得</span><strong>${money(Number(o.riderIncome||0)+Number(o.riderAdvance||0))}</strong></div><div class="finance-mini"><span>平台應得</span><strong>${money(o.expectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台已收</span><strong>${money(o.collectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台待收</span><strong>${money(o.outstandingPlatformIncome)}</strong></div></div>
