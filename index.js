@@ -1,4 +1,4 @@
-// UBee Order Lifecycle RC1 Stage 2 — TEST ONLY; operational handover, no new finance authority.
+// UBee Order Lifecycle RC1 Stage 3 — TEST ONLY; operational handover, no new finance authority.
 // UBee Order Lifecycle Reliability RC1 — Stage 1 TEST CANDIDATE; no deployment.
 // UBee Rider Benefits V2.0 RC1 — Production Stability candidate; B01 unchanged.
 // UBee Customer V1.7.0 RC6.2 — Multistop V2 + Rider Minimum NT$58 — TEST CANDIDATE (NOT DEPLOYED)
@@ -12464,6 +12464,7 @@ async function releaseScheduledReservation(
   reason = 'rider_unavailable',
   {
     emergency = false,
+    lifecycleRequest = null,
   } = {}
 ) {
   const orderId =
@@ -12508,13 +12509,15 @@ async function releaseScheduledReservation(
       admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  await db
-    .collection('orders')
-    .doc(orderId)
-    .set(
-      updateData,
-      { merge: true }
-    );
+  const ref=db.collection('orders').doc(orderId);
+  const released=await lifecycleRiderTransaction(lifecycleRequest,async tx=>{
+    const doc=await tx.get(ref);const latest=doc.data()||{};
+    if(!doc.exists||String(latest.status||'')!==String(order.status||'')||String(latest.reservedRiderDocId||'')!==String(order.reservedRiderDocId||'')||Number(latest.scheduleReservedAtMs||0)!==Number(order.scheduleReservedAtMs||0)||Number(latest.riderConfirmedAtMs||0)!==Number(order.riderConfirmedAtMs||0)){
+      if(lifecycleRequest)throw Error('SCHEDULE_STATE_CHANGED');return false;
+    }
+    tx.set(ref,updateData,{merge:true});return true;
+  });
+  if(!released)return null;
 
   const updatedOrder = {
     ...order,
@@ -12685,7 +12688,7 @@ async function maintainScheduledOrders() {
             order.riderConfirmedAtMs
           )
         ) {
-          await releaseScheduledReservation(
+          const released=await releaseScheduledReservation(
             order,
             'rider_not_confirmed_before_schedule',
             {
@@ -12696,6 +12699,7 @@ async function maintainScheduledOrders() {
             }
           );
 
+          if(!released)continue;
           try {
             await notifyCustomer(
               order,
@@ -12718,12 +12722,13 @@ async function maintainScheduledOrders() {
           startMs +
             UBEE_SCHEDULE_LATE_GRACE_MS
       ) {
-        await releaseScheduledReservation(
+        const released=await releaseScheduledReservation(
           order,
           'confirmed_rider_did_not_start',
           { emergency: true }
         );
 
+        if(!released)continue;
         try {
           await notifyCustomer(
             order,
@@ -13146,9 +13151,54 @@ app.get(
   }
 );
 
+// Lifecycle Stage 3: atomic operation receipts for rider mutations. No full order or tokens stored.
+const LIFECYCLE_RIDER_MUTATION_ROUTES = new Set(['reserve-order','confirm-scheduled-order','cancel-scheduled-reservation','accept-order','accept-stack-order','cancel-accepted-order','update-order-status']);
+function lifecycleRiderReceiptRef(riderDocId,key){return db.collection('lifecycle_rider_operations').doc(crypto.createHash('sha256').update(JSON.stringify([riderDocId,key])).digest('hex'));}
+function lifecycleRiderOperation(req){
+  const key=String(req.body?.lifecycleOperationKey||'');if(!key)return null;
+  const riderDocId=String(req.riderAuth?.riderDocId||'');
+  const route=String(req.lifecycleOperationRoute||req.path||'').split('/').pop();
+  const orderId=String(req.body?.orderId||'').trim().toUpperCase();
+  const status=String(req.body?.status||'');const canExecute=req.body?.canExecute===true?true:req.body?.canExecute===false?false:null;
+  if(!riderDocId||!LIFECYCLE_RIDER_MUTATION_ROUTES.has(route)||!/^[a-zA-Z0-9_-]{20,100}$/.test(key)||!/^[A-Z0-9_-]{1,120}$/.test(orderId))throw Error('RIDER_OPERATION_INVALID');
+  const expectedStopIndex=req.body?.lifecycleExpectedStopIndex==null?null:Number(req.body.lifecycleExpectedStopIndex);if(expectedStopIndex!==null&&(!Number.isSafeInteger(expectedStopIndex)||expectedStopIndex<0))throw Error('RIDER_OPERATION_INVALID');
+  const fingerprint=crypto.createHash('sha256').update(JSON.stringify([route,orderId,status,canExecute,expectedStopIndex])).digest('hex');
+  return {ref:lifecycleRiderReceiptRef(riderDocId,key),riderDocId,route,orderId,status,canExecute,fingerprint};
+}
+function lifecycleRiderReceiptMatches(data,op){return data?.riderDocId===op.riderDocId&&data?.fingerprint===op.fingerprint;}
+async function lifecycleRiderOperationGate(req,res,next){
+  try{const op=lifecycleRiderOperation(req);if(!op)return next();const doc=await op.ref.get();if(!doc.exists)return next();
+    if(!lifecycleRiderReceiptMatches(doc.data(),op))return res.status(409).json({success:false,code:'RIDER_OPERATION_CONFLICT',message:'操作識別碼與內容不一致。'});
+    return res.status(409).json({success:false,code:doc.data()?.abandoned===true?'RIDER_OPERATION_ABANDONED':'RIDER_OPERATION_COMMITTED',message:doc.data()?.abandoned===true?'原操作已安全關閉，請重新確認目前任務。':'原操作已由後端確認，請重新同步任務。'});
+  }catch(e){return res.status(e.message==='RIDER_OPERATION_INVALID'?400:503).json({success:false,code:'RIDER_OPERATION_UNAVAILABLE',message:'操作識別尚未確認，請勿另建重複操作。'});}
+}
+async function lifecycleRiderTransaction(req,callback){
+  const op=req?lifecycleRiderOperation(req):null;
+  if(!op)return db.runTransaction(callback);
+  return db.runTransaction(async tx=>{
+    const existing=await tx.get(op.ref);
+    if(existing.exists)throw Error(lifecycleRiderReceiptMatches(existing.data(),op)?existing.data()?.abandoned===true?'RIDER_OPERATION_ABANDONED':'RIDER_OPERATION_COMMITTED':'RIDER_OPERATION_CONFLICT');
+    const result=await callback(tx);
+    // A receipt commits atomically with the existing state transition. Firestore retries the entire transaction.
+    tx.set(op.ref,{riderDocId:op.riderDocId,route:op.route,orderId:op.orderId,status:op.status,canExecute:op.canExecute,fingerprint:op.fingerprint,committedAtMs:Date.now(),committedAt:admin.firestore.FieldValue.serverTimestamp()});
+    return result;
+  });
+}
+app.post('/api/rider/lifecycle-operations/:key/abandon',riderAuthMiddleware,async(req,res)=>{
+  try{req.lifecycleOperationRoute=String(req.body?.route||'');req.body={...(req.body||{}),lifecycleOperationKey:String(req.params.key||'')};const op=lifecycleRiderOperation(req);if(!op)throw Error('RIDER_OPERATION_INVALID');
+    const result=await db.runTransaction(async tx=>{const doc=await tx.get(op.ref);if(doc.exists){if(!lifecycleRiderReceiptMatches(doc.data(),op))throw Error('RIDER_OPERATION_CONFLICT');return {committed:doc.data()?.abandoned!==true,abandoned:doc.data()?.abandoned===true};}
+      tx.set(op.ref,{riderDocId:op.riderDocId,route:op.route,orderId:op.orderId,status:op.status,canExecute:op.canExecute,fingerprint:op.fingerprint,abandoned:true,closedAtMs:Date.now(),closedAt:admin.firestore.FieldValue.serverTimestamp()});return {committed:false,abandoned:true};});return res.json({success:true,...result});
+  }catch(e){return res.status(409).json({success:false,message:'操作結果尚待核對。'});}
+});
+app.get('/api/rider/lifecycle-operations/:key',riderAuthMiddleware,async(req,res)=>{
+  res.setHeader('Cache-Control','no-store, private');const riderDocId=String(req.riderAuth?.riderDocId||'');const key=String(req.params.key||'');
+  if(!riderDocId||!/^[a-zA-Z0-9_-]{20,100}$/.test(key))return res.status(400).json({success:false,message:'操作識別無效。'});
+  try{const doc=await lifecycleRiderReceiptRef(riderDocId,key).get();if(!doc.exists)return res.json({success:true,committed:false});const o=doc.data();if(o.riderDocId!==riderDocId)return res.status(403).json({success:false});return res.json({success:true,committed:o.abandoned!==true,abandoned:o.abandoned===true,route:o.route,orderId:o.orderId,status:o.status,canExecute:o.canExecute,committedAtMs:o.committedAtMs||0});}catch(e){return res.status(503).json({success:false,message:'暫時無法核對操作結果。'});}
+});
+
 app.post(
   '/api/rider/reserve-order',
-  riderAuthMiddleware,
+  riderAuthMiddleware, lifecycleRiderOperationGate,
   async (req, res) => {
     try {
       const {
@@ -13219,8 +13269,7 @@ app.post(
 
       let reservedOrder = null;
 
-      await db.runTransaction(
-        async transaction => {
+      await lifecycleRiderTransaction(req, async transaction => {
           const orderDoc =
             await transaction.get(orderRef);
 
@@ -13459,7 +13508,7 @@ app.post(
 // ============================================================
 app.post(
   '/api/rider/cancel-scheduled-reservation',
-  riderAuthMiddleware,
+  riderAuthMiddleware, lifecycleRiderOperationGate,
   async (req,res)=>{
     try{
       const {
@@ -13501,7 +13550,7 @@ app.post(
       let releasedOrder=null;
       let emergency=false;
 
-      await db.runTransaction(async transaction=>{
+      await lifecycleRiderTransaction(req, async transaction=>{
         const orderDoc=await transaction.get(orderRef);
         if(!orderDoc.exists){
           throw new Error('ORDER_NOT_FOUND');
@@ -13697,7 +13746,7 @@ app.post(
 
 app.post(
   '/api/rider/confirm-scheduled-order',
-  riderAuthMiddleware,
+  riderAuthMiddleware, lifecycleRiderOperationGate,
   async (req, res) => {
     try {
       const {
@@ -13807,6 +13856,7 @@ app.post(
             order,
             'rider_declined_final_confirmation',
             {
+              lifecycleRequest:req,
               emergency:
                 startMs > 0 &&
                 Date.now() >=
@@ -13815,6 +13865,7 @@ app.post(
             }
           );
 
+        if(!updated)throw Error('SCHEDULE_STATE_CHANGED');
         try {
           await notifyCustomer(
             order,
@@ -13847,10 +13898,11 @@ app.post(
           admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      await orderRef.set(
-        updateData,
-        { merge: true }
-      );
+      await lifecycleRiderTransaction(req,async tx=>{
+        const latest=await tx.get(orderRef);const current=latest.data()||{};
+        if(!latest.exists||!['scheduled_reserved','scheduled_confirmed'].includes(String(current.status||''))||String(current.reservedRiderDocId||'')!==identity.riderDocId||Number(current.scheduleReservedAtMs||0)!==Number(order.scheduleReservedAtMs||0))throw Error('SCHEDULE_STATE_CHANGED');
+        tx.set(orderRef,updateData,{merge:true});
+      });
 
       const updatedOrder = {
         ...order,
@@ -19758,13 +19810,13 @@ function dispatchConsoleV641Order(doc){
   };
 }
 
-// Lifecycle Stage 2: operational custody only. Existing dispatch middleware/CSRF
+// Lifecycle Stage 3: operational custody only. Existing dispatch middleware/CSRF
 // applies; no finance verification or payout authority is granted here.
 function lifecycleHandoverBlocked(o={}) {
   return o.postPickupCancellationRequested===true && o.cancellationHandoverManaged===true &&
     o.postPickupCancellationStatus!=='handover_confirmed';
 }
-function lifecycleHandoverEligibility(o={},r={},id='') {
+function lifecycleHandoverFinancialReviewReason(o={},r={},id='') {
   if(o.postPickupCancellationRequested!==true || !['picked_up'].includes(String(o.status||''))) return 'ORDER_STATE_CHANGED';
   if(!['send','pickup'].includes(String(o.serviceKey||'').toLowerCase()) || isMerchantOrderRecord(o) || o.singlePointTask===true || (Array.isArray(o.deliveryStops)&&o.deliveryStops.length>1) || Number(o.completedDeliveryStopCount||0)>0 || Number(o.currentDeliveryStopIndex||0)>0) return 'MANUAL_COMPLEX_CASE';
   if(!o.riderDocId || String(r.currentOrderId||'').toUpperCase()!==id || r.busy!==true) return 'RIDER_STATE_CHANGED';
@@ -19774,52 +19826,98 @@ function lifecycleHandoverEligibility(o={},r={},id='') {
   if(![fee,rider,platform].every(Number.isSafeInteger)||fee<=0||rider<0||platform<0||rider+platform!==fee) return 'INVALID_CANCELLATION_FEE';
   return '';
 }
+// Read every referenced task before writing; never discard a queued assignment or another active task.
+async function lifecycleHandoverContext(tx,o,id){
+  if(o.postPickupCancellationRequested!==true||String(o.status||'')!=='picked_up')throw Error('ORDER_STATE_CHANGED');
+  const fee=Number(o.cancellationFee),ri=Number(o.cancellationRiderShare),pf=Number(o.cancellationPlatformShare);
+  if(![fee,ri,pf].every(Number.isSafeInteger)||fee<=0||ri<0||pf<0||ri+pf!==fee)throw Error('INVALID_CANCELLATION_FEE');
+  if(!o.riderDocId)throw Error('RIDER_STATE_CHANGED');
+  const rr=db.collection(RIDER_V2_COLLECTIONS.riders).doc(String(o.riderDocId));const rd=await tx.get(rr);const rider=rd.data()||{};
+  if(!rd.exists||String(rider.currentOrderId||'').toUpperCase()!==id||rider.busy!==true||['QUEUED','COMPLETED'].includes(String(o.stackRole||'').toUpperCase()))throw Error('RIDER_STATE_CHANGED');
+  const ids=Array.isArray(rider.queuedOrderIds)?rider.queuedOrderIds.map(smartStackSafeOrderId).filter(Boolean):[];const qid=ids[0]||'';const orderQ=smartStackSafeOrderId(o.stackQueuedOrderId||'');
+  if(ids.length>1||qid===id||(orderQ&&orderQ!==qid)||(rider.smartStackActive===true&&!qid)||(Array.isArray(rider.activeOrderIds)&&rider.activeOrderIds.map(smartStackSafeOrderId).some(x=>x!==id&&x!==qid)))throw Error('STACK_STATE_CHANGED');
+  let queuedRef=null,queued=null;
+  if(qid){queuedRef=db.collection('orders').doc(qid);const q=await tx.get(queuedRef);queued=q.data()||{};if(!q.exists||String(queued.stackRole||'').toUpperCase()!=='QUEUED'||String(queued.status||'')!=='accepted'||String(queued.riderDocId||'')!==String(o.riderDocId)||smartStackSafeOrderId(queued.stackPrimaryOrderId||queued.stackQueuedBehindOrderId)!==id)throw Error('STACK_STATE_CHANGED');}
+  const review=lifecycleHandoverFinancialReviewReason(o,rider,id);return {rr,rider,queuedRef,queued,qid,review};
+}
+function lifecycleHandoverReleasePatch(o,id,ctx,now,ts){
+  if(!ctx.qid)return {riderPatch:{busy:false,currentOrderId:'',queuedOrderIds:[],activeOrderIds:[],smartStackActive:false,stackGroupId:'',activeTrackingOrderId:'',activeTrackingSessionId:'',taskTrackingStatus:'stopped',taskTrackingStopReason:'customer_post_pickup_cancel',taskTrackingUpdatedAtMs:now,taskTrackingUpdatedAt:ts,lastActive:now,updatedAt:ts},queuedPatch:null};
+  const trackingSessionId=crypto.randomUUID();const lat=Number(o.riderCurrentLat??o.riderCurrentLocation?.lat),lng=Number(o.riderCurrentLng??o.riderCurrentLocation?.lng);
+  const queuedPatch={stackRole:'CURRENT',stackState:'active',stackPosition:1,stackPrimaryOrderId:'',stackQueuedBehindOrderId:'',stackPreviousOrderId:id,stackPromotedAtMs:now,stackPromotedAt:ts,customerFinalEtaAvailable:false,customerFinalEtaPhase:'pickup',customerFinalEtaMinMinutes:null,customerFinalEtaMaxMinutes:null,customerFinalEtaStartAtMs:0,customerFinalEtaEndAtMs:0,customerFinalEtaUpdatedAtMs:0,customerFinalEtaConfidence:'',...(Number.isFinite(lat)&&Number.isFinite(lng)?{riderCurrentLat:lat,riderCurrentLng:lng,riderLocationUpdatedAtMs:Number(o.riderLocationUpdatedAtMs||o.riderCurrentLocation?.updatedAtMs||0)}:{}),riderTrackingStatus:'starting',trackingSessionId,trackingStartedAtMs:now,trackingStartedAt:ts,trackingUpdatedAtMs:now,trackingUpdatedAt:ts,trackingEndedAtMs:null,trackingEndedAt:null,trackingStopReason:'',...getEtaPayloadByStatus('accepted'),updatedAt:ts};
+  return {queuedPatch,riderPatch:{busy:true,currentOrderId:ctx.qid,queuedOrderIds:[],activeOrderIds:[ctx.qid],smartStackActive:false,stackGroupId:'',activeTrackingOrderId:ctx.qid,activeTrackingSessionId:trackingSessionId,taskTrackingStatus:'starting',taskTrackingUpdatedAtMs:now,taskTrackingUpdatedAt:ts,taskTrackingStopReason:'',lastActive:now,updatedAt:ts}};
+}
+app.post('/api/rider/cancellation-handover-evidence',riderAuthMiddleware,async(req,res)=>{
+  const riderDocId=String(req.riderAuth?.riderDocId||'');const id=String(req.body?.orderId||'').trim().toUpperCase();const action=String(req.body?.action||'');const note=String(req.body?.note||'').trim();const revision=Number(req.body?.revision||0);
+  if(!riderDocId||!/^[A-Z0-9_-]{1,120}$/.test(id)||!['submit','dispute'].includes(action)||note.length<5||note.length>1000||req.body?.acknowledged!==true)return res.status(400).json({success:false,message:'請確認身分及交接紀錄。'});
+  const ref=db.collection('orders').doc(id);
+  try{const result=await db.runTransaction(async tx=>{const doc=await tx.get(ref);const o=doc.data()||{};if(!doc.exists||String(o.riderDocId||'')!==riderDocId)throw Error('NOT_THIS_RIDER');
+    if(!lifecycleHandoverBlocked(o)||Number(o.cancellationHandoverRevision||0)!==revision)throw Error('HANDOVER_STATE_CHANGED');
+    const next=action==='submit'?'handover_submitted':'handover_disputed';
+    if(o.postPickupCancellationStatus===next&&o.cancellationHandoverEvidenceNote===note)return o;
+    if(o.postPickupCancellationStatus!=='handover_assigned')throw Error('HANDOVER_STATE_CHANGED');
+    const now=Date.now(),ts=admin.firestore.FieldValue.serverTimestamp();const patch={postPickupCancellationStatus:next,cancellationHandoverEvidenceNote:note,cancellationHandoverEvidenceAtMs:now,cancellationHandoverEvidenceRiderDocId:riderDocId,updatedAt:ts,updatedAtMs:now};
+    tx.set(ref,patch,{merge:true});tx.set(db.collection('lifecycle_cancellation_handover_audit').doc(id+'_rider_'+revision+'_'+action),{orderId:id,action,riderDocId,revision,note,createdAtMs:now,createdAt:ts});return {...o,...patch};});
+    orders[id]={...result,id};return res.json({success:true,case:lifecycleCaseSummary(result)});
+  }catch(e){return res.status(e.message==='NOT_THIS_RIDER'?403:e.message==='HANDOVER_STATE_CHANGED'?409:503).json({success:false,message:'交接結果待核對，請刷新任務後確認。'});}
+});
+app.get('/api/rider/cancellation-history',riderAuthMiddleware,async(req,res)=>{
+  res.setHeader('Cache-Control','no-store, private');const riderDocId=String(req.riderAuth?.riderDocId||'');if(!riderDocId)return res.status(403).json({success:false,message:'須以現有已驗證小U身分查看取消補償。'});
+  try{let q=db.collection('orders').where('riderDocId','==',riderDocId).where('postPickupCancellationRequested','==',true).orderBy(admin.firestore.FieldPath.documentId()).limit(51);const cursor=String(req.query.cursor||'');if(cursor){if(!/^[A-Z0-9_-]{1,120}$/.test(cursor))return res.status(400).json({success:false,message:'游標無效'});q=q.startAfter(cursor);}const snap=await q.get();const docs=snap.docs.slice(0,50);const items=docs.map(d=>{const o=d.data(),c=lifecycleCaseSummary(o);return {orderId:d.id,handoverStatus:c.handoverStatus,paymentStatus:c.paymentStatus,payoutStatus:c.payoutStatus,riderShare:c.riderShare,payoutAmount:c.payoutAmount,financialReview:c.financialReview};});return res.json({success:true,items,nextCursor:snap.size>50?docs[49].id:null});}catch(e){return res.status(503).json({success:false,message:'取消補償資料暫時無法讀取。'});}
+});
 function lifecycleCaseSummary(o={}) {
   if(o.postPickupCancellationRequested!==true)return null;
   const fields=getPostPickupCancelPublicFieldsV1(o);
-  return {handoverStatus:fields.postPickupCancellationStatus,paymentStatus:fields.cancellationPaymentStatus,fee:fields.cancellationFee,riderShare:fields.cancellationRiderShare,platformShare:fields.cancellationPlatformShare,dueAtMs:fields.cancellationPaymentDueAtMs,payoutStatus:String(o.cancellationPayoutStatus||'pending_payment_and_handover'),managed:o.cancellationHandoverManaged===true,confirmedAtMs:Number(o.cancellationHandoverConfirmedAtMs||0),financialReview:o.cancellationFinancialReviewRequired===true};
+  return {handoverStatus:fields.postPickupCancellationStatus,paymentStatus:fields.cancellationPaymentStatus,fee:fields.cancellationFee,riderShare:fields.cancellationRiderShare,platformShare:fields.cancellationPlatformShare,dueAtMs:fields.cancellationPaymentDueAtMs,payoutStatus:String(o.cancellationPayoutStatus||'pending_payment_and_handover'),managed:o.cancellationHandoverManaged===true,confirmedAtMs:Number(o.cancellationHandoverConfirmedAtMs||0),financialReview:o.cancellationFinancialReviewRequired===true,payoutEligible:o.cancellationPayoutEligible===true,operationalReviewReason:String(o.cancellationOperationalReviewReason||''),revision:Number(o.cancellationHandoverRevision||0),evidenceNote:String(o.cancellationHandoverEvidenceNote||''),evidenceAtMs:Number(o.cancellationHandoverEvidenceAtMs||0),paidAmount:isCancellationFeeFinanceVerifiedV1(o)?Number(o.cancellationPaidAmount||0):0,payoutAmount:o.cancellationPayoutStatus==='settled'?Number(o.cancellationActualPayoutAmount||0):0};
 }
 app.post('/api/dispatch/console/order/:orderId/cancellation-handover',async(req,res)=>{
   // Only the existing trusted dispatch device role; not a finance endpoint.
   if(req.dispatchAdminAuthV642?.mode!=='trusted_device')return res.status(403).json({success:false,message:'需使用現有已授權的調度中心裝置。'});
   const id=String(req.params.orderId||'').trim().toUpperCase();
   const action=String(req.body?.action||'');const note=String(req.body?.note||'').trim();
-  if(action==='assign'&&process.env.UBEE_LIFECYCLE_HANDOVER_ENABLED!=='true')return res.status(409).json({success:false,message:'交接操作尚未啟用，請先完成測試環境驗收。'});
-  if(!/^[A-Z0-9_-]{1,120}$/.test(id)||!['assign','confirm'].includes(action)||note.length<5||note.length>1000||req.body?.acknowledged!==true)return res.status(400).json({success:false,message:'請填寫交接指示／實際交接證明紀錄並確認。'});
+  if(['assign','reassign'].includes(action)&&process.env.UBEE_LIFECYCLE_HANDOVER_ENABLED!=='true')return res.status(409).json({success:false,message:'交接操作尚未啟用，請先完成測試環境驗收。'});
+  if(!/^[A-Z0-9_-]{1,120}$/.test(id)||!['assign','confirm','reassign'].includes(action)||note.length<5||note.length>1000||req.body?.acknowledged!==true)return res.status(400).json({success:false,message:'請填寫交接指示／實際交接證明紀錄並確認。'});
   const ref=db.collection('orders').doc(id);let result=null;let notification=null;
   try {
     await db.runTransaction(async tx=>{
       result=null;notification=null;
       const doc=await tx.get(ref);if(!doc.exists)throw Error('ORDER_NOT_FOUND');const o=doc.data()||{};
       if(o.postPickupCancellationRequested===true&&o.postPickupCancellationStatus==='handover_confirmed'&&o.status==='cancelled'){result={...o,id};return;}
-      if(action==='assign'&&lifecycleHandoverBlocked(o)){result={...o,id};return;}
-      if(!o.riderDocId)throw Error('RIDER_STATE_CHANGED');
-      const rr=db.collection(RIDER_V2_COLLECTIONS.riders).doc(String(o.riderDocId));const rd=await tx.get(rr);if(!rd.exists)throw Error('RIDER_STATE_CHANGED');const rider=rd.data()||{};
-      const reason=lifecycleHandoverEligibility(o,rider,id);if(reason)throw Error(reason);
+      if(action==='assign'&&lifecycleHandoverBlocked(o)&&o.postPickupCancellationStatus!=='pending_handover'){result={...o,id};return;}
+      if(action==='reassign'&&o.postPickupCancellationStatus==='handover_assigned'&&o.cancellationHandoverInstruction===note){result={...o,id};return;}
+      const ctx=await lifecycleHandoverContext(tx,o,id);const rr=ctx.rr;const complex=Boolean(ctx.review);
+      if(complex&&req.body?.complexAcknowledged!==true)throw Error('COMPLEX_ACK_REQUIRED');
       const now=Date.now();const ts=admin.firestore.FieldValue.serverTimestamp();const actor=String(req.dispatchAdminAuthV642.deviceId||'');if(!actor)throw Error('RIDER_STATE_CHANGED');
       let patch;
-      if(action==='assign'){
-        if(String(o.postPickupCancellationStatus||'pending_handover')!=='pending_handover')throw Error('ORDER_STATE_CHANGED');
-        patch={postPickupCancellationStatus:'handover_assigned',cancellationHandoverManaged:true,cancellationHandoverInstruction:note,cancellationHandoverAssignedAtMs:now,updatedAt:ts,updatedAtMs:now};
+      if(action==='assign'||action==='reassign'){
+        if(action==='assign'?String(o.postPickupCancellationStatus||'pending_handover')!=='pending_handover':(!['handover_disputed','handover_submitted'].includes(o.postPickupCancellationStatus)||Number(req.body?.revision||0)!==Number(o.cancellationHandoverRevision||0)))throw Error('ORDER_STATE_CHANGED');
+        patch={postPickupCancellationStatus:'handover_assigned',cancellationHandoverManaged:true,cancellationOperationalReviewReason:'',cancellationHandoverRevision:Number(o.cancellationHandoverRevision||0)+1,cancellationHandoverInstruction:note,cancellationHandoverEvidenceNote:'',cancellationHandoverEvidenceAtMs:0,cancellationHandoverAssignedAtMs:now,updatedAt:ts,updatedAtMs:now};
       }else{
-        if(!lifecycleHandoverBlocked(o)||o.postPickupCancellationStatus!=='handover_assigned')throw Error('ORDER_STATE_CHANGED');
+        if(!lifecycleHandoverBlocked(o)||!['handover_submitted','handover_assigned'].includes(o.postPickupCancellationStatus))throw Error('ORDER_STATE_CHANGED');
+        if(o.postPickupCancellationStatus==='handover_assigned'&&req.body?.manualEvidenceOverride!==true)throw Error('ORDER_STATE_CHANGED');
+        if(Number(req.body?.revision||0)!==Number(o.cancellationHandoverRevision||0))throw Error('ORDER_STATE_CHANGED');
         const verified=isCancellationFeeFinanceVerifiedV1(o);
         // Custody closure is independent of payment. Keep original amounts as an audit snapshot.
         const original={customerPayableTotal:getOrderCustomerPayableTotal(o),riderIncome:Number(o.riderIncome??o.riderFee??0),platformIncome:Number(o.platformIncome??o.platformFee??0),advancePayment:getOrderAdvancePaymentAmount(o)};
         const fee=Number(o.cancellationFee), ri=Number(o.cancellationRiderShare), pf=Number(o.cancellationPlatformShare);
-        patch={status:'cancelled',riderStatus:'cancelled',cancelType:'customer_post_pickup_cancel',cancelledAt:now,cancelledAtMs:now,cancelledAtServer:ts,customerTrackingStatus:'cancelled',customerTrackingStatusLabel:getStatusLabel('cancelled'),customerTrackingUpdatedAtMs:now,statusUpdatedAtMs:now,riderTrackingStatus:'stopped',trackingEndedAtMs:now,trackingEndedAt:ts,trackingStopReason:'customer_post_pickup_cancel',trackingUpdatedAtMs:now,updatedAt:ts,updatedAtMs:now,scheduleStatus:'cancelled',postPickupCancellationStatus:'handover_confirmed',cancellationHandoverConfirmedAtMs:now,cancellationOriginalQuote:o.cancellationOriginalQuote||original,initialEstimatedTotal:getFinanceInitialEstimate(o)||original.customerPayableTotal,finalCustomerTotal:fee,customerPayableTotal:fee,payableTotal:fee,finalTotal:fee,total:fee,serviceTotal:fee,serviceSubtotal:fee,taskSubtotal:fee,riderIncome:ri,estimatedRiderIncome:ri,riderFee:ri,driverFee:ri,platformFee:pf,platformIncome:pf,platformServiceFee:pf,riderIncomeBeforeGuarantee:ri,riderGuaranteeSubsidy:0,riderMinimumApplied:false,cancellationFinancialReviewRequired:true,cancellationFinancialContractVersion:'lifecycle-post-pickup-v1',financePaymentStatus:verified?'paid':'unpaid',paymentStatus:verified?'paid':'unpaid',actualPaidAmount:verified?Number(o.cancellationPaidAmount):0,paidAmount:verified?Number(o.cancellationPaidAmount):0,isPaid:verified,cashCollected:false,cashCollectAmount:0,financeReconciliationStatus:'needs_review',cancellationSettlementStatus:verified?'pending_rider_payout':'pending_collection',cancellationPayoutStatus:verified?'pending_payout':'pending_payment_and_handover',settlementStatus:'not_applicable',cashRemittanceStatus:'not_applicable',cashDueToPlatform:0,platformReceivable:0,riderDueToPlatform:0};
-        tx.set(rr,{busy:false,currentOrderId:'',queuedOrderIds:[],activeOrderIds:[],smartStackActive:false,activeTrackingOrderId:'',activeTrackingSessionId:'',taskTrackingStatus:'stopped',taskTrackingStopReason:'customer_post_pickup_cancel',taskTrackingUpdatedAtMs:now,taskTrackingUpdatedAt:ts,lastActive:now,updatedAt:ts},{merge:true});
+        patch={status:'cancelled',riderStatus:'cancelled',cancelType:'customer_post_pickup_cancel',cancelledAt:now,cancelledAtMs:now,cancelledAtServer:ts,customerTrackingStatus:'cancelled',customerTrackingStatusLabel:getStatusLabel('cancelled'),customerTrackingUpdatedAtMs:now,statusUpdatedAtMs:now,riderTrackingStatus:'stopped',trackingEndedAtMs:now,trackingEndedAt:ts,trackingStopReason:'customer_post_pickup_cancel',trackingUpdatedAtMs:now,updatedAt:ts,updatedAtMs:now,scheduleStatus:'cancelled',stackState:'cancelled',stackQueuedOrderId:'',stackRole:ctx.qid?'COMPLETED':String(o.stackRole||''),stackNextOrderId:ctx.qid||'',postPickupCancellationStatus:'handover_confirmed',cancellationHandoverConfirmedAtMs:now,cancellationOriginalQuote:o.cancellationOriginalQuote||original,initialEstimatedTotal:getFinanceInitialEstimate(o)||original.customerPayableTotal,cancellationFinancialReviewRequired:complex,cancellationFinancialReviewReason:ctx.review||'',cancellationPayoutEligible:!complex,cancellationFinancialContractVersion:'lifecycle-post-pickup-v2',cancellationSettlementStatus:complex?'manual_financial_review':verified?'pending_rider_payout':'pending_collection',cancellationPayoutStatus:complex?'manual_financial_review':verified?'pending_payout':'pending_payment_and_handover'};
+        if(!complex)Object.assign(patch,{finalCustomerTotal:fee,customerPayableTotal:fee,payableTotal:fee,finalTotal:fee,total:fee,serviceTotal:fee,serviceSubtotal:fee,taskSubtotal:fee,riderIncome:ri,estimatedRiderIncome:ri,riderFee:ri,driverFee:ri,platformFee:pf,platformIncome:pf,platformServiceFee:pf,riderIncomeBeforeGuarantee:ri,riderGuaranteeSubsidy:0,riderMinimumApplied:false,financePaymentStatus:verified?'paid':'unpaid',paymentStatus:verified?'paid':'unpaid',actualPaidAmount:verified?Number(o.cancellationPaidAmount):0,paidAmount:verified?Number(o.cancellationPaidAmount):0,isPaid:verified,cashCollected:false,cashCollectAmount:0,financeReconciliationStatus:verified?'pending_settlement':'unpaid',settlementStatus:'not_applicable',cashRemittanceStatus:'not_applicable',cashDueToPlatform:0,platformReceivable:0,riderDueToPlatform:0});
+        else patch.financeReconciliationStatus='needs_review';
+        const release=lifecycleHandoverReleasePatch(o,id,ctx,now,ts);tx.set(rr,release.riderPatch,{merge:true});
+        if(release.queuedPatch)tx.set(ctx.queuedRef,release.queuedPatch,{merge:true});
+        if(ctx.qid)patch.cancellationPromotedOrderId=ctx.qid;
+
       }
       tx.set(ref,patch,{merge:true});
-      const auditRef=db.collection('lifecycle_cancellation_handover_audit').doc(id+'_'+action);
+      const auditRef=db.collection('lifecycle_cancellation_handover_audit').doc(id+'_'+action+'_'+Number(patch.cancellationHandoverRevision??o.cancellationHandoverRevision??0));
       tx.set(auditRef,{orderId:id,action,deviceId:actor,note,createdAtMs:now,createdAt:ts});
-      result={...o,...patch,id};notification={riderId:String(o.riderDocId),customerId:String(o.userId||o.customerId||''),action};
+      result={...o,...patch,id};notification={riderId:String(o.riderDocId),customerId:String(o.userId||o.customerId||''),action,promotedOrderId:patch.cancellationPromotedOrderId||''};
     });
     if(result)orders[id]=result;
+    if(notification?.promotedOrderId){try{const q=await db.collection('orders').doc(notification.promotedOrderId).get();if(q.exists)orders[q.id]={id:q.id,...q.data()};await Promise.allSettled([refreshCustomerLiveEtaV1(notification.promotedOrderId,{reason:'stack_promoted_after_cancel',allowRoute:true,force:true}),refreshCustomerFinalDeliveryEtaV1(notification.promotedOrderId,{reason:'stack_promoted_after_cancel',force:true})]);}catch(e){console.warn('handover promotion refresh pending');}}
     if(notification){const confirmed=notification.action==='confirm';const title=confirmed?'物品交接已確認':'平台已安排物品交接';const message=confirmed?`訂單 ${id} 的物品交接已由平台核實，取消費及補償仍須獨立核對。`:`訂單 ${id}：平台已安排交接，請依調度指示辦理。`;
       await Promise.allSettled([createRiderInboxNotification(notification.riderId,{eventKey:`lifecycle_handover_${action}:${id}`,revision:'1',type:'order_update',category:'任務',title,message:confirmed?message:message+' '+String(result.cancellationHandoverInstruction||''),orderId:id,actionType:'order',actionTarget:id,webPush:true}),notification.customerId?createCustomerInboxNotification(notification.customerId,{eventKey:`lifecycle_handover_${action}:${id}`,revision:'1',type:'order_update',category:'取消與付款',title,message,orderId:id,actionType:'order',actionTarget:id,webPush:true}):Promise.resolve()]);}
     return res.json({success:true,case:lifecycleCaseSummary(result),message:action==='confirm'?'物品交接已確認，財務仍待核對。':'交接安排已保存。'});
-  }catch(e){const code=String(e?.message||'');const known={ORDER_NOT_FOUND:'找不到訂單',ORDER_STATE_CHANGED:'案件狀態已變更，請重新查詢',RIDER_STATE_CHANGED:'小U任務歸屬已改變，請人工確認',MANUAL_COMPLEX_CASE:'涉及多點、疊單、店家或非標準配送，暫不支援自動釋放',MANUAL_FINANCIAL_CASE:'涉及非現金、代墊或既有收款／結算，須人工處理',INVALID_CANCELLATION_FEE:'取消費資料不一致'};return res.status(code==='ORDER_NOT_FOUND'?404:known[code]?409:500).json({success:false,code:known[code]?code:'HANDOVER_UNKNOWN',message:known[code]||'交接結果待確認，請重新查詢訂單，勿重複交接。'});}
+  }catch(e){const code=String(e?.message||'');const known={ORDER_NOT_FOUND:'找不到訂單',ORDER_STATE_CHANGED:'案件狀態已變更，請重新查詢',RIDER_STATE_CHANGED:'小U任務歸屬已改變，請人工確認',STACK_STATE_CHANGED:'疊單任務指標不一致，須先確認任務歸屬',COMPLEX_ACK_REQUIRED:'複雜案件須確認保留原財務待人工對帳後才能操作',MANUAL_COMPLEX_CASE:'涉及多點、疊單、店家或非標準配送',MANUAL_FINANCIAL_CASE:'涉及非現金、代墊或既有收款／結算',INVALID_CANCELLATION_FEE:'取消費資料不一致'};return res.status(code==='ORDER_NOT_FOUND'?404:known[code]?409:500).json({success:false,code:known[code]?code:'HANDOVER_UNKNOWN',message:known[code]||'交接結果待確認，請重新查詢訂單，勿重複交接。'});}
 });
 
 app.get('/api/dispatch/console/orders',async(req,res)=>{
@@ -41508,7 +41606,7 @@ function buildRiderSelfCancelUpdate(order={},identity={},nowMs=Date.now(),cycleI
   return update;
 }
 
-app.post('/api/rider/cancel-accepted-order', riderAuthMiddleware, async (req,res)=>{
+app.post('/api/rider/cancel-accepted-order', riderAuthMiddleware, lifecycleRiderOperationGate, async (req,res)=>{
   try{
     const {orderId,lineUserId,phone,riderId} = req.body || {};
     const safeOrderId=smartStackSafeOrderId(orderId);
@@ -41533,7 +41631,8 @@ app.post('/api/rider/cancel-accepted-order', riderAuthMiddleware, async (req,res
     const releasedOrders=[];
     let keptCurrentOrderId='';
 
-    await db.runTransaction(async transaction=>{
+    await lifecycleRiderTransaction(req, async transaction=>{
+      releasedOrders.length=0;keptCurrentOrderId='';
       // All reads first.
       const [latestRiderDoc,orderDoc]=await Promise.all([
         transaction.get(riderRef),
@@ -41744,7 +41843,7 @@ app.post('/api/rider/cancel-accepted-order', riderAuthMiddleware, async (req,res
 // ============================================================
 // Smart Stack V1｜承接第二張 QUEUED 任務
 // ============================================================
-app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) => {
+app.post('/api/rider/accept-stack-order', riderAuthMiddleware, lifecycleRiderOperationGate, async (req, res) => {
   try {
     const { orderId, lineUserId, phone, riderId } = req.body || {};
     const safeOrderId = smartStackSafeOrderId(orderId);
@@ -41834,7 +41933,7 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
     let primaryOrder = null;
     let eligibilityResult = null;
 
-    await db.runTransaction(async transaction => {
+    await lifecycleRiderTransaction(req, async transaction => {
       const latestRiderDoc = await transaction.get(riderRef);
       if (!latestRiderDoc.exists) throw new Error('RIDER_NOT_FOUND');
 
@@ -42156,7 +42255,7 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
 
 // 3. 接受任務：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
-app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
+app.post('/api/rider/accept-order', riderAuthMiddleware, lifecycleRiderOperationGate, async (req, res) => {
   try {
     const { orderId, lineUserId, phone, riderId } = req.body || {};
 
@@ -42230,7 +42329,7 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
 
     let acceptedOrder = null;
 
-    await db.runTransaction(async (transaction) => {
+    await lifecycleRiderTransaction(req, async (transaction) => {
       const orderDoc = await transaction.get(orderRef);
 
       if (!orderDoc.exists) {
@@ -43346,7 +43445,7 @@ app.post(
 // ===== 騎士更新任務狀態 API =====
 // 4. 更新任務狀態：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
-app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res) => {
+app.post('/api/rider/update-order-status', riderAuthMiddleware, lifecycleRiderOperationGate, async (req, res) => {
   try {
     const { orderId, status, lineUserId, phone, riderId } = req.body || {};
 
@@ -43413,7 +43512,8 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     let promotedOrder = null;
     let promotedOrderId = '';
 
-    await db.runTransaction(async (transaction) => {
+    await lifecycleRiderTransaction(req, async (transaction) => {
+      updatedOrder=null;multiStopAdvanced=false;completedStopNumber=0;nextStopNumber=0;promotedOrder=null;promotedOrderId='';
       const orderDoc = await transaction.get(orderRef);
 
       if (!orderDoc.exists) {
@@ -43447,6 +43547,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       }
 
       if(lifecycleHandoverBlocked(order)) throw new Error('CANCELLATION_HANDOVER_ACTIVE');
+      if(req.body?.lifecycleOperationKey&&req.body?.lifecycleExpectedStopIndex!=null&&Number(req.body.lifecycleExpectedStopIndex)!==Number(order.currentDeliveryStopIndex||0))throw new Error('RIDER_OPERATION_STOP_CHANGED');
       if (currentStatus === status) {
         updatedOrder = {
           ...order,
@@ -44267,6 +44368,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       });
     }
 
+    if(error.message==='RIDER_OPERATION_STOP_CHANGED')return res.status(409).json({success:false,code:'RIDER_OPERATION_STOP_CHANGED',message:'配送站序已更新，請重新同步目前任務。'});
     if(error.message==='CANCELLATION_HANDOVER_ACTIVE')return res.status(409).json({success:false,code:'CANCELLATION_HANDOVER_ACTIVE',message:'取消交接處理中，請依平台指示，勿執行正常送達。'});
     if (error.message === 'INVALID_TRANSITION') {
       return res.status(409).json({
@@ -44885,10 +44987,10 @@ function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Dat
       };
   // Preserve original quote and actual collection/advance evidence. A suspected
   // pre-pickup advance is a manual reconciliation item, never silently erased.
-  const actualAdvance=firstFinanceMoney(order,['actualAdvancePayment','actualPurchaseAmount'],0);
-  const actualCollected=firstFinanceMoney(order,['actualPaidAmount','paidAmount','receivedAmount','customerPaidAmount','cashCollectedAmount','cashGrossCollected'],0);
+  const actualAdvance=Math.max(0,...['actualAdvancePayment','actualPurchaseAmount'].map(k=>Number.isFinite(Number(order[k]))?Number(order[k]):0));
+  const actualCollected=Math.max(0,...['actualPaidAmount','paidAmount','receivedAmount','customerPaidAmount','cashCollectedAmount','cashGrossCollected'].map(k=>Number.isFinite(Number(order[k]))?Number(order[k]):0));
   const estimatedAdvance=getOrderAdvancePaymentAmount(order);
-  const cancellationReview=actualAdvance>0||estimatedAdvance>0||actualCollected>0||order.cashCollected===true||Number(order.stackTransferSubsidy||0)>0||['settled','remitted','paid','completed'].includes(String(order.cashRemittanceStatus||'').toLowerCase());
+  const cancellationReview=actualAdvance>0||estimatedAdvance>0||actualCollected>0||order.cashCollected===true||order.isPaid===true||['paid','collected','partial','cash_collected','paid_confirmed'].includes(String(order.financePaymentStatus||order.paymentStatus||'').toLowerCase())||['paid','settled','completed'].includes(String(order.settlementStatus||'').toLowerCase())||Number(order.stackTransferSubsidy||0)>0||['settled','remitted','paid','completed'].includes(String(order.cashRemittanceStatus||'').toLowerCase());
   if(cancellationReview){
     delete driveCancellationFinancials.cashCollected;
     delete driveCancellationFinancials.cashRemittedAmount;
@@ -44901,12 +45003,12 @@ function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Dat
     ...driveCancellationFinancials,
     riderIncomeBeforeGuarantee:driveCancel.riderCompensation,riderGuaranteeSubsidy:0,riderMinimumApplied:false,
     financePaymentStatus:cancellationReview?'partial':driveCancel.cancellationFee>0?'unpaid':'cancelled',
-    financeReconciliationStatus:cancellationReview?'needs_review':'pending',
+    financeReconciliationStatus:cancellationReview?'needs_review':driveCancel.cancellationFee>0?'unpaid':'ready',
     cancellationFinancialContractVersion:'lifecycle-cancel-v1',
     cancellationFinancialReviewRequired:cancellationReview,
     cancellationActualAdvanceAmount:actualAdvance,
     cancellationActualPaidAmount:actualCollected,
-    ...(cancellationReview?{}:{isPaid:false,cashDueToPlatform:0,platformReceivable:0,riderDueToPlatform:0}),
+    ...(cancellationReview?{}:{isPaid:false,actualPaidAmount:0,paidAmount:0,cashDueToPlatform:0,platformReceivable:0,riderDueToPlatform:0,settlementStatus:'not_applicable',cashRemittanceStatus:'not_applicable'}),
     status:'cancelled',
     riderStatus:'cancelled',
     cancelType:'customer_cancel',
@@ -45018,11 +45120,19 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
         const nowMs=Date.now();
         const dueAtMs=nowMs+UBEE_POST_PICKUP_CANCEL_WINDOW_MS;
         const dueRef=db.collection(UBEE_POST_PICKUP_CANCEL_DUE_COLLECTION).doc(safeOrderId);
+        let managedHandover=false,operationalReviewReason='';
+        if(process.env.UBEE_LIFECYCLE_HANDOVER_ENABLED==='true'){
+          try{await lifecycleHandoverContext(transaction,{...order,postPickupCancellationRequested:true,cancellationFee:quote.fee,cancellationRiderShare:quote.riderShare,cancellationPlatformShare:quote.platformShare},safeOrderId);managedHandover=true;}
+          catch(e){if(!['ORDER_STATE_CHANGED','RIDER_STATE_CHANGED','STACK_STATE_CHANGED','INVALID_CANCELLATION_FEE'].includes(e.message))throw e;operationalReviewReason=e.message;}
+        }
+
         transaction.set(orderRef,{
           postPickupCancellationRequested:true,
           postPickupCancellationStatus:'pending_handover',
+          cancellationHandoverManaged:managedHandover,cancellationOperationalReviewReason:operationalReviewReason,cancellationHandoverRevision:0,
           postPickupCancellationRequestedAtMs:nowMs,
           postPickupCancellationRequestedAt:admin.firestore.FieldValue.serverTimestamp(),
+          cancellationOriginalQuote:{customerPayableTotal:getOrderCustomerPayableTotal(order),riderIncome:Number(order.riderIncome??order.riderFee??0),platformIncome:Number(order.platformIncome??order.platformFee??0),advancePayment:getOrderAdvancePaymentAmount(order)},
           cancellationFee:quote.fee,
           cancellationRiderShare:quote.riderShare,
           cancellationPlatformShare:quote.platformShare,
@@ -45503,6 +45613,7 @@ async function runPostPickupCancellationDueWorkerV1(){
       try{
         let notify=null;
         await db.runTransaction(async transaction=>{
+          notify=null;
           const orderRef=db.collection('orders').doc(item.id);
           const [cueDoc,orderDoc]=await Promise.all([transaction.get(item.ref),transaction.get(orderRef)]);
           if(!cueDoc.exists)return;
@@ -45514,9 +45625,9 @@ async function runPostPickupCancellationDueWorkerV1(){
           if(verified){
             transaction.set(orderRef,{
               cancellationPaymentStatus:'paid_confirmed',cancellationUnpaidFlag:false,
-              cancellationPaymentConfirmedAtMs:nowMs,
-              cancellationSettlementStatus:order.cancellationSettlementStatus==='settled'?'settled':order.postPickupCancellationStatus==='handover_confirmed'?'pending_rider_payout':'pending_handover',
-              cancellationPayoutStatus:order.cancellationPayoutStatus==='settled'?'settled':order.postPickupCancellationStatus==='handover_confirmed'?'pending_payout':'pending_payment_and_handover',
+              cancellationPaymentConfirmedAtMs:Number(order.cancellationPaymentVerifiedAtMs||nowMs),
+              cancellationSettlementStatus:order.cancellationSettlementStatus==='settled'?'settled':order.postPickupCancellationStatus==='handover_confirmed'?(order.cancellationPayoutEligible===true?'pending_rider_payout':'manual_financial_review'):'pending_handover',
+              cancellationPayoutStatus:order.cancellationPayoutStatus==='settled'?'settled':order.postPickupCancellationStatus==='handover_confirmed'?(order.cancellationPayoutEligible===true?'pending_payout':'manual_financial_review'):'pending_payment_and_handover',
               updatedAt:admin.firestore.FieldValue.serverTimestamp(),
             },{merge:true});
             transaction.delete(item.ref);
@@ -48099,6 +48210,7 @@ function firstFinanceMoney(order = {}, fields = [], fallback = 0) {
 }
 
 function normalizeFinancePaymentStatus(order = {}) {
+  if(order.cancellationFinancialContractVersion==='lifecycle-cancel-v1'&&order.cancellationFinancialReviewRequired!==true){return Number(order.cancellationFee||0)>0?(Number(order.actualPaidAmount||0)>=Number(order.cancellationFee||0)?'paid':'unpaid'):'cancelled';}
   const raw = String(
     order.financePaymentStatus ||
     order.paymentStatus ||
@@ -48342,6 +48454,7 @@ function buildFinanceClosureSnapshot(order = {}) {
     settlementStatus = String(order.merchantBillingStatus || 'pending').trim().toLowerCase();
   }
 
+  if(isCancelled&&order.cancellationFinancialContractVersion==='lifecycle-cancel-v1'&&order.cancellationFinancialReviewRequired!==true){settlementExpected=0;settlementActual=0;settlementStatus='not_applicable';}
   const settlementVariance = Math.round(settlementActual - settlementExpected);
   let collectedPlatformIncome = 0;
   if (isCompleted && !isCancelled) {
@@ -48410,12 +48523,15 @@ function buildFinanceClosureSnapshot(order = {}) {
   if (String(order.financeReconciliationStatus || '').trim().toLowerCase() === 'reconciled') {
     reconciliationStatus = 'reconciled';
   }
+  if(order.postPickupCancellationRequested===true){reconciliationStatus=order.cancellationFinancialReviewRequired===true||order.cancellationPayoutStatus==='manual_financial_review'?'needs_review':order.cancellationPayoutStatus==='settled'?'reconciled':!isCancellationFeeFinanceVerifiedV1(order)?'unpaid':order.cancellationPayoutStatus==='pending_payout'?'pending_settlement':'in_progress';}
 
   return {
     orderId: String(order.id || order.orderId || '').trim().toUpperCase(),
     orderNo: String(order.orderNo || order.id || '').trim(),
     orderStatus,
-    cancellationCase:lifecycleCaseSummary(order),
+    cancellationCase:order.postPickupCancellationRequested===true?{...lifecycleCaseSummary(order),evidenceNote:undefined}:null,
+    cancellationOriginalQuote:order.cancellationOriginalQuote||null,
+    cancellationFinancialContractVersion:String(order.cancellationFinancialContractVersion||''),
     completedAtMs: getFinanceCompletedAtMs(order),
     createdAtMs: financeToMs(order.createdAt) || financeToMs(order.createdAtMs),
     paymentMethod,
@@ -48551,9 +48667,11 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
       totalStackTransferSubsidy: 0,
       todayRiderAdvance: 0,
       totalVarianceAmount: 0,
+      cancellationCaseCount:0,cancellationFeeDue:0,cancellationFeeReceived:0,cancellationFeeOutstanding:0,cancellationRiderPayoutPending:0,cancellationRiderPayoutSettled:0,
     };
 
     items.forEach(item => {
+      if(item.cancellationCase){const c=item.cancellationCase;summary.cancellationCaseCount++;summary.cancellationFeeDue+=c.fee;summary.cancellationFeeReceived+=c.paidAmount;summary.cancellationFeeOutstanding+=Math.max(0,c.fee-c.paidAmount);summary.cancellationRiderPayoutPending+=c.payoutStatus==='pending_payout'?c.riderShare:0;summary.cancellationRiderPayoutSettled+=c.payoutAmount;if(c.financialReview)summary.needsReviewCount++;return;}
       if (item.reconciliationStatus === 'needs_review') summary.needsReviewCount += 1;
       if (item.reconciliationStatus === 'unpaid') {
         summary.unpaidCount += 1;
