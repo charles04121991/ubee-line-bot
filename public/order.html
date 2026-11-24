@@ -12,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 Manifest：與 Web Clip 安裝描述檔分開管理 -->
-<link href="/manifest-order.json?v=20261124-customer-v1-7-0-rc6-3-hf4-8-4-cancellation-reliability" rel="manifest"/>
+<link href="/manifest-order.json?v=20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -22,7 +22,7 @@
 <meta content="UBee 跑腿" name="apple-mobile-web-app-title"/>
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
-<title>UBee 跑腿｜正式營運用戶端</title>
+<title>UBee 跑腿｜HF4.8.5 Lifecycle RC1 Stage 2 (TEST)</title>
 <!-- UBee 用戶端 V2.12 + Password Reset V3：2026-08-14｜LINE Messaging API Bot 全自動核對；不使用 LIFF／不需客服 -->
 <!-- UBee 客戶端：文字化地址、後端計價、訂單進度及 ETA；不載入可視地圖 SDK。 -->
 <style>
@@ -11378,6 +11378,18 @@ async function createOrder(options = {}){
 
     // Snapshot before repricing. The visible amount is what the customer approved.
     const approved = options.approvedPricing || captureApprovedCustomerCheckoutPricing();
+    const ensuredCustomerId = typeof window.ensureCustomerSessionForOrder === 'function'
+      ? await window.ensureCustomerSessionForOrder() : String(userId || currentCustomer?.customerId || '').trim();
+    if(!/^customer_[a-f0-9]{32}$/.test(String(ensuredCustomerId||'')))throw new Error('目前無法建立安全的客戶使用身分，請稍後再試。');
+    const operationStorageKey='ubee_pending_order_operation_v1:'+ensuredCustomerId;
+    let operationKey=localStorage.getItem(operationStorageKey)||'';
+    let data=null;
+    let payload={};
+    if(operationKey){
+      const recovered=await customerApiFetch('/api/customer/order-operations/'+encodeURIComponent(operationKey));
+      if(recovered.orderId)data=recovered;
+    }
+    if(!data){
     invalidateQuote();
 
     const freshQuote = await renderEstimate();
@@ -11415,15 +11427,8 @@ async function createOrder(options = {}){
       throw quoteChanged;
     }
 
-    btn.innerText = '確認下單人身分...';
-    const ensuredCustomerId = typeof window.ensureCustomerSessionForOrder === 'function'
-      ? await window.ensureCustomerSessionForOrder()
-      : String(userId || currentCustomer?.customerId || '').trim();
-    if(!/^customer_[a-f0-9]{32}$/.test(String(ensuredCustomerId||''))){
-      throw new Error('目前無法建立安全的客戶使用身分，請稍後再試。');
-    }
     btn.innerText = '建立訂單中...';
-    const payload = getPayload();
+    payload = getPayload();
     // RC6: legacy wallet input removed; backend also rejects new redemption attempts.
     payload.checkoutExpectedPayableTotal = approved.payable;
 
@@ -11431,11 +11436,20 @@ async function createOrder(options = {}){
       throw new Error('正式報價識別碼不存在，請重新估價後再送出。');
     }
 
-    const data = await customerApiFetch('/api/orders', {
-      method:'POST',
-      body:JSON.stringify(payload),
-      authPrompt:true
-    });
+    if(!operationKey){
+      operationKey=Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>b.toString(16).padStart(2,'0')).join('');
+      localStorage.setItem(operationStorageKey,operationKey);
+    }
+    payload.idempotencyKey=operationKey;
+    try{
+      data=await customerApiFetch('/api/orders',{method:'POST',body:JSON.stringify(payload),authPrompt:true});
+    }catch(err){
+      // Do not generate another key when the write outcome is unknown.
+      const recovered=await customerApiFetch('/api/customer/order-operations/'+encodeURIComponent(operationKey)).catch(()=>null);
+      if(recovered?.orderId)data=recovered;
+      else throw err;
+    }
+    }
 
     currentOrderId =
       data.orderId ||
@@ -11462,7 +11476,7 @@ async function createOrder(options = {}){
     }
 
     // HttpOnly session and server response are authoritative; storage may be disabled.
-    try{localStorage.setItem('ubee_current_order_id', String(currentOrderId))}
+    try{localStorage.setItem('ubee_current_order_id', String(currentOrderId));if(localStorage.getItem(operationStorageKey)===operationKey)localStorage.removeItem(operationStorageKey)}
     catch(error){console.warn('UBee 訂單已建立，本機快取無法寫入：',error)}
 
     // Post-create presentation failures must never ask customer to submit again.
@@ -11471,12 +11485,14 @@ async function createOrder(options = {}){
     try{renderTimeline(currentOrderData?.status || 'pending_payment', currentOrderData)}
     catch(error){console.warn('進度渲染失敗：',error)}
     try{startOrderListener(currentOrderId)}catch(error){console.warn('訂單同步啟動失敗：',error)}
+    if(String(currentOrderData?.status||'')==='pending_payment'){
     try{selectPaymentMethod('cash')}catch(error){console.warn('現金選項顯示失敗：',error)}
 
     // The customer has explicitly agreed to cash payment on the checkout page.
     // If the second API request fails, keep the real order and the visible retry action.
     try{await confirmPaid({skipDialog:true})}
     catch(error){console.warn('現金單尚待確認，保留訂單供重試：',error)}
+    }
     return String(currentOrderId);
 
   }catch(err){
@@ -11743,6 +11759,8 @@ async function cancelOrder(orderIdOverride=''){
     });
     const preview=await previewRes.json().catch(()=>({}));
     if(!previewRes.ok||preview.success!==true)throw new Error(preview.message||'無法確認取消規則，請稍後再試。');
+    let data=preview.mode==='recovered'?preview:null;
+    if(!data){
     const postPickup=preview.mode==='post_pickup_request';
     const confirmation=postPickup
       ? `小U已完成取件。這是取消申請，物品交接仍須由平台協調，並不會立即結束小U任務。\n\n取消費 NT$${preview.fee}（小U 85%：NT$${preview.riderShare}／平台 15%：NT$${preview.platformShare}）。\n請於 10 分鐘內使用街口支付 ${preview.jkopayAccount}，並保留付款證明。確認申請嗎？`
@@ -11753,6 +11771,7 @@ async function cancelOrder(orderIdOverride=''){
       confirmText:postPickup?'提出取消申請':'確認取消',cancelText:'保留任務'
     });
     if(!ok)return {success:false,cancelledByCustomer:true};
+    try{
     const res=await fetch('/cancel-order',{
       method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',
       body:JSON.stringify({
@@ -11761,8 +11780,13 @@ async function cancelOrder(orderIdOverride=''){
         postPickupCancellationAcknowledged:postPickup,
       })
     });
-    const data=await res.json().catch(()=>({}));
+    data=await res.json().catch(()=>({}));
     if(!res.ok||data.success!==true)throw new Error(data.message||data.error||'取消失敗');
+    }catch(err){
+      const recovered=await customerApiFetch(`/api/customer/orders/${encodeURIComponent(targetOrderId)}/cancellation-preview`).catch(()=>null);
+      if(recovered?.mode==='recovered')data=recovered;else throw err;
+    }
+    }
     const trulyCancelled=String(data.status||'').toLowerCase()==='cancelled';
     if(String(currentOrderId||'').trim().toUpperCase()===targetOrderId){
       if(currentOrderData){currentOrderData={...currentOrderData,...(trulyCancelled?{status:'cancelled'}:{
@@ -17709,6 +17733,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     return `<section class="ubee-native-detail-group ubee-cancellation-payment" aria-live="polite">
       <div class="ubee-native-detail-group-title">取件後取消申請｜${escapeHtml(label)}</div>
       <div class="ubee-native-detail-list">
+        <div class="ubee-native-detail-row"><span>物品交接</span><strong>${escapeHtml(({pending_handover:"等待平台安排",handover_assigned:"平台已安排交接",handover_confirmed:"交接已核實"})[order.postPickupCancellationStatus]||"等待平台確認")}</strong></div>
         <div class="ubee-native-detail-row"><span>取消費</span><strong>NT$${fee}</strong></div>
         <div class="ubee-native-detail-row"><span>小U補償（85%）</span><strong>NT$${Math.max(0,Number(order.cancellationRiderShare||0))}</strong></div>
         <div class="ubee-native-detail-row"><span>平台分潤（15%）</span><strong>NT$${Math.max(0,Number(order.cancellationPlatformShare||0))}</strong></div>
@@ -18439,8 +18464,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261124-customer-v1-7-0-rc6-3-hf4-8-4-cancellation-reliability';
-    const CUSTOMER_SW_SCOPE = '/';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage2';
+    const CUSTOMER_SW_SCOPE = '/order.html';
 
     if (!('serviceWorker' in navigator)) {
       console.warn('⚠️ 此瀏覽器不支援 Service Worker。');
@@ -18457,6 +18482,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           }
         );
 
+        window.__ubeeCustomerServiceWorkerRegistration=registration;
         await registration.update().catch(() => {});
 
         console.log(
@@ -18879,9 +18905,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
   }
 
+  async function customerScopedRegistration(){
+    const registration=window.__ubeeCustomerServiceWorkerRegistration||await navigator.serviceWorker.getRegistration('/order.html');
+    if(!registration||new URL(registration.scope).pathname!=='/order.html'||!registration.active)throw new Error('用戶端通知服務尚未準備完成，請重新開啟 App。');
+    return registration;
+  }
   async function currentPushSubscription(){
     if(!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await customerScopedRegistration();
     return registration.pushManager.getSubscription();
   }
 
@@ -18913,7 +18944,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       let permission = Notification.permission;
       if(permission === 'default') permission = await Notification.requestPermission();
       if(permission !== 'granted') throw new Error('通知權限尚未開啟，請到瀏覽器或手機設定中允許 UBee 通知。');
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await customerScopedRegistration();
       let subscription = await registration.pushManager.getSubscription();
       if(!subscription){
         const keyResponse = await fetch('/api/web-push/public-key',{credentials:'include',cache:'no-store'});
@@ -18922,6 +18953,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
         subscription = await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:base64ToUint8Array(keyData.publicKey)});
       }
       await savePushSubscription(subscription);
+      try{
+        const legacy=(await navigator.serviceWorker.getRegistrations()).find(reg=>new URL(reg.scope).pathname==='/'&&reg.active&&new URL(reg.active.scriptURL).pathname==='/ubee-customer-sw.js');
+        const old=await legacy?.pushManager.getSubscription();
+        if(old&&old.endpoint!==subscription.endpoint){
+          const result=await fetch(PUSH_ENDPOINT,{method:'DELETE',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:old.endpoint})});
+          if(!result.ok)console.warn('舊客戶推播綁定尚未移除');
+        }
+      }catch(e){console.warn('舊客戶推播遷移待確認',e);}
       window.__UBEE_REFRESH_PUSH_SETTING__?.();
       return true;
     }catch(error){
@@ -20954,7 +20993,7 @@ async function copyRC4Feedback(){
 async function checkRC4Update(){
  const status=document.getElementById('ubeeV17UpdateStatus');if(!status)return;
  status.textContent='正在檢查本裝置的 Service Worker 更新…';
- try{if(!('serviceWorker' in navigator))throw new Error('not supported');const r=await navigator.serviceWorker.getRegistration('/');if(!r){status.textContent='目前沒有取得此頁的 Service Worker 註冊資訊；請確認安裝方式。';return;}await r.update();status.textContent='已向伺服器檢查更新。若有新版，仍須依現有更新流程重新載入；不代表新版本已安裝。';}
+ try{if(!('serviceWorker' in navigator))throw new Error('not supported');const r=await navigator.serviceWorker.getRegistration('/order.html');if(!r){status.textContent='目前沒有取得此頁的 Service Worker 註冊資訊；請確認安裝方式。';return;}await r.update();status.textContent='已向伺服器檢查更新。若有新版，仍須依現有更新流程重新載入；不代表新版本已安裝。';}
  catch(_){status.textContent='更新檢查未完成。請確認網路與安裝環境，稍後再試。';}
 }
 function resetRC4Display(){
