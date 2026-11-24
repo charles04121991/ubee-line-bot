@@ -1,7 +1,7 @@
 /* ============================================================
  * UBee 跑腿｜客戶端 Service Worker｜Guest Order RC1 candidate 2026-11-11
  * Release: Customer Guest Order Session V4 + Native Settings V2 + Silent Reconnect V1 + Native Clean UI V1 + Native Smooth UI V1 + My Service Smooth V1
- * Version: 20261124-customer-v1-7-0-rc6-3-hf4-8-4-cancellation-reliability
+ * Version: 20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage2
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／我的；訂單／通知仍維持內部深層連結）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261124-customer-v1-7-0-rc6-3-hf4-8-4-cancellation-reliability';
+const UBEE_CUSTOMER_SW_VERSION = '20261124-customer-v1-7-0-rc6-3-hf4-8-5-lifecycle-rc1-stage2';
 const UBEE_CUSTOMER_ICON_REV = '20261016-brand-icons-v3-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
@@ -195,6 +195,7 @@ self.addEventListener('activate', event => {
     });
 
     for (const client of clientList) {
+      if(!isUBeeCustomerClientUrl(client.url))continue;
       client.postMessage({
         type: 'UBEE_CUSTOMER_SW_UPDATED',
         version: UBEE_CUSTOMER_SW_VERSION
@@ -246,6 +247,7 @@ self.addEventListener('push', event => {
     };
   }
 
+  try{const target=new URL(data.url||data.deepLink||'/order.html',self.location.origin);if(target.origin===self.location.origin&&target.pathname==='/rider.html')return;}catch(_){}
   const orderId = String(
     data.orderId ||
     data.id ||
