@@ -44575,6 +44575,116 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
 // - 普通已接單：同步解除小U busy/currentOrderId。
 // - 預約任務：同步清除 reserved rider 欄位。
 // ============================================================
+// ============================================================
+// Customer Post-Pickup Cancellation HF4.8.4 (opt-in, fail closed)
+// Once the rider holds goods, this is a cancellation REQUEST and
+// reconciliation/return case, NOT a terminal order cancellation.
+// Fee distance thresholds MUST be approved and configured explicitly.
+// ============================================================
+const UBEE_POST_PICKUP_CANCEL_DUE_COLLECTION = 'customerPostPickupCancellationDuesV1';
+const UBEE_POST_PICKUP_CANCEL_JKOPAY = '901871793';
+const UBEE_POST_PICKUP_CANCEL_WINDOW_MS = 10 * 60 * 1000;
+
+function getPostPickupCancelPolicyV1() {
+  if (String(process.env.UBEE_POST_PICKUP_CANCEL_ENABLED || '').trim().toLowerCase() !== 'true') {
+    return { enabled:false, reason:'disabled', tiers:[] };
+  }
+  // Prevent charging orders that existed before the approved policy took effect.
+  const effectiveAtMs=Number(process.env.UBEE_POST_PICKUP_CANCEL_EFFECTIVE_AT_MS||0);
+  if (!Number.isSafeInteger(effectiveAtMs) || effectiveAtMs < 1600000000000 || effectiveAtMs > Date.now()) {
+    return { enabled:false, reason:'missing_effective_date', tiers:[] };
+  }
+  try {
+    const tiers = JSON.parse(String(process.env.UBEE_POST_PICKUP_CANCEL_TIERS_JSON || ''));
+    if (!Array.isArray(tiers) || tiers.length < 2 || tiers.length > 30) throw new Error('tiers');
+    let previous = 0;
+    let previousFee = 0;
+    let hasShortDistance = false;
+    let hasLongDistance = false;
+    const parsed = tiers.map((item,index)=>{
+      const maxKm = item?.maxKm === null ? Infinity : Number(item?.maxKm);
+      const fee = Number(item?.fee);
+      if (!Number.isInteger(fee) || !((fee >= 80 && fee <= 150) || (fee >= 160 && fee <= 180)) ||
+          fee < previousFee || !(maxKm > previous) ||
+          (!Number.isFinite(maxKm) && index !== tiers.length - 1)) {
+        throw new Error('invalid tier');
+      }
+      if (fee <= 150) hasShortDistance = true;
+      if (fee >= 160) hasLongDistance = true;
+      previous = maxKm;
+      previousFee = fee;
+      return { maxKm, fee };
+    });
+    if (parsed[parsed.length - 1].maxKm !== Infinity || !hasShortDistance || !hasLongDistance) throw new Error('invalid fee bands');
+    return { enabled:true, effectiveAtMs, tiers:parsed };
+  } catch(error) {
+    console.error('Post-pickup cancellation policy not approved/configured:', error.message);
+    return { enabled:false, reason:'invalid_tiers', tiers:[] };
+  }
+}
+
+function isPostPickupCancellationCaseV1(order={}) {
+  const service = String(order.serviceMode || order.serviceKey || '').toLowerCase();
+  return String(order.status || '').toLowerCase() === 'picked_up' &&
+    !['drive','queue'].includes(service) &&
+    Boolean(order.riderDocId || order.riderId);
+}
+
+function getPostPickupCancellationQuoteV1(order={}) {
+  const policy = getPostPickupCancelPolicyV1();
+  if (!policy.enabled || !isPostPickupCancellationCaseV1(order)) return null;
+  const createdAtMs=customerOrderApiTimeMs(order.createdAtMs||order.createdAt);
+  if (!(createdAtMs>=policy.effectiveAtMs)) return null;
+  const rawMeters = order.distanceMeters;
+  const km = Number(rawMeters) > 0 ? Number(rawMeters) / 1000 : Number(order.distanceKm);
+  if (!Number.isFinite(km) || km <= 0) return null;
+  const tier = policy.tiers.find(item => km <= item.maxKm);
+  if (!tier) return null;
+  const fee = tier.fee;
+  const platformShare = Math.round(fee * 0.15);
+  return { fee, riderShare:fee-platformShare, platformShare, distanceKm:Math.round(km*100)/100 };
+}
+
+function isCancellationFeeFinanceVerifiedV1(order={}) {
+  const fee = Number(order.cancellationFee || 0);
+  const requestedAt = Number(order.postPickupCancellationRequestedAtMs || 0);
+  // Do NOT trust the generic finance payment-status endpoint as proof of a
+  // JKOPAY transfer. Only a separately audited and authenticated reconciliation
+  // may write these dedicated verification fields.
+  return fee > 0 && requestedAt > 0 &&
+    String(order.cancellationPaymentStatus || '').toLowerCase() === 'paid_confirmed' &&
+    Number(order.cancellationPaidAmount || 0) >= fee &&
+    Number(order.cancellationPaymentVerifiedAtMs || 0) >= requestedAt &&
+    Boolean(String(order.cancellationPaymentVerifiedBy || '').trim());
+}
+
+function getPostPickupCancelPublicFieldsV1(order={}) {
+  const requested = order.postPickupCancellationRequested === true;
+  const verified = requested && isCancellationFeeFinanceVerifiedV1(order);
+  const dueAt = Math.max(0, Number(order.cancellationPaymentDueAtMs || 0));
+  const overdue = requested && !verified && dueAt > 0 && Date.now() >= dueAt;
+  const reportAt = Math.max(0, Number(order.cancellationPaymentReportedAtMs || 0));
+  const status = !requested ? '' : verified ? 'paid_confirmed' : overdue ?
+    (reportAt ? 'overdue_unverified' : 'overdue') : reportAt ? 'reported' : 'pending';
+  return {
+    postPickupCancelEligible:!requested && Boolean(getPostPickupCancellationQuoteV1(order)),
+    postPickupCancellationRequested:requested,
+    postPickupCancellationStatus:requested ? String(order.postPickupCancellationStatus || 'pending_handover') : '',
+    cancellationFee:requested ? Math.max(0, Number(order.cancellationFee || 0)) : 0,
+    cancellationRiderShare:requested ? Math.max(0, Number(order.cancellationRiderShare || 0)) : 0,
+    cancellationPlatformShare:requested ? Math.max(0, Number(order.cancellationPlatformShare || 0)) : 0,
+    cancellationPaymentStatus:status,
+    cancellationPaymentDueAtMs:requested ? dueAt : 0,
+    cancellationUnpaidFlag:overdue,
+    cancellationPaymentReportedAtMs:requested ? reportAt : 0,
+    cancellationJkopayAccount:requested ? UBEE_POST_PICKUP_CANCEL_JKOPAY : '',
+  };
+}
+
+function buildPostPickupCancelPaymentMessageV1(orderId, fee) {
+  return `UBee 跑腿｜取件後取消費通知\n訂單 ${orderId} 已提出取消申請，物品交接仍由平台協調。\n應付取消費 NT$${fee}。請於 10 分鐘內使用街口支付：${UBEE_POST_PICKUP_CANCEL_JKOPAY}，並在付款備註註明訂單編號。\n付款不會自動核銷，請保留交易明細，待平台確認後才會顯示已付款。`;
+}
+
 function isCustomerOrderCancellableStatusV1(status){
   const normalized=String(status||'').trim().toLowerCase();
   return ![
@@ -44667,6 +44777,31 @@ function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Dat
   };
 }
 
+app.get('/api/customer/orders/:orderId/cancellation-preview', requireCustomerAuth, async (req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try {
+    const orderId=smartStackSafeOrderId(req.params.orderId);
+    if (!orderId) return res.status(400).json({success:false,message:'訂單編號不正確。'});
+    const doc=await db.collection('orders').doc(orderId).get();
+    if (!doc.exists) return res.status(404).json({success:false,message:'訂單不存在。'});
+    const order={id:doc.id,...doc.data()};
+    if (!isSameCustomerUserId(order,req.customerAuth.customerId)) return res.status(403).json({success:false,message:'無權取消此訂單。'});
+    if (order.postPickupCancellationRequested===true) return res.status(409).json({success:false,message:'這張訂單已提出取消申請，請查看付款資訊與交接進度。'});
+    const status=String(order.status||'').toLowerCase();
+    if (status==='picked_up') {
+      const quote=getPostPickupCancellationQuoteV1(order);
+      if (!quote) return res.status(409).json({success:false,message:'目前無法自助申請取件後取消，請聯絡客服協調物品交接及費用。'});
+      return res.json({success:true,mode:'post_pickup_request',status,fee:quote.fee,riderShare:quote.riderShare,platformShare:quote.platformShare,distanceKm:quote.distanceKm,deadlineMinutes:10,jkopayAccount:UBEE_POST_PICKUP_CANCEL_JKOPAY});
+    }
+    if (!isCustomerOrderCancellableStatusV1(status)) return res.status(409).json({success:false,message:'這個訂單階段無法自行取消，請聯絡客服。'});
+    const charge=getDriveCustomerCancellationCharge(order);
+    return res.json({success:true,mode:'standard_cancel',status,fee:charge.cancellationFee,riderShare:charge.riderCompensation,platformShare:charge.platformCancellationFee});
+  } catch(error) {
+    console.error('customer cancellation preview:',error);
+    return res.status(500).json({success:false,message:'暫時無法確認取消費，請稍後再試。'});
+  }
+});
+
 app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
   try{
     const safeOrderId=smartStackSafeOrderId(req.body?.orderId);
@@ -44685,6 +44820,7 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
     let promotedOrder=null;
     let promotedOrderId='';
     let affectedRiderDocId='';
+    let postPickupRequestResult=null;
 
     await db.runTransaction(async transaction=>{
       const orderDoc=await transaction.get(orderRef);
@@ -44702,8 +44838,52 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
         throw new Error('NOT_ORDER_OWNER');
       }
 
+      // Post-pickup: preserve goods custody and rider workflow. Only create an auditable request.
+      if(String(order.status||'').trim().toLowerCase()==='picked_up'){
+        if(order.postPickupCancellationRequested===true) throw new Error('POST_PICKUP_ALREADY_REQUESTED');
+        const quote=getPostPickupCancellationQuoteV1(order);
+        if(!quote) throw new Error('POST_PICKUP_POLICY_NOT_READY');
+        if(req.body?.postPickupCancellationAcknowledged!==true ||
+           !Number.isInteger(Number(req.body?.expectedCancellationFee)) ||
+           Number(req.body.expectedCancellationFee)!==quote.fee){
+          throw new Error('CANCELLATION_QUOTE_CHANGED');
+        }
+        const nowMs=Date.now();
+        const dueAtMs=nowMs+UBEE_POST_PICKUP_CANCEL_WINDOW_MS;
+        const dueRef=db.collection(UBEE_POST_PICKUP_CANCEL_DUE_COLLECTION).doc(safeOrderId);
+        transaction.set(orderRef,{
+          postPickupCancellationRequested:true,
+          postPickupCancellationStatus:'pending_handover',
+          postPickupCancellationRequestedAtMs:nowMs,
+          postPickupCancellationRequestedAt:admin.firestore.FieldValue.serverTimestamp(),
+          cancellationFee:quote.fee,
+          cancellationRiderShare:quote.riderShare,
+          cancellationPlatformShare:quote.platformShare,
+          cancellationDistanceKm:quote.distanceKm,
+          cancellationDistanceBasis:'order_route_distance',
+          cancellationPolicyVersion:'post_pickup_customer_cancel_v1',
+          cancellationPaymentStatus:'pending',
+          cancellationPaymentDueAtMs:dueAtMs,
+          cancellationUnpaidFlag:false,
+          cancellationSettlementStatus:'pending_collection',
+          cancellationPaymentMethod:'jkopay',
+          cancellationJkopayAccount:UBEE_POST_PICKUP_CANCEL_JKOPAY,
+          cancellationPayoutStatus:'pending_payment_and_handover',
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        },{merge:true});
+        transaction.set(dueRef,{orderId:safeOrderId,customerId:requestUserId,dueAtMs,createdAtMs:nowMs});
+        affectedRiderDocId=String(order.riderDocId||'').trim();
+        postPickupRequestResult={...quote,orderId:safeOrderId,customerId:requestUserId,dueAtMs,riderDocId:affectedRiderDocId};
+        return;
+      }
       if(!isCustomerOrderCancellableStatusV1(order.status)){
         throw new Error('CUSTOMER_CANCEL_CUSTODY_LOCK');
+      }
+      // New clients lock their visible charge, while older clients remain compatible
+      // for the already-operational pre-pickup cancellation path.
+      if(req.body?.expectedCancellationFee!==undefined &&
+         Number(req.body.expectedCancellationFee)!==getDriveCustomerCancellationCharge(order).cancellationFee){
+        throw new Error('CANCELLATION_QUOTE_CHANGED');
       }
 
       const role=String(order.stackRole||'').trim().toUpperCase();
@@ -44965,6 +45145,35 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
       }
     });
 
+    if(postPickupRequestResult){
+      const request=postPickupRequestResult;
+      // Notify asynchronously; inbox IDs are deterministic and won't duplicate on retries.
+      Promise.allSettled([
+        createCustomerInboxNotification(request.customerId,{
+          eventKey:`post_pickup_cancel_requested:${safeOrderId}`,revision:'1',
+          type:'order_update',category:'取消與付款',title:'取件後取消申請已收到',
+          message:buildPostPickupCancelPaymentMessageV1(safeOrderId,request.fee),
+          orderId:safeOrderId,actionType:'order',actionTarget:safeOrderId,webPush:true,
+        }),
+        request.riderDocId ? createRiderInboxNotification(request.riderDocId,{
+          eventKey:`post_pickup_cancel_requested:${safeOrderId}`,revision:'1',
+          type:'order_update',category:'任務',title:'客人申請取件後取消',
+          message:`任務 ${safeOrderId} 已提出取消申請，請先依平台協調程序保管物品及辦理交接。任務尚未自動取消，請勿自行停止履約。取消費待核銷後，小U預定分潤 NT$${request.riderShare}。`,
+          actionType:'task_running',actionTarget:safeOrderId,webPush:true,
+        }) : Promise.resolve(),
+        logDispatchEvent({type:'CUSTOMER_POST_PICKUP_CANCEL_REQUESTED',orderId:safeOrderId,riderDocId:request.riderDocId,createdAtMs:Date.now()}),
+      ]).catch(()=>{});
+      return res.json({
+        success:true,orderId:safeOrderId,status:'picked_up',
+        postPickupCancellationRequested:true,postPickupCancellationStatus:'pending_handover',
+        cancellationFee:request.fee,cancellationRiderShare:request.riderShare,
+        cancellationPlatformShare:request.platformShare,
+        cancellationPaymentStatus:'pending',cancellationPaymentDueAtMs:request.dueAtMs,
+        cancellationJkopayAccount:UBEE_POST_PICKUP_CANCEL_JKOPAY,
+        message:`已收到取件後取消申請。費用 NT$${request.fee}，請於 10 分鐘內透過街口支付 ${UBEE_POST_PICKUP_CANCEL_JKOPAY}。物品交接須待平台協調，訂單尚未正式取消。`,
+      });
+    }
+
     // 取消成功後退回下單時保留的 U幣；事件鍵以訂單編號去重。
     if (cancelledOrder?.uCoinReservationStatus === 'reserved') {
       await releaseUCoinReservation(cancelledOrder, 'customer_cancelled').catch(error =>
@@ -45049,7 +45258,10 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
     const map={
       ORDER_NOT_FOUND:[404,'訂單不存在。'],
       NOT_ORDER_OWNER:[403,'此訂單只能由原本下單的客人取消。'],
-      CUSTOMER_CANCEL_CUSTODY_LOCK:[409,'小U已完成取件或任務已進入後續配送階段，目前無法自行取消。請聯繫 UBee 客服。'],
+      CUSTOMER_CANCEL_CUSTODY_LOCK:[409,'任務已進入後續配送階段，目前無法自行取消。請聯繫 UBee 客服。'],
+      POST_PICKUP_ALREADY_REQUESTED:[409,'已提出取件後取消申請，請查看訂單付款與交接資訊。'],
+      POST_PICKUP_POLICY_NOT_READY:[409,'取件後取消規則尚未正式開放或無法確認計價距離，請聯繫客服。'],
+      CANCELLATION_QUOTE_CHANGED:[409,'取消費或任務狀態已變更，請重新確認費用後再提出申請。'],
     };
 
     const result=map[code]||[500,'取消失敗，請稍後再試。'];
@@ -45066,6 +45278,112 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
     });
   }
 });
+
+// Payment self-report does NOT mark a payment as received. Finance operator must verify.
+app.post('/api/customer/orders/:orderId/cancellation-payment-report', requireCustomerAuth, async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try {
+    const orderId=smartStackSafeOrderId(req.params.orderId);
+    if (!orderId) return res.status(400).json({success:false,message:'訂單編號不正確。'});
+    const ref=db.collection('orders').doc(orderId);
+    let customerId='';
+    let alreadyReported=false;
+    await db.runTransaction(async transaction=>{
+      const doc=await transaction.get(ref);
+      if (!doc.exists) throw new Error('ORDER_NOT_FOUND');
+      const order={id:doc.id,...doc.data()};
+      if (!isSameCustomerUserId(order,req.customerAuth.customerId)) throw new Error('NOT_ORDER_OWNER');
+      if (order.postPickupCancellationRequested!==true) throw new Error('NO_CANCEL_PAYMENT');
+      if (isCancellationFeeFinanceVerifiedV1(order)) throw new Error('ALREADY_VERIFIED');
+      customerId=req.customerAuth.customerId;
+      alreadyReported=Number(order.cancellationPaymentReportedAtMs||0)>0;
+      if (!alreadyReported) transaction.set(ref,{
+        cancellationPaymentReportedAtMs:Date.now(),
+        cancellationPaymentReportedAt:admin.firestore.FieldValue.serverTimestamp(),
+        cancellationPaymentStatus:'reported',
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      },{merge:true});
+    });
+    if (!alreadyReported) {
+      Promise.allSettled([
+        createCustomerInboxNotification(customerId,{
+          eventKey:`post_pickup_payment_reported:${orderId}`,revision:'1',type:'order_update',
+          category:'取消與付款',title:'已收到付款回報',
+          message:`訂單 ${orderId} 已收到你的付款回報，但尚未核對街口支付交易。請保存付款明細，確認完成後才會標記已付款。`,
+          orderId,actionType:'order',actionTarget:orderId,webPush:true,
+        }),
+        logDispatchEvent({type:'CUSTOMER_CANCELLATION_PAYMENT_REPORTED',orderId,createdAtMs:Date.now()}),
+      ]).catch(()=>{});
+    }
+    return res.json({success:true,reported:true,verified:false,message:'已收到付款回報，仍須由平台核對街口支付交易，尚不代表付款成功。'});
+  }catch(error){
+    const code=String(error?.message||'');
+    const statuses={ORDER_NOT_FOUND:404,NOT_ORDER_OWNER:403,NO_CANCEL_PAYMENT:409,ALREADY_VERIFIED:409};
+    return res.status(statuses[code]||500).json({success:false,code,message:code==='ALREADY_VERIFIED'?'此筆取消費已核對完成。':code==='NOT_ORDER_OWNER'?'無權操作此訂單。':code==='NO_CANCEL_PAYMENT'?'這張訂單沒有待回報取消費。':code==='ORDER_NOT_FOUND'?'訂單不存在。':'回報失敗，請稍後再試。'});
+  }
+});
+
+// Persistent due queue: resumes after server restart; no duplicate reminders.
+async function runPostPickupCancellationDueWorkerV1(){
+  try {
+    const nowMs=Date.now();
+    const snap=await db.collection(UBEE_POST_PICKUP_CANCEL_DUE_COLLECTION)
+      .where('dueAtMs','<=',nowMs).orderBy('dueAtMs').limit(40).get();
+    for(const item of snap.docs){
+      try{
+        let notify=null;
+        await db.runTransaction(async transaction=>{
+          const orderRef=db.collection('orders').doc(item.id);
+          const [cueDoc,orderDoc]=await Promise.all([transaction.get(item.ref),transaction.get(orderRef)]);
+          if(!cueDoc.exists)return;
+          if(!orderDoc.exists || orderDoc.data()?.postPickupCancellationRequested!==true){
+            transaction.delete(item.ref);return;
+          }
+          const order=orderDoc.data()||{};
+          const verified=isCancellationFeeFinanceVerifiedV1(order);
+          if(verified){
+            transaction.set(orderRef,{
+              cancellationPaymentStatus:'paid_confirmed',cancellationUnpaidFlag:false,
+              cancellationPaymentConfirmedAtMs:nowMs,
+              cancellationSettlementStatus:'pending_rider_payout',
+              updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            },{merge:true});
+            transaction.delete(item.ref);
+            return;
+          }
+          const reported=Number(order.cancellationPaymentReportedAtMs||0)>0;
+          const nextStatus=reported?'overdue_unverified':'overdue';
+          if(String(order.cancellationPaymentStatus||'')!==nextStatus || order.cancellationUnpaidFlag!==true){
+            transaction.set(orderRef,{
+              cancellationPaymentStatus:nextStatus,cancellationUnpaidFlag:true,
+              cancellationReminderAtMs:nowMs,
+              updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            },{merge:true});
+          }
+          notify={customerId:String(order.userId||order.customerId||''),orderId:item.id,fee:Number(order.cancellationFee||0),reported};
+        });
+        if(notify){
+          // Keep due job until the inbox has been stored; retry safely on worker restart.
+          const result=await createCustomerInboxNotification(notify.customerId,{
+            eventKey:`post_pickup_cancel_payment_10m:${item.id}`,revision:'1',type:'order_update',
+            category:'取消與付款',title:'取消費收款尚未確認',
+            message:`訂單 ${item.id} 已超過 10 分鐘，取消費 NT$${notify.fee} 尚未由平台確認收款。${notify.reported?'如已付款，請保留交易紀錄等待核對。':'請使用街口支付 '+UBEE_POST_PICKUP_CANCEL_JKOPAY+' 並註明訂單編號。'} 系統已標記待處理，不會因此自動認定付款成功。`,
+            orderId:item.id,actionType:'order',actionTarget:item.id,webPush:true,
+          });
+          if(result?.created===true || result?.notificationId) await item.ref.delete();
+        }
+      }catch(error){console.warn('post-pickup cancellation due job:',item.id,error?.message||error)}
+    }
+  }catch(error){console.error('post-pickup due worker error:',error?.message||error)}
+}
+let postPickupCancellationDueWorkerBusyV1=false;
+const postPickupCancellationDueTimerV1=setInterval(()=>{
+  if(postPickupCancellationDueWorkerBusyV1)return;
+  postPickupCancellationDueWorkerBusyV1=true;
+  Promise.resolve(runPostPickupCancellationDueWorkerV1())
+    .finally(()=>{postPickupCancellationDueWorkerBusyV1=false});
+},60*1000);
+postPickupCancellationDueTimerV1.unref?.();
 
 async function handlePostback(event) {
   const data = event.postback.data || '';
@@ -50723,6 +51041,7 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
     total:getCustomerTrackingMoney(order),
     paymentMethod:String(order.paymentMethod || ''),
     paymentStatus:String(order.paymentStatus || ''),
+    ...getPostPickupCancelPublicFieldsV1(order),
     riderRatingSubmitted:order.riderRatingSubmitted === true,
     riderRating:Number(order.riderRating?.rating || order.riderRatingValue || 0) || 0,
     riderRatingTags:Array.isArray(order.riderRating?.tags) ? order.riderRating.tags.slice(0, 6) : [],
@@ -50770,6 +51089,7 @@ function sanitizeCustomerOrderForApi(order = {}) {
   return {
     id: String(order.id || ''),
     status: String(order.status || ''),
+    ...getPostPickupCancelPublicFieldsV1(order),
     riderStatus: String(order.riderStatus || order.status || ''),
     customerTrackingStatus: String(order.customerTrackingStatus || order.status || ''),
     statusUpdatedAtMs: Number(
