@@ -1,3 +1,5 @@
+// UBee Order Lifecycle RC1 Stage 2 — TEST ONLY; operational handover, no new finance authority.
+// UBee Order Lifecycle Reliability RC1 — Stage 1 TEST CANDIDATE; no deployment.
 // UBee Rider Benefits V2.0 RC1 — Production Stability candidate; B01 unchanged.
 // UBee Customer V1.7.0 RC6.2 — Multistop V2 + Rider Minimum NT$58 — TEST CANDIDATE (NOT DEPLOYED)
 // UBee Customer V1.7.0 RC6 — LEGACY CUSTOMER RETIREMENT CANDIDATE, NOT DEPLOYED.
@@ -10609,6 +10611,7 @@ function getOrderMoneyValue(order, fields) {
 }
 
 function getOrderAdvancePaymentAmount(order) {
+  if(order?.cancellationFinancialContractVersion==='lifecycle-cancel-v1')return Math.max(0,Number(order.cancellationActualAdvanceAmount||0));
   return getOrderMoneyValue(order, [
     'advancePayment',
     'advanceAmount',
@@ -11415,6 +11418,7 @@ function smartStackOrderPoint(order = {}, type = 'pickup') {
 }
 
 function isSmartStackStandardDelivery(order = {}) {
+  if(order.postPickupCancellationRequested===true)return false;
   const status = String(order.status || '').trim().toLowerCase();
   const serviceKey = String(order.serviceKey || '').trim().toLowerCase();
   const serviceMode = String(order.serviceMode || '').trim().toLowerCase();
@@ -13967,10 +13971,22 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
       return order;
     }
 
+    async function restoreCurrentPointer(candidate, patch) {
+      return db.runTransaction(async tx=>{
+        const [od,rd]=await Promise.all([tx.get(db.collection('orders').doc(candidate.id)),tx.get(riderDoc.ref)]);
+        if(!od.exists||!rd.exists)return false;
+        const o=od.data()||{},r=rd.data()||{};
+        if(!activeStatuses.includes(String(o.status||'').trim())||!isOrderBelongsToRider(o,identity)||String(o.stackRole||'').toUpperCase()==='QUEUED')return false;
+        const pointer=String(r.currentOrderId||'');
+        if(pointer!==String(rider.currentOrderId||'')&&pointer!==candidate.id)return false;
+        tx.set(riderDoc.ref,patch,{merge:true});return true;
+      });
+    }
+    const recoveryConflict=()=>res.status(409).json({success:false,code:'RIDER_CURRENT_ORDER_CHANGED',message:'目前任務剛發生變更，請重新同步。'});
     // 第一優先：騎士資料上的 currentOrderId
     const directOrder = await returnOrderIfActive(rider.currentOrderId);
     if (directOrder) {
-      await riderDoc.ref.set({
+      if(!await restoreCurrentPointer(directOrder,{
         busy: true,
         currentOrderId: directOrder.id,
         activeTrackingOrderId: directOrder.id,
@@ -13978,7 +13994,7 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
         lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
         lastSeenAtMs: Date.now(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      }))return recoveryConflict();
 
       const stackPayload = await buildSmartStackCurrentPayload(rider, directOrder, identity);
       return res.json({
@@ -14038,7 +14054,7 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
         throw new Error('STACK_RECOVERY_QUEUED_BLOCKED');
       }
 
-      await riderDoc.ref.set({
+      if(!await restoreCurrentPointer(found,{
         busy:true,
         currentOrderId:found.id,
         activeTrackingOrderId:found.id,
@@ -14046,7 +14062,7 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
         lastSeenAt:admin.firestore.FieldValue.serverTimestamp(),
         lastSeenAtMs:Date.now(),
         updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      },{merge:true});
+      }))return recoveryConflict();
 
       const repairedRider = {
         ...rider,
@@ -19729,6 +19745,9 @@ function dispatchConsoleV641Order(doc){
     platformFee:dispatchConsoleV641Amount(o.platformFee,o.platformIncome),
     advancePayment:dispatchConsoleV641Amount(o.advancePayment,o.advancePaymentAmount),
     finance:(()=>{try{return typeof buildFinanceClosureSnapshot==='function'?buildFinanceClosureSnapshot(o):null;}catch(_){return null;}})(),
+    cancellationCase:lifecycleCaseSummary(o),
+    cancellationHandoverInstruction:String(o.cancellationHandoverInstruction||''),
+    cancellationHandoverEnabled:process.env.UBEE_LIFECYCLE_HANDOVER_ENABLED==='true'||lifecycleHandoverBlocked(o),
     // UI display only. Server transaction routes remain authoritative for all writes.
     actions:{
       assign:status==='pending_dispatch',
@@ -19738,6 +19757,71 @@ function dispatchConsoleV641Order(doc){
     }
   };
 }
+
+// Lifecycle Stage 2: operational custody only. Existing dispatch middleware/CSRF
+// applies; no finance verification or payout authority is granted here.
+function lifecycleHandoverBlocked(o={}) {
+  return o.postPickupCancellationRequested===true && o.cancellationHandoverManaged===true &&
+    o.postPickupCancellationStatus!=='handover_confirmed';
+}
+function lifecycleHandoverEligibility(o={},r={},id='') {
+  if(o.postPickupCancellationRequested!==true || !['picked_up'].includes(String(o.status||''))) return 'ORDER_STATE_CHANGED';
+  if(!['send','pickup'].includes(String(o.serviceKey||'').toLowerCase()) || isMerchantOrderRecord(o) || o.singlePointTask===true || (Array.isArray(o.deliveryStops)&&o.deliveryStops.length>1) || Number(o.completedDeliveryStopCount||0)>0 || Number(o.currentDeliveryStopIndex||0)>0) return 'MANUAL_COMPLEX_CASE';
+  if(!o.riderDocId || String(r.currentOrderId||'').toUpperCase()!==id || r.busy!==true) return 'RIDER_STATE_CHANGED';
+  if(r.smartStackActive===true || (r.queuedOrderIds||[]).length || (r.activeOrderIds||[]).some(x=>String(x).toUpperCase()!==id) || ['QUEUED','COMPLETED'].includes(String(o.stackRole||'').toUpperCase()) || o.stackNextOrderId || Number(o.stackTransferSubsidy||0)>0) return 'MANUAL_COMPLEX_CASE';
+  if(getOrderPaymentMethod(o)!=='cash' || getOrderAdvancePaymentAmount(o)>0 || firstFinanceMoney(o,['actualAdvancePayment','actualPurchaseAmount','actualPaidAmount','paidAmount','receivedAmount','customerPaidAmount','cashCollectedAmount','cashGrossCollected','cashRemittedAmount','settledAmount'],0)>0 || ['actualAdvancePayment','actualPurchaseAmount','actualPaidAmount','paidAmount','receivedAmount','customerPaidAmount','cashCollectedAmount','cashGrossCollected','cashRemittedAmount','settledAmount','codAmount','cashCollectAmount','collectAmount','merchantCollectAmount'].some(k=>Number(o[k]||0)>0) || o.isPaid===true || o.cashCollected===true || ['paid','collected','partial','cash_collected'].includes(String(o.financePaymentStatus||o.customerPaymentStatus||'').toLowerCase()) || ['pending','settled','paid'].includes(String(o.settlementStatus||'').toLowerCase()) || ['pending','remitted','settled'].includes(String(o.cashRemittanceStatus||'').toLowerCase())) return 'MANUAL_FINANCIAL_CASE';
+  const fee=Number(o.cancellationFee), rider=Number(o.cancellationRiderShare), platform=Number(o.cancellationPlatformShare);
+  if(![fee,rider,platform].every(Number.isSafeInteger)||fee<=0||rider<0||platform<0||rider+platform!==fee) return 'INVALID_CANCELLATION_FEE';
+  return '';
+}
+function lifecycleCaseSummary(o={}) {
+  if(o.postPickupCancellationRequested!==true)return null;
+  const fields=getPostPickupCancelPublicFieldsV1(o);
+  return {handoverStatus:fields.postPickupCancellationStatus,paymentStatus:fields.cancellationPaymentStatus,fee:fields.cancellationFee,riderShare:fields.cancellationRiderShare,platformShare:fields.cancellationPlatformShare,dueAtMs:fields.cancellationPaymentDueAtMs,payoutStatus:String(o.cancellationPayoutStatus||'pending_payment_and_handover'),managed:o.cancellationHandoverManaged===true,confirmedAtMs:Number(o.cancellationHandoverConfirmedAtMs||0),financialReview:o.cancellationFinancialReviewRequired===true};
+}
+app.post('/api/dispatch/console/order/:orderId/cancellation-handover',async(req,res)=>{
+  // Only the existing trusted dispatch device role; not a finance endpoint.
+  if(req.dispatchAdminAuthV642?.mode!=='trusted_device')return res.status(403).json({success:false,message:'需使用現有已授權的調度中心裝置。'});
+  const id=String(req.params.orderId||'').trim().toUpperCase();
+  const action=String(req.body?.action||'');const note=String(req.body?.note||'').trim();
+  if(action==='assign'&&process.env.UBEE_LIFECYCLE_HANDOVER_ENABLED!=='true')return res.status(409).json({success:false,message:'交接操作尚未啟用，請先完成測試環境驗收。'});
+  if(!/^[A-Z0-9_-]{1,120}$/.test(id)||!['assign','confirm'].includes(action)||note.length<5||note.length>1000||req.body?.acknowledged!==true)return res.status(400).json({success:false,message:'請填寫交接指示／實際交接證明紀錄並確認。'});
+  const ref=db.collection('orders').doc(id);let result=null;let notification=null;
+  try {
+    await db.runTransaction(async tx=>{
+      result=null;notification=null;
+      const doc=await tx.get(ref);if(!doc.exists)throw Error('ORDER_NOT_FOUND');const o=doc.data()||{};
+      if(o.postPickupCancellationRequested===true&&o.postPickupCancellationStatus==='handover_confirmed'&&o.status==='cancelled'){result={...o,id};return;}
+      if(action==='assign'&&lifecycleHandoverBlocked(o)){result={...o,id};return;}
+      if(!o.riderDocId)throw Error('RIDER_STATE_CHANGED');
+      const rr=db.collection(RIDER_V2_COLLECTIONS.riders).doc(String(o.riderDocId));const rd=await tx.get(rr);if(!rd.exists)throw Error('RIDER_STATE_CHANGED');const rider=rd.data()||{};
+      const reason=lifecycleHandoverEligibility(o,rider,id);if(reason)throw Error(reason);
+      const now=Date.now();const ts=admin.firestore.FieldValue.serverTimestamp();const actor=String(req.dispatchAdminAuthV642.deviceId||'');if(!actor)throw Error('RIDER_STATE_CHANGED');
+      let patch;
+      if(action==='assign'){
+        if(String(o.postPickupCancellationStatus||'pending_handover')!=='pending_handover')throw Error('ORDER_STATE_CHANGED');
+        patch={postPickupCancellationStatus:'handover_assigned',cancellationHandoverManaged:true,cancellationHandoverInstruction:note,cancellationHandoverAssignedAtMs:now,updatedAt:ts,updatedAtMs:now};
+      }else{
+        if(!lifecycleHandoverBlocked(o)||o.postPickupCancellationStatus!=='handover_assigned')throw Error('ORDER_STATE_CHANGED');
+        const verified=isCancellationFeeFinanceVerifiedV1(o);
+        // Custody closure is independent of payment. Keep original amounts as an audit snapshot.
+        const original={customerPayableTotal:getOrderCustomerPayableTotal(o),riderIncome:Number(o.riderIncome??o.riderFee??0),platformIncome:Number(o.platformIncome??o.platformFee??0),advancePayment:getOrderAdvancePaymentAmount(o)};
+        const fee=Number(o.cancellationFee), ri=Number(o.cancellationRiderShare), pf=Number(o.cancellationPlatformShare);
+        patch={status:'cancelled',riderStatus:'cancelled',cancelType:'customer_post_pickup_cancel',cancelledAt:now,cancelledAtMs:now,cancelledAtServer:ts,customerTrackingStatus:'cancelled',customerTrackingStatusLabel:getStatusLabel('cancelled'),customerTrackingUpdatedAtMs:now,statusUpdatedAtMs:now,riderTrackingStatus:'stopped',trackingEndedAtMs:now,trackingEndedAt:ts,trackingStopReason:'customer_post_pickup_cancel',trackingUpdatedAtMs:now,updatedAt:ts,updatedAtMs:now,scheduleStatus:'cancelled',postPickupCancellationStatus:'handover_confirmed',cancellationHandoverConfirmedAtMs:now,cancellationOriginalQuote:o.cancellationOriginalQuote||original,initialEstimatedTotal:getFinanceInitialEstimate(o)||original.customerPayableTotal,finalCustomerTotal:fee,customerPayableTotal:fee,payableTotal:fee,finalTotal:fee,total:fee,serviceTotal:fee,serviceSubtotal:fee,taskSubtotal:fee,riderIncome:ri,estimatedRiderIncome:ri,riderFee:ri,driverFee:ri,platformFee:pf,platformIncome:pf,platformServiceFee:pf,riderIncomeBeforeGuarantee:ri,riderGuaranteeSubsidy:0,riderMinimumApplied:false,cancellationFinancialReviewRequired:true,cancellationFinancialContractVersion:'lifecycle-post-pickup-v1',financePaymentStatus:verified?'paid':'unpaid',paymentStatus:verified?'paid':'unpaid',actualPaidAmount:verified?Number(o.cancellationPaidAmount):0,paidAmount:verified?Number(o.cancellationPaidAmount):0,isPaid:verified,cashCollected:false,cashCollectAmount:0,financeReconciliationStatus:'needs_review',cancellationSettlementStatus:verified?'pending_rider_payout':'pending_collection',cancellationPayoutStatus:verified?'pending_payout':'pending_payment_and_handover',settlementStatus:'not_applicable',cashRemittanceStatus:'not_applicable',cashDueToPlatform:0,platformReceivable:0,riderDueToPlatform:0};
+        tx.set(rr,{busy:false,currentOrderId:'',queuedOrderIds:[],activeOrderIds:[],smartStackActive:false,activeTrackingOrderId:'',activeTrackingSessionId:'',taskTrackingStatus:'stopped',taskTrackingStopReason:'customer_post_pickup_cancel',taskTrackingUpdatedAtMs:now,taskTrackingUpdatedAt:ts,lastActive:now,updatedAt:ts},{merge:true});
+      }
+      tx.set(ref,patch,{merge:true});
+      const auditRef=db.collection('lifecycle_cancellation_handover_audit').doc(id+'_'+action);
+      tx.set(auditRef,{orderId:id,action,deviceId:actor,note,createdAtMs:now,createdAt:ts});
+      result={...o,...patch,id};notification={riderId:String(o.riderDocId),customerId:String(o.userId||o.customerId||''),action};
+    });
+    if(result)orders[id]=result;
+    if(notification){const confirmed=notification.action==='confirm';const title=confirmed?'物品交接已確認':'平台已安排物品交接';const message=confirmed?`訂單 ${id} 的物品交接已由平台核實，取消費及補償仍須獨立核對。`:`訂單 ${id}：平台已安排交接，請依調度指示辦理。`;
+      await Promise.allSettled([createRiderInboxNotification(notification.riderId,{eventKey:`lifecycle_handover_${action}:${id}`,revision:'1',type:'order_update',category:'任務',title,message:confirmed?message:message+' '+String(result.cancellationHandoverInstruction||''),orderId:id,actionType:'order',actionTarget:id,webPush:true}),notification.customerId?createCustomerInboxNotification(notification.customerId,{eventKey:`lifecycle_handover_${action}:${id}`,revision:'1',type:'order_update',category:'取消與付款',title,message,orderId:id,actionType:'order',actionTarget:id,webPush:true}):Promise.resolve()]);}
+    return res.json({success:true,case:lifecycleCaseSummary(result),message:action==='confirm'?'物品交接已確認，財務仍待核對。':'交接安排已保存。'});
+  }catch(e){const code=String(e?.message||'');const known={ORDER_NOT_FOUND:'找不到訂單',ORDER_STATE_CHANGED:'案件狀態已變更，請重新查詢',RIDER_STATE_CHANGED:'小U任務歸屬已改變，請人工確認',MANUAL_COMPLEX_CASE:'涉及多點、疊單、店家或非標準配送，暫不支援自動釋放',MANUAL_FINANCIAL_CASE:'涉及非現金、代墊或既有收款／結算，須人工處理',INVALID_CANCELLATION_FEE:'取消費資料不一致'};return res.status(code==='ORDER_NOT_FOUND'?404:known[code]?409:500).json({success:false,code:known[code]?code:'HANDOVER_UNKNOWN',message:known[code]||'交接結果待確認，請重新查詢訂單，勿重複交接。'});}
+});
+
 app.get('/api/dispatch/console/orders',async(req,res)=>{
   try{
     // Firestore status IN 單欄查詢，避免既有 dashboard 按近期單裁切。
@@ -19754,6 +19838,9 @@ app.get('/api/dispatch/console/orders',async(req,res)=>{
     res.status(500).json({success:false,message:'調度即時訂單查詢失敗，請保留舊版並查看 Render 日誌。'});}
 });
 // 所有記錄依 Firestore 文件識別碼排序分頁：不依賴 createdAt，兼容早期缺少日期的訂單。
+app.get('/api/dispatch/console/cancellation-cases',async(req,res)=>{
+  try{const size=100;let q=db.collection('orders').where('postPickupCancellationRequested','==',true).orderBy(admin.firestore.FieldPath.documentId()).limit(size+1);const cursor=String(req.query.cursor||'');if(cursor){if(!/^[A-Za-z0-9_-]{1,120}$/.test(cursor))return res.status(400).json({success:false,message:'游標格式錯誤'});q=q.startAfter(cursor);}const snap=await q.get();const docs=snap.docs.slice(0,size);res.json({success:true,orders:docs.map(dispatchConsoleV641Order),nextCursor:snap.size>size?docs[docs.length-1].id:null});}catch(e){res.status(500).json({success:false,message:'取消案件讀取失敗'});}
+});
 app.get('/api/dispatch/console/history',async(req,res)=>{
   try{
     const size=Math.min(50,Math.max(10,Number.parseInt(req.query.limit,10)||40));
@@ -30755,7 +30842,29 @@ async function consumeDynamicPricingQuote(quoteRef, orderId) {
 
 // Production Order Atomicity V1：正式客戶建單與 Quote 消耗必須在同一 Firestore transaction。
 // 避免雙擊／網路重送時兩個請求同時看到 active quote 而建立兩張訂單。
-async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
+// Lifecycle RC1: opaque operation keys are scoped to the authenticated customer.
+function lifecycleOperationRef(customerId,key){
+  return db.collection('customerOrderOperations').doc(crypto.createHash('sha256').update(JSON.stringify([customerId,key])).digest('hex'));
+}
+function lifecycleRequestHash(body){
+  const excluded=new Set(['idempotencyKey','quoteId','quotedAtMs','quoteExpiresAtMs','clientSubmittedAtMs','dynamicPricingFee','fareMode']);
+  const sort=value=>Array.isArray(value)?value.map(sort):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,sort(value[k])])):value;
+  return crypto.createHash('sha256').update(JSON.stringify(sort(Object.fromEntries(Object.entries(body).filter(([k])=>!excluded.has(k)))))).digest('hex');
+}
+function lifecycleConflict(code,message){const err=new Error(message);err.code=code;err.statusCode=409;return err;}
+async function lifecycleReadOperation(ref,customerId,hash){
+  const snap=await ref.get();if(!snap.exists)return null;
+  const op=snap.data()||{};
+  if(op.customerId!==customerId||(hash&&op.requestFingerprint!==hash))throw lifecycleConflict('ORDER_OPERATION_CONFLICT','此送單識別碼已用於其他內容，請先查看原訂單。');
+  const doc=await db.collection('orders').doc(op.orderId).get();
+  if(!doc.exists||!isSameCustomerUserId(doc.data(),customerId))throw lifecycleConflict('ORDER_OPERATION_INCONSISTENT','訂單紀錄待平台確認，請勿重複下單。');
+  return {...doc.data(),id:doc.id};
+}
+function lifecycleRecoveredOrder(order){
+  const total=getOrderCustomerPayableTotal(order);
+  return {success:true,duplicateRecovered:true,orderId:order.id,order:sanitizeCustomerOrderForApi(order),total,customerPayableTotal:total,serviceSubtotal:Number(order.serviceSubtotal||0),advancePayment:Number(order.advancePayment||0),paymentMethod:order.paymentMethod||'',paymentOptions:{cash:getPaymentInfo('cash',total)},message:'已找回原訂單。'};
+}
+async function saveCustomerOrderWithQuoteLock(order, quoteRef, operation=null) {
   if (!order?.id || !quoteRef) {
     const error = new Error('正式報價或訂單資料不存在，請重新估價。');
     error.code = 'QUOTE_REQUIRED';
@@ -30767,7 +30876,17 @@ async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
   const orderRef = db.collection('orders').doc(orderId);
   const nowMs = Date.now();
 
-  await db.runTransaction(async transaction => {
+  const committed = await db.runTransaction(async transaction => {
+    if(operation){
+      const prior=await transaction.get(operation.ref);
+      if(prior.exists){
+        const op=prior.data()||{};
+        if(op.customerId!==operation.customerId||op.requestFingerprint!==operation.hash)throw lifecycleConflict('ORDER_OPERATION_CONFLICT','此送單識別碼已用於其他內容。');
+        const original=await transaction.get(db.collection('orders').doc(op.orderId));
+        if(!original.exists||!isSameCustomerUserId(original.data(),operation.customerId))throw lifecycleConflict('ORDER_OPERATION_INCONSISTENT','訂單紀錄待平台確認。');
+        return {order:{...original.data(),id:original.id},recovered:true};
+      }
+    }
     const quoteSnap = await transaction.get(quoteRef);
     if (!quoteSnap.exists) {
       const error = new Error('找不到正式報價，請重新估價。');
@@ -30848,12 +30967,14 @@ async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
       usedAt: admin.firestore.FieldValue.serverTimestamp(),
       orderId,
     }, { merge: true });
-    Object.assign(order, savedOrder);
+    if(operation)transaction.create(operation.ref,{customerId:operation.customerId,requestFingerprint:operation.hash,orderId,quoteId:quoteRef.id,createdAtMs:nowMs,operationStatus:'committed'});
+    return {order:savedOrder,recovered:false};
   });
-
+  if(committed.recovered)return committed;
+  Object.assign(order,committed.order);
   order.id = orderId;
   orders[orderId] = order;
-  return order;
+  return committed;
 }
 
 function summarizeDynamicPricingForDashboard(zones = [], globalSettings = {}) {
@@ -39901,6 +40022,15 @@ function applyVerifiedStoreDiscoveryToOrder(orderData, storeDiscovery) {
 
 // Clean RC3: removed customer store discovery endpoints (search/detail); customer ordering and pricing retained.
 
+app.get('/api/customer/order-operations/:key',requireCustomerAuth,async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  try{
+    const key=String(req.params.key||'');
+    if(!/^[a-zA-Z0-9_-]{20,80}$/.test(key))return res.status(400).json({success:false,message:'操作識別碼不正確。'});
+    const order=await lifecycleReadOperation(lifecycleOperationRef(req.customerAuth.customerId,key),req.customerAuth.customerId);
+    return res.json(order?lifecycleRecoveredOrder(order):{success:true,orderId:null});
+  }catch(e){return res.status(e.statusCode||503).json({success:false,code:e.code||'ORDER_OPERATION_UNAVAILABLE',message:'暫時無法確認訂單操作，請勿重新建立。'});}
+});
 app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req, res) => {
     try {
     if(!req.body || typeof req.body !== 'object'){
@@ -39919,6 +40049,10 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       return res.status(410).json({success:false,code:'CUSTOMER_UCOIN_RETIRED',error:'U幣折抵已停止，請重新取得未折抵的正式報價。'});
     }
     req.body.uCoinRedeemWhole = 0;
+    const operationKey=String(req.body.idempotencyKey||'');
+    if(operationKey&&!/^[a-zA-Z0-9_-]{20,80}$/.test(operationKey))return res.status(400).json({success:false,code:'ORDER_OPERATION_KEY_INVALID',error:'操作識別碼不正確。'});
+    const operation=operationKey?{ref:lifecycleOperationRef(req.customerAuth.customerId,operationKey),customerId:req.customerAuth.customerId,hash:lifecycleRequestHash(req.body)}:null;
+    if(operation){const previous=await lifecycleReadOperation(operation.ref,operation.customerId,operation.hash);if(previous)return res.json(lifecycleRecoveredOrder(previous));}
     const trustedSelfOrderIdentityKeys = buildCustomerSelfOrderIdentityKeys(
       {...req.customerAuth.account, phone:req.customerAuth.account.authMode==='guest_order' ? req.customerAuth.account.guestContactPhone : req.customerAuth.account.phone},
       req.customerAuth.customerId
@@ -39951,7 +40085,7 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
 
     // Production Idempotency V1：先找回短時間內已成功建立的相同訂單。
     // 這一步必須早於 Quote 驗證，才能處理「訂單已建立、但手機沒收到成功回應」後的重送。
-    const duplicateOrder = await findRecentDuplicateOrder(data);
+    const duplicateOrder = operation ? null : await findRecentDuplicateOrder(data);
     if (duplicateOrder?.id) {
       const duplicateTotal = Math.max(0, Math.round(Number(
         duplicateOrder.customerPayableTotal ||
@@ -40779,7 +40913,8 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     }
 
     // 訂單與 Quote 在同一 transaction 內提交：成功就兩者一起成功，失敗就兩者都不寫入。
-    await saveCustomerOrderWithQuoteLock(order, quoteValidation.ref);
+    const committed=await saveCustomerOrderWithQuoteLock(order, quoteValidation.ref,operation);
+    if(committed.recovered)return res.json(lifecycleRecoveredOrder(committed.order));
 
     // 已註冊正式小U使用客戶端下單時，自動通知「可下單、不可自接」。
     // 通知失敗不回滾已成功建立的客戶訂單。
@@ -43311,6 +43446,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         throw new Error('NOT_THIS_RIDER');
       }
 
+      if(lifecycleHandoverBlocked(order)) throw new Error('CANCELLATION_HANDOVER_ACTIVE');
       if (currentStatus === status) {
         updatedOrder = {
           ...order,
@@ -44131,6 +44267,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       });
     }
 
+    if(error.message==='CANCELLATION_HANDOVER_ACTIVE')return res.status(409).json({success:false,code:'CANCELLATION_HANDOVER_ACTIVE',message:'取消交接處理中，請依平台指示，勿執行正常送達。'});
     if (error.message === 'INVALID_TRANSITION') {
       return res.status(409).json({
         success: false,
@@ -44669,6 +44806,8 @@ function getPostPickupCancelPublicFieldsV1(order={}) {
   return {
     postPickupCancelEligible:!requested && Boolean(getPostPickupCancellationQuoteV1(order)),
     postPickupCancellationRequested:requested,
+    cancellationHandoverManaged:requested&&order.cancellationHandoverManaged===true,
+    cancellationPayoutStatus:requested?String(order.cancellationPayoutStatus||'pending_payment_and_handover'):'',
     postPickupCancellationStatus:requested ? String(order.postPickupCancellationStatus || 'pending_handover') : '',
     cancellationFee:requested ? Math.max(0, Number(order.cancellationFee || 0)) : 0,
     cancellationRiderShare:requested ? Math.max(0, Number(order.cancellationRiderShare || 0)) : 0,
@@ -44710,9 +44849,7 @@ function getDriveCustomerCancellationCharge(order = {}) {
 
 function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Date.now()){
   const driveCancel = getDriveCustomerCancellationCharge(order);
-  const isDriveOrder = String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive';
-  const driveCancellationFinancials = isDriveOrder
-    ? {
+  const driveCancellationFinancials = {
         cancellationFee:driveCancel.cancellationFee,
         cancellationCompensation:driveCancel.riderCompensation,
         platformCancellationFee:driveCancel.platformCancellationFee,
@@ -44745,10 +44882,31 @@ function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Dat
         cashCollectAmount:0,
         cashRemittanceStatus:'not_applicable',
         cashRemittedAmount:0,
-      }
-    : {};
+      };
+  // Preserve original quote and actual collection/advance evidence. A suspected
+  // pre-pickup advance is a manual reconciliation item, never silently erased.
+  const actualAdvance=firstFinanceMoney(order,['actualAdvancePayment','actualPurchaseAmount'],0);
+  const actualCollected=firstFinanceMoney(order,['actualPaidAmount','paidAmount','receivedAmount','customerPaidAmount','cashCollectedAmount','cashGrossCollected'],0);
+  const estimatedAdvance=getOrderAdvancePaymentAmount(order);
+  const cancellationReview=actualAdvance>0||estimatedAdvance>0||actualCollected>0||order.cashCollected===true||Number(order.stackTransferSubsidy||0)>0||['settled','remitted','paid','completed'].includes(String(order.cashRemittanceStatus||'').toLowerCase());
+  if(cancellationReview){
+    delete driveCancellationFinancials.cashCollected;
+    delete driveCancellationFinancials.cashRemittedAmount;
+    delete driveCancellationFinancials.cashRemittanceStatus;
+    delete driveCancellationFinancials.cashCollectAmount;
+  }
   return {
+    initialEstimatedTotal:getFinanceInitialEstimate(order)||getOrderCustomerPayableTotal(order),
+    cancellationOriginalQuote:{customerPayableTotal:getOrderCustomerPayableTotal(order),riderIncome:Number(order.riderIncome??order.riderFee??0),platformIncome:Number(order.platformIncome??order.platformFee??0),advancePayment:getOrderAdvancePaymentAmount(order)},
     ...driveCancellationFinancials,
+    riderIncomeBeforeGuarantee:driveCancel.riderCompensation,riderGuaranteeSubsidy:0,riderMinimumApplied:false,
+    financePaymentStatus:cancellationReview?'partial':driveCancel.cancellationFee>0?'unpaid':'cancelled',
+    financeReconciliationStatus:cancellationReview?'needs_review':'pending',
+    cancellationFinancialContractVersion:'lifecycle-cancel-v1',
+    cancellationFinancialReviewRequired:cancellationReview,
+    cancellationActualAdvanceAmount:actualAdvance,
+    cancellationActualPaidAmount:actualCollected,
+    ...(cancellationReview?{}:{isPaid:false,cashDueToPlatform:0,platformReceivable:0,riderDueToPlatform:0}),
     status:'cancelled',
     riderStatus:'cancelled',
     cancelType:'customer_cancel',
@@ -44777,6 +44935,11 @@ function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Dat
   };
 }
 
+function lifecycleCancellationResult(order){
+  if(order.postPickupCancellationRequested===true)return {success:true,mode:'recovered',orderId:order.id,status:order.status,...getPostPickupCancelPublicFieldsV1(order),message:'已找回取消申請，請查看付款及交接進度。'};
+  if(String(order.status||'').toLowerCase()==='cancelled'&&order.cancelType==='customer_cancel')return {success:true,mode:'recovered',orderId:order.id,status:'cancelled',cancellationFee:Number(order.cancellationFee||0),cancellationPaymentStatus:order.cancellationPaymentStatus||'',message:'已找回原取消結果。'};
+  return null;
+}
 app.get('/api/customer/orders/:orderId/cancellation-preview', requireCustomerAuth, async (req,res)=>{
   res.setHeader('Cache-Control','no-store');
   try {
@@ -44786,7 +44949,7 @@ app.get('/api/customer/orders/:orderId/cancellation-preview', requireCustomerAut
     if (!doc.exists) return res.status(404).json({success:false,message:'訂單不存在。'});
     const order={id:doc.id,...doc.data()};
     if (!isSameCustomerUserId(order,req.customerAuth.customerId)) return res.status(403).json({success:false,message:'無權取消此訂單。'});
-    if (order.postPickupCancellationRequested===true) return res.status(409).json({success:false,message:'這張訂單已提出取消申請，請查看付款資訊與交接進度。'});
+    const recovered=lifecycleCancellationResult(order);if(recovered)return res.json(recovered);
     const status=String(order.status||'').toLowerCase();
     if (status==='picked_up') {
       const quote=getPostPickupCancellationQuoteV1(order);
@@ -44821,8 +44984,10 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
     let promotedOrderId='';
     let affectedRiderDocId='';
     let postPickupRequestResult=null;
+    let recoveredCancellation=null;
 
     await db.runTransaction(async transaction=>{
+      cancelledOrder=null;promotedOrder=null;promotedOrderId='';affectedRiderDocId='';postPickupRequestResult=null;recoveredCancellation=null;
       const orderDoc=await transaction.get(orderRef);
 
       if(!orderDoc.exists){
@@ -44838,6 +45003,8 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
         throw new Error('NOT_ORDER_OWNER');
       }
 
+      recoveredCancellation=lifecycleCancellationResult(order);
+      if(recoveredCancellation)return;
       // Post-pickup: preserve goods custody and rider workflow. Only create an auditable request.
       if(String(order.status||'').trim().toLowerCase()==='picked_up'){
         if(order.postPickupCancellationRequested===true) throw new Error('POST_PICKUP_ALREADY_REQUESTED');
@@ -45145,6 +45312,7 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
       }
     });
 
+    if(recoveredCancellation)return res.json(recoveredCancellation);
     if(postPickupRequestResult){
       const request=postPickupRequestResult;
       // Notify asynchronously; inbox IDs are deterministic and won't duplicate on retries.
@@ -45288,13 +45456,14 @@ app.post('/api/customer/orders/:orderId/cancellation-payment-report', requireCus
     const ref=db.collection('orders').doc(orderId);
     let customerId='';
     let alreadyReported=false;
+    let alreadyVerified=false;
     await db.runTransaction(async transaction=>{
       const doc=await transaction.get(ref);
       if (!doc.exists) throw new Error('ORDER_NOT_FOUND');
       const order={id:doc.id,...doc.data()};
       if (!isSameCustomerUserId(order,req.customerAuth.customerId)) throw new Error('NOT_ORDER_OWNER');
       if (order.postPickupCancellationRequested!==true) throw new Error('NO_CANCEL_PAYMENT');
-      if (isCancellationFeeFinanceVerifiedV1(order)) throw new Error('ALREADY_VERIFIED');
+      if (isCancellationFeeFinanceVerifiedV1(order)){alreadyReported=true;alreadyVerified=true;return;}
       customerId=req.customerAuth.customerId;
       alreadyReported=Number(order.cancellationPaymentReportedAtMs||0)>0;
       if (!alreadyReported) transaction.set(ref,{
@@ -45315,6 +45484,7 @@ app.post('/api/customer/orders/:orderId/cancellation-payment-report', requireCus
         logDispatchEvent({type:'CUSTOMER_CANCELLATION_PAYMENT_REPORTED',orderId,createdAtMs:Date.now()}),
       ]).catch(()=>{});
     }
+    if(alreadyVerified)return res.json({success:true,reported:true,verified:true,message:'此筆取消費已核對完成。'});
     return res.json({success:true,reported:true,verified:false,message:'已收到付款回報，仍須由平台核對街口支付交易，尚不代表付款成功。'});
   }catch(error){
     const code=String(error?.message||'');
@@ -45345,7 +45515,8 @@ async function runPostPickupCancellationDueWorkerV1(){
             transaction.set(orderRef,{
               cancellationPaymentStatus:'paid_confirmed',cancellationUnpaidFlag:false,
               cancellationPaymentConfirmedAtMs:nowMs,
-              cancellationSettlementStatus:'pending_rider_payout',
+              cancellationSettlementStatus:order.cancellationSettlementStatus==='settled'?'settled':order.postPickupCancellationStatus==='handover_confirmed'?'pending_rider_payout':'pending_handover',
+              cancellationPayoutStatus:order.cancellationPayoutStatus==='settled'?'settled':order.postPickupCancellationStatus==='handover_confirmed'?'pending_payout':'pending_payment_and_handover',
               updatedAt:admin.firestore.FieldValue.serverTimestamp(),
             },{merge:true});
             transaction.delete(item.ref);
@@ -47981,6 +48152,7 @@ function getFinanceFinalCustomerTotal(order = {}) {
 }
 
 function getFinanceActualPaidAmount(order = {}, finalCustomerTotal = 0) {
+  if(order.cancellationFinancialContractVersion==='lifecycle-cancel-v1'&&order.cancellationFinancialReviewRequired!==true)return firstFinanceMoney(order,['actualPaidAmount','paidAmount','receivedAmount','customerPaidAmount','cashCollectedAmount','cancellationActualPaidAmount'],0);
   const fields = [
     'actualPaidAmount',
     'paidAmount',
@@ -48199,6 +48371,7 @@ function buildFinanceClosureSnapshot(order = {}) {
     Math.round(expectedPlatformIncome - collectedPlatformIncome)
   );
   const discrepancyReasons = [];
+  if(order.cancellationFinancialReviewRequired===true)discrepancyReasons.push('取消前代墊、實收或結算紀錄需人工核對');
   if (Math.abs(customerVariance) > 1 && !['unpaid', 'cash_pending'].includes(paymentStatus)) {
     discrepancyReasons.push('客戶實收與最終應收不一致');
   }
@@ -48242,6 +48415,7 @@ function buildFinanceClosureSnapshot(order = {}) {
     orderId: String(order.id || order.orderId || '').trim().toUpperCase(),
     orderNo: String(order.orderNo || order.id || '').trim(),
     orderStatus,
+    cancellationCase:lifecycleCaseSummary(order),
     completedAtMs: getFinanceCompletedAtMs(order),
     createdAtMs: financeToMs(order.createdAt) || financeToMs(order.createdAtMs),
     paymentMethod,
@@ -48471,6 +48645,7 @@ app.post('/api/admin/finance-orders/:orderId/adjust', async (req, res) => {
     const doc = await getFinanceOrderDoc(req.params.orderId);
     if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
     const beforeOrder = { id: doc.id, ...doc.data() };
+    if(beforeOrder.postPickupCancellationRequested===true)return res.status(409).json({success:false,code:'CANCELLATION_FINANCE_SEPARATE',message:'取件後取消費須獨立核銷，禁止一般財務調整／對帳。'});
     const beforeSnapshot = buildFinanceClosureSnapshot(beforeOrder);
     const update = {
       financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -48481,7 +48656,8 @@ app.post('/api/admin/finance-orders/:orderId/adjust', async (req, res) => {
       financeReconciliationStatus: 'needs_review',
     };
     UBEE_FINANCE_ADJUSTABLE_FIELDS[field].forEach(target => { update[target] = value; });
-    await doc.ref.set(update, { merge: true });
+    const applied=await db.runTransaction(async tx=>{const latest=await tx.get(doc.ref);if(!latest.exists||latest.data()?.postPickupCancellationRequested===true)return false;tx.set(doc.ref,update,{merge:true});return true;});
+    if(!applied)return res.status(409).json({success:false,code:'CANCELLATION_FINANCE_SEPARATE',message:'訂單已變更或進入取消流程，請重新查詢。'});
     const updatedDoc = await doc.ref.get();
     const afterOrder = { id: updatedDoc.id, ...updatedDoc.data() };
     const afterSnapshot = buildFinanceClosureSnapshot(afterOrder);
@@ -48515,6 +48691,7 @@ app.post('/api/admin/finance-orders/:orderId/payment-status', async (req, res) =
     const doc = await getFinanceOrderDoc(req.params.orderId);
     if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
     const beforeOrder = { id: doc.id, ...doc.data() };
+    if(beforeOrder.postPickupCancellationRequested===true)return res.status(409).json({success:false,code:'CANCELLATION_FINANCE_SEPARATE',message:'取件後取消費須獨立核銷，禁止一般財務調整／對帳。'});
     const update = {
       financePaymentStatus: status,
       paymentStatus: status === 'cash_collected' ? 'cash_on_delivery' : status,
@@ -48527,7 +48704,8 @@ app.post('/api/admin/finance-orders/:orderId/payment-status', async (req, res) =
       update.actualPaidAmount = paidAmount;
       update.paidAmount = paidAmount;
     }
-    await doc.ref.set(update, { merge: true });
+    const applied=await db.runTransaction(async tx=>{const latest=await tx.get(doc.ref);if(!latest.exists||latest.data()?.postPickupCancellationRequested===true)return false;tx.set(doc.ref,update,{merge:true});return true;});
+    if(!applied)return res.status(409).json({success:false,code:'CANCELLATION_FINANCE_SEPARATE',message:'訂單已變更或進入取消流程，請重新查詢。'});
     const updatedDoc = await doc.ref.get();
     const afterOrder = { id: updatedDoc.id, ...updatedDoc.data() };
     await writeFinanceAuditLog({
@@ -48553,12 +48731,13 @@ app.post('/api/admin/finance-orders/:orderId/reconcile', async (req, res) => {
     const doc = await getFinanceOrderDoc(req.params.orderId);
     if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
     const order = { id: doc.id, ...doc.data() };
+    if(order.postPickupCancellationRequested===true)return res.status(409).json({success:false,code:'CANCELLATION_FINANCE_SEPARATE',message:'取件後取消費須獨立核銷，禁止一般財務調整／對帳。'});
     const snapshot = buildFinanceClosureSnapshot(order);
     if (snapshot.discrepancyReasons.length && !force) {
       return res.status(409).json({ success: false, code: 'FINANCE_DISCREPANCY_EXISTS', message: '這筆訂單仍有財務差異，請先修正或勾選強制結案。', discrepancyReasons: snapshot.discrepancyReasons, order: snapshot });
     }
     const nowMs = Date.now();
-    await doc.ref.set({
+    const applied=await db.runTransaction(async tx=>{const latest=await tx.get(doc.ref);if(!latest.exists||latest.data()?.postPickupCancellationRequested===true)return false;tx.set(doc.ref,{
       financeReconciliationStatus: 'reconciled',
       financeReconciliationNote: note.slice(0, 1000),
       financeReconciledBy: operator,
@@ -48569,7 +48748,8 @@ app.post('/api/admin/finance-orders/:orderId/reconcile', async (req, res) => {
       financeSettlementVariance: snapshot.settlementVariance,
       financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
       financialUpdatedAtMs: nowMs,
-    }, { merge: true });
+    }, { merge: true });return true;});
+    if(!applied)return res.status(409).json({success:false,code:'CANCELLATION_FINANCE_SEPARATE',message:'訂單已變更或進入取消流程，請重新查詢。'});
     await writeFinanceAuditLog({
       orderId: doc.id,
       type: force && snapshot.discrepancyReasons.length ? 'forced_reconciliation' : 'reconciliation',
@@ -51150,7 +51330,7 @@ function sanitizeCustomerOrderForApi(order = {}) {
     total: Number(order.total || 0),
     serviceSubtotal: Number(order.serviceSubtotal || order.serviceTotal || 0),
     customerPayableTotal: Number(
-      order.customerPayableTotal || order.payableTotal || order.total || 0
+      order.customerPayableTotal ?? order.payableTotal ?? order.total ?? 0
     ),
     deliveryFee: Number(order.deliveryFee || 0),
     serviceFee: Number(order.serviceFee || 0),
